@@ -1,0 +1,41 @@
+[tools]
+rust = "1.91.1"
+
+[env]
+_.file = ".env"
+
+[tasks.build]
+description = "Build all operator binaries"
+run = "cargo build --release"
+
+[tasks.build-debug]
+description = "Build all operator binaries in debug mode"
+run = "cargo build"
+
+[tasks.run-all]
+description = "Run operator all network"
+run = "cargo run -- --network all"
+
+[tasks.run-hedera]
+description = "Run operator for Hedera network"
+run = "cargo run -- --network hedera"
+
+[tasks.run-ethereum]
+description = "Run operator for Ethereum network"
+run = "cargo run -- --network ethereum"
+
+[tasks.docker-build]
+description = "Build Docker image for paradapp operator"
+run = "docker build -t renrensan/paradapp-interoperability-service ."
+
+[tasks.docker-compose-up]
+description = "Start services with Docker Compose"
+run = "docker compose up -d"
+
+[tasks.docker-compose-down]
+description = "Stop services and remove containers"
+run = "docker compose down"
+
+[tasks.docker-compose-logs]
+description = "Follow logs for all services"
+run = "docker compose logs -f"

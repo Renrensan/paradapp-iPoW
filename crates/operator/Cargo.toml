@@ -1,0 +1,13 @@
+[package]
+name = "paradapp-operator"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+paradapp-core = { path = "../core" }
+paradapp-chain-evm = { path = "../chains/evm" }
+anyhow = "1"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+clap = { version = "4.5.54", features = ["derive"] }
+ethers-core = "2.0.14"

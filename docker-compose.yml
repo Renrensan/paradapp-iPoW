@@ -1,0 +1,27 @@
+services:
+  hedera-operator:
+    container_name: hedera-operator
+    image: renrensan/paradapp-interoperability-service
+    build: .
+    command: ["--network", "hedera"]
+    env_file: .env
+    environment:
+      SQLITE_DB_DIR: "/app/data"
+    volumes:
+      - hedera_data:/app/data
+    restart: unless-stopped
+
+  ethereum-operator:
+    container_name: ethereum-operator
+    image: renrensan/paradapp-interoperability-service
+    command: ["--network", "ethereum"]
+    env_file: .env
+    environment:
+      SQLITE_DB_DIR: "/app/data"
+    volumes:
+      - ethereum_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  hedera_data:
+  ethereum_data:

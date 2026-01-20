@@ -1,0 +1,2103 @@
+[
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_selfNetworkId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "_operator",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_oracle",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_bitcoinUsdPriceId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_nativeUsdPriceId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_commitFeeNative",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint16",
+				"name": "_serviceFeeBps",
+				"type": "uint16"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"inputs": [],
+		"name": "AlreadyVerified",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "AnchorMustBeTip",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ApproveWindowOver",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "BadBitcoinProgram",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "BadSlippage",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "BadState",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "BadTxId",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DutyExpired",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DutyNotExpired",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "EpochAnchorsMissing",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "EpochFirstMissing",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "EpochMetaMissing",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ExceedsRemovable",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "GlobalAnchorMissing",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "GlobalFirstHeaderMissing",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "HeaderStarted",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "HeightRewrite",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "IncorrectCommitFee",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "IncorrectNetwork",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "IncorrectNetworkAddress",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "IncorrectValue",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "IncorrectWindow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidAnchorHeight",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidConstructor",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidFeeConfig",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidFirstOrAnchor",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidHeader",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidNetworkConfig",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidRetarget",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidTypeFilter",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "LE8OutOfBounds",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "LowLiquidity",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "LowReserve",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "LowWork",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MetaAnchorHeaderMissing",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MetaFirstHeaderMissing",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NeedBitcoinAmount",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NeedDestAddress",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NeedDutyWindow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NetworkAddressNotAllowed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NetworkChangeLocked",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NetworkNotAllowed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NoHeadersYet",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NoJumpWhenActive",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "OracleDecimalsIncorrect",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "OracleZeroPrice",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "PrevAndTipUnmatch",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ProgramOutOfBounds",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "SlippageNotAllowed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TransactionOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TransactionTooShort",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TransferFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "Unauthorized",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "UnexpectedValue",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "UserBitcoinProgramNotAllowed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ValueOutOfBounds",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "Var16OutOfBounds",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "Var32OutOfBounds",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "Var64OutOfBounds",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "VarIntOutOfBounds",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "VoutOutOfBounds",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "WrongConversionType",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ZeroValue",
+		"type": "error"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "height",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "hashLE",
+				"type": "bytes32"
+			}
+		],
+		"name": "AnchorPinnedAsTip",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "dutyWindowSeconds",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "firstHeight",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "firstHeaderHashLE",
+				"type": "bytes32"
+			}
+		],
+		"name": "ConversionApproved",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "bool",
+				"name": "isNativetoBitcoin",
+				"type": "bool"
+			}
+		],
+		"name": "ConversionCommitted",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			}
+		],
+		"name": "ConversionCompleted",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "nativeAmount",
+				"type": "uint256"
+			}
+		],
+		"name": "ConversionDeposited",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "refundNative",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "bool",
+				"name": "commitFeeRefunded",
+				"type": "bool"
+			}
+		],
+		"name": "ConversionRefunded",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "height",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "hashLE",
+				"type": "bytes32"
+			}
+		],
+		"name": "EpochFirstIndexed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newCommitFee",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint16",
+				"name": "newServiceFeeBps",
+				"type": "uint16"
+			}
+		],
+		"name": "FeesUpdated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "height",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "hashLE",
+				"type": "bytes32"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "prevHashLE",
+				"type": "bytes32"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "merkleRootLE",
+				"type": "bytes32"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint32",
+				"name": "nBits",
+				"type": "uint32"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint32",
+				"name": "timestamp",
+				"type": "uint32"
+			}
+		],
+		"name": "GlobalHeaderAppended",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "height",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "hashLE",
+				"type": "bytes32"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "prevHashLE",
+				"type": "bytes32"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "merkleRootLE",
+				"type": "bytes32"
+			}
+		],
+		"name": "HeaderAppended",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "height",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "hashLE",
+				"type": "bytes32"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "prevHashLE",
+				"type": "bytes32"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "merkleRootLE",
+				"type": "bytes32"
+			}
+		],
+		"name": "HeaderChainStarted",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "nativeLiquidity",
+				"type": "uint256"
+			}
+		],
+		"name": "LiquidityUpdated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "newOperator",
+				"type": "address"
+			}
+		],
+		"name": "OperatorChanged",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "txidLE",
+				"type": "bytes32"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "blockHashLE",
+				"type": "bytes32"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "reason",
+				"type": "string"
+			}
+		],
+		"name": "ProofCheckFailed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint8",
+				"name": "attempts",
+				"type": "uint8"
+			}
+		],
+		"name": "ProofReplaced",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "txidLE",
+				"type": "bytes32"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "blockHashLE",
+				"type": "bytes32"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "blockHeight",
+				"type": "uint256"
+			}
+		],
+		"name": "ProofStored",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "txidLE",
+				"type": "bytes32"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "voutIndex",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint64",
+				"name": "valueSats",
+				"type": "uint64"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes",
+				"name": "program",
+				"type": "bytes"
+			}
+		],
+		"name": "ProofTxStored",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "txidLE",
+				"type": "bytes32"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "blockHashLE",
+				"type": "bytes32"
+			}
+		],
+		"name": "ProofVerified",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "APPROVAL_WINDOW_SEC",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "BPS_DENOM",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "CONFIRMATIONS_REQUIRED",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "DEPOSIT_BLOCKS_WINDOW",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "DIFF_PERIOD",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "MAX_TIMESPAN_SEC",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "MIN_TIMESPAN_SEC",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "PROOF_BLOCKS_WINDOW",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "RESERVE_MARGIN_BPS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "RETARGET_PERIOD_SEC",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "SELF_NETWORK_ID",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "activeOpenConversions",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "addNativeLiquidity",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "networkId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint16",
+				"name": "minAddrLen",
+				"type": "uint16"
+			},
+			{
+				"internalType": "uint16",
+				"name": "maxAddrLen",
+				"type": "uint16"
+			}
+		],
+		"name": "addNetwork",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			}
+		],
+		"name": "anchorInfo",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "anchorHeight",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "epochFirstHeight",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "dutyWindowSeconds",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes",
+				"name": "paradappReceiveProgram",
+				"type": "bytes"
+			},
+			{
+				"internalType": "uint16",
+				"name": "slippage",
+				"type": "uint16"
+			}
+		],
+		"name": "approveAndStartWithAnchorAndFirst",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "bitcoinUsdPriceId",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			}
+		],
+		"name": "claimNative_AfterOperatorExpired",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			}
+		],
+		"name": "closeNoBitcoin_BitcoinToNative",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "bitcoinAmount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "networkId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "destAddress",
+				"type": "address"
+			},
+			{
+				"internalType": "bytes",
+				"name": "networkAddress",
+				"type": "bytes"
+			},
+			{
+				"internalType": "uint256",
+				"name": "dutyWindowSeconds",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes",
+				"name": "paradappReceiveProgram",
+				"type": "bytes"
+			},
+			{
+				"internalType": "uint256",
+				"name": "lockedAnchorHeight",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint16",
+				"name": "slippage",
+				"type": "uint16"
+			}
+		],
+		"name": "commitBitcoinToNative",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "commitFeeNative",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes",
+				"name": "header80",
+				"type": "bytes"
+			},
+			{
+				"internalType": "uint256",
+				"name": "height",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "txIdsToCheck",
+				"type": "uint256[]"
+			}
+		],
+		"name": "commitGlobalBitcoinHeader80",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "nativeAmount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "networkId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes",
+				"name": "networkAddress",
+				"type": "bytes"
+			},
+			{
+				"internalType": "bytes",
+				"name": "userProgram",
+				"type": "bytes"
+			}
+		],
+		"name": "commitNativeToBitcoin",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "conversions",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"internalType": "bool",
+				"name": "isNativeToBitcoin",
+				"type": "bool"
+			},
+			{
+				"internalType": "uint16",
+				"name": "slippage",
+				"type": "uint16"
+			},
+			{
+				"internalType": "bytes",
+				"name": "userProgram",
+				"type": "bytes"
+			},
+			{
+				"internalType": "bytes",
+				"name": "paradappReceiveProgram",
+				"type": "bytes"
+			},
+			{
+				"internalType": "bytes",
+				"name": "networkAddress",
+				"type": "bytes"
+			},
+			{
+				"internalType": "uint256",
+				"name": "networkId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "nativeAmount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "bitcoinAmount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "createdAt",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "approvedAt",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "depositedAt",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "commitFee",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "approved",
+				"type": "bool"
+			},
+			{
+				"internalType": "bool",
+				"name": "deposited",
+				"type": "bool"
+			},
+			{
+				"internalType": "bool",
+				"name": "completed",
+				"type": "bool"
+			},
+			{
+				"internalType": "bool",
+				"name": "refunded",
+				"type": "bool"
+			},
+			{
+				"internalType": "uint256",
+				"name": "reservedNative",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "operatorDutyExpiresAt",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes",
+				"name": "header80",
+				"type": "bytes"
+			}
+		],
+		"name": "debugDecodeHeader",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "hashLE",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "prevLE",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "merkleLE",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "uint32",
+				"name": "nBits",
+				"type": "uint32"
+			},
+			{
+				"internalType": "uint32",
+				"name": "timestamp",
+				"type": "uint32"
+			}
+		],
+		"stateMutability": "pure",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			}
+		],
+		"name": "depositApprovedConversion",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "nativeAmount",
+				"type": "uint256"
+			}
+		],
+		"name": "estimateBitcoinFromNative",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "bitcoinAmount",
+				"type": "uint256"
+			}
+		],
+		"name": "estimateNativeFromBitcoin",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			}
+		],
+		"name": "expectedNext",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "headersStarted",
+				"type": "bool"
+			},
+			{
+				"internalType": "uint256",
+				"name": "nextHeight",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "expectedPrevHashLE",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			}
+		],
+		"name": "getConversionWithPhase",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "address",
+						"name": "user",
+						"type": "address"
+					},
+					{
+						"internalType": "bool",
+						"name": "isNativeToBitcoin",
+						"type": "bool"
+					},
+					{
+						"internalType": "uint16",
+						"name": "slippage",
+						"type": "uint16"
+					},
+					{
+						"internalType": "bytes",
+						"name": "userProgram",
+						"type": "bytes"
+					},
+					{
+						"internalType": "bytes",
+						"name": "paradappReceiveProgram",
+						"type": "bytes"
+					},
+					{
+						"internalType": "bytes",
+						"name": "networkAddress",
+						"type": "bytes"
+					},
+					{
+						"internalType": "uint256",
+						"name": "networkId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "nativeAmount",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "bitcoinAmount",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "createdAt",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "approvedAt",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "depositedAt",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "commitFee",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "approved",
+						"type": "bool"
+					},
+					{
+						"internalType": "bool",
+						"name": "deposited",
+						"type": "bool"
+					},
+					{
+						"internalType": "bool",
+						"name": "completed",
+						"type": "bool"
+					},
+					{
+						"internalType": "bool",
+						"name": "refunded",
+						"type": "bool"
+					},
+					{
+						"internalType": "uint256",
+						"name": "reservedNative",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "operatorDutyExpiresAt",
+						"type": "uint256"
+					}
+				],
+				"internalType": "struct ParadappConvert.Conversion",
+				"name": "c",
+				"type": "tuple"
+			},
+			{
+				"internalType": "enum ParadappConvert.Phase",
+				"name": "phase",
+				"type": "uint8"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "enum ParadappConvert.TypeFilter",
+				"name": "typeFilter",
+				"type": "uint8"
+			},
+			{
+				"internalType": "enum ParadappConvert.Phase",
+				"name": "phaseFilter",
+				"type": "uint8"
+			},
+			{
+				"internalType": "address",
+				"name": "userFilter",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "fromTxId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "toTxId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "maxResults",
+				"type": "uint256"
+			}
+		],
+		"name": "getTxIdsByFilter",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "txIds",
+				"type": "uint256[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"name": "globalHeaders",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "prevHashLE",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "merkleRootLE",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "uint32",
+				"name": "nBits",
+				"type": "uint32"
+			},
+			{
+				"internalType": "uint32",
+				"name": "timestamp",
+				"type": "uint32"
+			},
+			{
+				"internalType": "bool",
+				"name": "set",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "globalHeightToHashLE",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "globalTipHeight",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "minAnchorHeight",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "nativeLiquidity",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "nativeUsdPriceId",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "networkConfigs",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "enabled",
+				"type": "bool"
+			},
+			{
+				"internalType": "uint16",
+				"name": "minAddrLen",
+				"type": "uint16"
+			},
+			{
+				"internalType": "uint16",
+				"name": "maxAddrLen",
+				"type": "uint16"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "nextTxId",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "operator",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			}
+		],
+		"name": "proofInfo",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "set",
+				"type": "bool"
+			},
+			{
+				"internalType": "bool",
+				"name": "verified",
+				"type": "bool"
+			},
+			{
+				"internalType": "bool",
+				"name": "invalid",
+				"type": "bool"
+			},
+			{
+				"internalType": "uint8",
+				"name": "attempts",
+				"type": "uint8"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "txidLE",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "blockHashLE",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "uint256",
+				"name": "blockHeight",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint64",
+				"name": "outValueSats",
+				"type": "uint64"
+			},
+			{
+				"internalType": "bytes",
+				"name": "outProgram",
+				"type": "bytes"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			}
+		],
+		"name": "refundAfterNoProof_NativeToBitcoin",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			}
+		],
+		"name": "refundIfNotApproved",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "removableNative",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "removeNativeLiquidity",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "networkId",
+				"type": "uint256"
+			}
+		],
+		"name": "removeNetwork",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "serviceFeeBps",
+		"outputs": [
+			{
+				"internalType": "uint16",
+				"name": "",
+				"type": "uint16"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "newCommitFee",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint16",
+				"name": "newServiceFeeBps",
+				"type": "uint16"
+			}
+		],
+		"name": "setFees",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newOperator",
+				"type": "address"
+			}
+		],
+		"name": "setOperator",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes",
+				"name": "txRaw",
+				"type": "bytes"
+			},
+			{
+				"internalType": "uint256",
+				"name": "voutIndex",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "blockHashLE",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "uint256",
+				"name": "blockHeight",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes32[]",
+				"name": "branchLE",
+				"type": "bytes32[]"
+			},
+			{
+				"internalType": "uint256",
+				"name": "index",
+				"type": "uint256"
+			}
+		],
+		"name": "submitBitcoinMerkleProofWithTx",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			}
+		],
+		"name": "timeoutNoDeposit_NativetoBitcoin",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "totalHeldCommitFees",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "totalLockedDeposits",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "totalReservedNative",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"name": "usedProofs",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "txId",
+				"type": "uint256"
+			}
+		],
+		"name": "windowsFor",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "headersStarted",
+				"type": "bool"
+			},
+			{
+				"internalType": "uint256",
+				"name": "startHeight",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "lastHeight",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "depositWindowEndHeight",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "proofWindowEndHeight",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "operatorDutyExpiresAt",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"stateMutability": "payable",
+		"type": "receive"
+	}
+]

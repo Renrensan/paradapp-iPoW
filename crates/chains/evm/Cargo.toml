@@ -1,0 +1,26 @@
+[package]
+name = "paradapp-chain-evm"
+version = "0.1.0"
+edition = "2024"
+build = "gen_abi_evm.rs"
+
+[dependencies]
+paradapp-core = { path = "../../core" }
+ethers = "2.0"
+dotenvy = "0.15.7"
+anyhow = "1.0.100"
+async-trait = "0.1.89"
+tracing = "0.1.44"
+futures = "0.3.31"
+sqlx = { version = "0.8", features = [
+    "sqlite",
+    "runtime-tokio",
+    "macros",
+] }
+chrono = "0.4.43"
+hex = "0.4.3"
+
+[build-dependencies]
+ethers-contract-abigen = "2"
+
+
