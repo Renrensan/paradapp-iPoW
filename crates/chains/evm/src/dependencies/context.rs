@@ -1,4 +1,4 @@
-use crate::{bindings::paradapp_convert::ParadappConvert, dependencies::config::EvmConfig, };
+use crate::{bindings::paradapp_convert::ParadappConvert, dependencies::config::EvmConfig};
 use ethers::{
     middleware::SignerMiddleware,
     providers::{Http, Provider},

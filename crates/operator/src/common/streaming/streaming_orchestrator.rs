@@ -1,5 +1,5 @@
 use anyhow::Result;
-use paradapp_core::traits::streaming::{StreamTarget, StreamingAdapter};
+use paradapp_core::traits::streaming_adapter::{StreamTarget, StreamingAdapter};
 use std::sync::Arc;
 use tracing::info;
 

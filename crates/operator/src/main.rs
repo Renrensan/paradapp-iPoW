@@ -33,22 +33,22 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.network {
         Network::Hedera => {
-            let hedera = runtime::hedera::start(core_ctx.clone()).await?;
+            let hedera = runtime::hedera_run::start(core_ctx.clone()).await?;
             tokio::select! {
                 _ = hedera => {}
             }
         }
 
         Network::Ethereum => {
-            let ethereum = runtime::ethereum::start(core_ctx.clone()).await?;
+            let ethereum = runtime::ethereum_run::start(core_ctx.clone()).await?;
             tokio::select! {
                 _ = ethereum => {}
             }
         }
 
         Network::All => {
-            let hedera = runtime::hedera::start(core_ctx.clone()).await?;
-            let ethereum = runtime::ethereum::start(core_ctx.clone()).await?;
+            let hedera = runtime::hedera_run::start(core_ctx.clone()).await?;
+            let ethereum = runtime::ethereum_run::start(core_ctx.clone()).await?;
             tokio::select! {
                 _ = hedera => {},
                 _ = ethereum => {},

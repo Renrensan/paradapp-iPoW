@@ -1,6 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use ethers::types::{ U256};
+use ethers::types::U256;
 
 pub struct StreamTarget {
     pub needed: bool,

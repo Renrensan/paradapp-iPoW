@@ -1,4 +1,4 @@
-use crate::btc::btc::parse_btc_network;
+use crate::btc::btc_service::parse_btc_network;
 use bitcoin::Network;
 use reqwest::Client;
 use std::env;

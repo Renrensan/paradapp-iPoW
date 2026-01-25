@@ -1,26 +1,26 @@
 use std::sync::Arc;
 
 use paradapp_chain_evm::{
-    approve::EvmApprovingAdapter,
-    convert::EvmConvertingAdapter,
+    approving_adapter::EvmApprovingAdapter,
+    converting_adapter::EvmConvertingAdapter,
     dependencies::{config::EvmConfig, context::EvmContext, db::sqlite::SqliteStorage},
     network::EvmNetwork,
-    streaming::EvmStreamingAdapter,
+    streaming_adapter::EvmStreamingAdapter,
 };
 use paradapp_core::context::CoreContext;
 use tokio::task::JoinHandle;
 
 use crate::common::{
-    approving::{approving::ApprovingOrchestrator, bot::ApprovingBot},
-    converting::{bot::ConvertingBot, converting::ConvertingOrchestrator},
-    streaming::{bot::StreamingBot, streaming::StreamingOrchestrator},
+    approving::{approving_bot::ApprovingBot, approving_orchestrator::ApprovingOrchestrator},
+    converting::{converting_bot::ConvertingBot, converting_orchestrator::ConvertingOrchestrator},
+    streaming::{streaming_bot::StreamingBot, streaming_orchestrator::StreamingOrchestrator},
 };
 
 pub async fn start(core_ctx: Arc<CoreContext>) -> anyhow::Result<JoinHandle<()>> {
-    let network = EvmNetwork::EthereumSepolia.string_identifier();
+    let network = EvmNetwork::Hedera.string_identifier();
 
     // network context
-    let evm_cfg = EvmConfig::load(EvmNetwork::EthereumSepolia);
+    let evm_cfg = EvmConfig::load(EvmNetwork::Hedera);
     let evm_ctx = Arc::new(EvmContext::init(evm_cfg).await?);
 
     // SQLite storage

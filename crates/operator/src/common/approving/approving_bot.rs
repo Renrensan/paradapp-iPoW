@@ -1,4 +1,4 @@
-use crate::common::approving::approving::ApprovingOrchestrator;
+use crate::common::approving::approving_orchestrator::ApprovingOrchestrator;
 use std::time::Duration;
 use tokio::signal;
 use tracing::{error, info};

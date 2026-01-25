@@ -1,2 +1,2 @@
-pub mod bot;
-pub mod approving;
+pub mod approving_bot;
+pub mod approving_orchestrator;

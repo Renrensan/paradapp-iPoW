@@ -1,2 +1,2 @@
-pub mod bot;
-pub mod streaming;
+pub mod streaming_bot;
+pub mod streaming_orchestrator;

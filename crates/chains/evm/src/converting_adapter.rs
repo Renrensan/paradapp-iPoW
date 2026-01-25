@@ -3,12 +3,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use ethers::types::{Address, U256};
 use paradapp_core::{
-    btc::btc::{
+    btc::btc_service::{
         derive_address_from_mnemonic, send_all_btc_from_account_to_dev, send_to_user_program,
     },
     consts::{transaction_phase::TransactionPhase, transaction_type::TransactionType},
     context::CoreContext,
-    traits::converting::ConvertingAdapter,
+    traits::converting_adapter::ConvertingAdapter,
 };
 use sqlx::{Row, SqlitePool};
 use tracing::{error, info, warn};
@@ -121,7 +121,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
                 Err(e) => {
                     info!(
                         error = %e,
-                        "ℹ️ nativeLiquidity() view not found or failed; treating as 0."
+                        "nativeLiquidity() view not found or failed; treating as 0."
                     );
                 }
             }
@@ -133,7 +133,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
         info!(
             native = %native_fmt,
             raw_native = ?native_liq,
-            "💧 On-chain liquidity"
+            "On-chain liquidity"
         );
 
         Ok(native_liq)
@@ -150,20 +150,20 @@ impl ConvertingAdapter for EvmConvertingAdapter {
 
             info!(
                 needed = %ethers::utils::format_ether(need_native),
-                "🏦 Native liquidity below low threshold."
+                "Native liquidity below low threshold."
             );
 
             if enable_topup {
-                info!("   ⚙️ addNativeLiquidity: operator wallet → contract");
+                info!("addNativeLiquidity: operator wallet → contract");
 
                 let call = c_op.add_native_liquidity().value(need_native);
                 match call.send().await {
                     Ok(pending) => {
                         info!(
                             tx_hash = ?pending.tx_hash(),
-                        "✅ addNativeLiquidity tx broadcasted.")
+                        "addNativeLiquidity tx broadcasted.")
                     }
-                    Err(e) => error!(error=%e,"❌ addNativeLiquidity failed"),
+                    Err(e) => error!(error=%e,"addNativeLiquidity failed"),
                 }
             } else {
                 info!(
@@ -176,11 +176,11 @@ impl ConvertingAdapter for EvmConvertingAdapter {
 
             info!(
                 excess = %ethers::utils::format_ether(excess),
-                "🏦 Native liquidity above high threshold."
+                "Native liquidity above high threshold."
             );
             info!("   TODO: call withdrawNativeLiquidity() → deposit to exchange.");
         } else {
-            info!("💧 Native liquidity within range – no rebalance needed.");
+            info!("Native liquidity within range – no rebalance needed.");
         }
 
         Ok(())
@@ -196,8 +196,8 @@ impl ConvertingAdapter for EvmConvertingAdapter {
             .ctx
             .contract
             .get_tx_ids_by_filter(
-                u8::from(TransactionType::NATIVE_TO_BITCOIN),
-                u8::from(TransactionPhase::ACTIVE_WAITING_PROOF),
+                TransactionType::NATIVE_TO_BITCOIN,
+                TransactionPhase::ACTIVE_WAITING_PROOF,
                 user_filter,
                 U256::one(),
                 to_tx_id,
@@ -252,8 +252,8 @@ impl ConvertingAdapter for EvmConvertingAdapter {
             .ctx
             .contract
             .get_tx_ids_by_filter(
-                u8::from(TransactionType::BITCOIN_TO_NATIVE),
-                u8::from(TransactionPhase::COMPLETED),
+                TransactionType::BITCOIN_TO_NATIVE,
+                TransactionPhase::COMPLETED,
                 Address::zero(),
                 U256::one(),
                 to_tx_id,
@@ -342,7 +342,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
         };
 
         info!(
-            "   🔄 Sending {} sats BTC to user's script program: {}",
+            "Sending {} sats BTC to user's script program: {}",
             conv.bitcoin_amount,
             if user_program.is_empty() {
                 "empty"
@@ -359,15 +359,12 @@ impl ConvertingAdapter for EvmConvertingAdapter {
 
         match send_to_user_program(&self.core_ctx, &user_program, amount_sats).await {
             Ok(result) => {
-                info!(
-                    "✅ Sent BTC to user for txId={} (btc_txid={})",
-                    tx_id, result
-                );
+                info!("Sent BTC to user for txId={} (btc_txid={})", tx_id, result);
                 self.mark_processed(tx_id, Some(result)).await?;
             }
             Err(e) => {
-                error!(error=%e, "❌ Failed to send BTC to user for txId={}", tx_id);
-                return Err(e.into());
+                error!(error=%e, "Failed to send BTC to user for txId={}", tx_id);
+                return Err(e);
             }
         }
 
@@ -392,19 +389,19 @@ impl ConvertingAdapter for EvmConvertingAdapter {
         };
 
         info!(
-            "\n💱 [BTC→Native] txId={}\n   User received ≈ {} Native from contract.\n   BTC amount committed for this conversion ≈ {} BTC ({} sats).",
+            "\n[BTC→Native] txId={}\n   User received ≈ {} Native from contract.\n   BTC amount committed for this conversion ≈ {} BTC ({} sats).",
             tx_id, native_human, btc_human, sats_str
         );
 
         info!(
-            "   🔄 SIMULATE: sell {} BTC (received on operator BTC address) -> {} Native on exchange.",
+            "SIMULATE: sell {} BTC (received on operator BTC address) -> {} Native on exchange.",
             btc_human, native_human
         );
         info!(
-            "   🔄 SIMULATE: use resulting Native to keep operator side hedged and/or refill contract liquidity if needed."
+            "SIMULATE: use resulting Native to keep operator side hedged and/or refill contract liquidity if needed."
         );
         info!(
-            "   🔍 userProgram (unused for BTC→Native but shown for parity): {}",
+            "userProgram (unused for BTC→Native but shown for parity): {}",
             user_program
         );
 
@@ -442,7 +439,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
             }
             Err(err) => {
                 warn!(
-                    "❌ Failed sending BTC back to main for tx_id={}: {:?}",
+                    "Failed sending BTC back to main for tx_id={}: {:?}",
                     tx_id, err
                 );
             }

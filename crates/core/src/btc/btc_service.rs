@@ -105,7 +105,7 @@ pub async fn btc_tip_height(ctx: &CoreContext) -> Result<u64> {
 
 pub fn dsha256(buf: &[u8]) -> [u8; 32] {
     let first = Sha256::digest(buf);
-    let second = Sha256::digest(&first);
+    let second = Sha256::digest(first);
     let mut out = [0u8; 32];
     out.copy_from_slice(&second);
     out
@@ -173,8 +173,8 @@ pub fn check_work_le(header80_0x: &str) -> Result<(bool, u32, U256, U256)> {
 
     // Parse 32-byte little-endian hash into U256
     let mut h_val = U256::zero();
-    for i in 0..32 {
-        let b = U256::from(bytes[i]);
+    for (i, byte) in bytes.iter().take(32).enumerate() {
+        let b = U256::from(*byte);
         h_val |= b << (8 * i);
     }
 
@@ -567,9 +567,9 @@ pub async fn build_proof_bundle(
     // Return
     Ok(ProofBundle {
         legacy_0x: format!("0x{}", hex::encode(legacy)),
-        vout_index: vout_index,
-        block_hash_le: block_hash_le,
-        block_height: block_height,
+        vout_index,
+        block_hash_le,
+        block_height,
         branch: branch_to_use,
         index: pos,
     })
@@ -679,7 +679,7 @@ pub async fn maybe_rebalance_btc_wallets(ctx: &CoreContext) -> anyhow::Result<()
     let hot_bal_sats = match get_address_balance_sats(ctx, &hot).await {
         Ok(v) => v,
         Err(e) => {
-            error!(error=%e, "❌ Failed to fetch hot wallet balance");
+            error!(error=%e, "Failed to fetch hot wallet balance");
             return Ok(());
         }
     };
@@ -735,7 +735,7 @@ pub async fn send_to_user_program(
 ) -> Result<String> {
     let mempool_api = &ctx.cfg.mempool_api;
     let dev_address = &ctx.cfg.operator_btc_wallet_address;
-    let network = ctx.btc_network.clone();
+    let network = ctx.btc_network;
 
     // Parse operator private key
     let wif = &ctx.cfg.operator_btc_wallet_private_key;
@@ -747,7 +747,7 @@ pub async fn send_to_user_program(
     // Get fee rate
     let fee_res: FeeRecommended = ctx
         .http
-        .get(&format!("{}/v1/fees/recommended", mempool_api))
+        .get(format!("{}/v1/fees/recommended", mempool_api))
         .send()
         .await?
         .json()
@@ -758,7 +758,7 @@ pub async fn send_to_user_program(
     // Get operator UTXOs
     let utxos: Vec<Utxo> = ctx
         .http
-        .get(&format!("{}/address/{}/utxo", mempool_api, dev_address))
+        .get(format!("{}/address/{}/utxo", mempool_api, dev_address))
         .send()
         .await?
         .json()
@@ -851,14 +851,14 @@ pub async fn send_to_user_program(
         tx.input[i].witness.push(sig_ser);
         tx.input[i]
             .witness
-            .push(private_key.public_key(&secp).to_bytes().to_vec());
+            .push(private_key.public_key(&secp).to_bytes());
     }
 
     // Serialize and broadcast
     let tx_hex = hex::encode(serialize(&tx));
     let response = ctx
         .http
-        .post(&format!("{}/tx", mempool_api))
+        .post(format!("{}/tx", mempool_api))
         .header("Content-Type", "text/plain")
         .body(tx_hex)
         .send()
@@ -974,7 +974,7 @@ pub async fn send_all_btc_from_account_to_dev(
     from_address_str: &str,
     from_wif: &str,
 ) -> Result<String> {
-    let network = ctx.btc_network.clone();
+    let network = ctx.btc_network;
 
     let from_address_unchecked = BTCAddress::from_str(from_address_str)?;
     let from_address = from_address_unchecked.require_network(network)?;
@@ -1005,7 +1005,7 @@ pub async fn send_all_btc_from_account_to_dev(
     for utxo in &utxos {
         selected.push(utxo.clone());
         input_sum += utxo.value;
-        let est_vbytes = (selected.len() as u64 * 59) + (1 * 31) + 10;
+        let est_vbytes = (selected.len() as u64 * 59) + 31 + 10;
         final_fee = est_vbytes * fee_rate;
         final_fee = 300.max(final_fee.min(800));
     }
@@ -1064,7 +1064,7 @@ pub async fn send_all_btc_from_account_to_dev(
         tx.input[i].witness.push(sig_ser);
         tx.input[i]
             .witness
-            .push(private_key.public_key(&secp).to_bytes().to_vec());
+            .push(private_key.public_key(&secp).to_bytes());
     }
 
     let tx_bytes = serialize(&tx);

@@ -6,10 +6,12 @@ use ethers::{
     utils::hex,
 };
 use paradapp_core::{
-    btc::btc::{btc_tip_height, decode_header80, derive_p2wpkh_address, header80_by_height},
+    btc::btc_service::{
+        btc_tip_height, decode_header80, derive_p2wpkh_address, header80_by_height,
+    },
     consts::{transaction_phase::TransactionPhase, transaction_type::TransactionType},
     context::CoreContext,
-    traits::approving::{ApprovingAdapter, GlobalChainState},
+    traits::approving_adapter::{ApprovingAdapter, GlobalChainState},
 };
 use sqlx::SqlitePool;
 use tracing::{error, info, warn};
@@ -83,7 +85,7 @@ impl ApprovingAdapter for EvmApprovingAdapter {
         let btc_tip = btc_tip_height(&self.core_ctx).await?;
 
         Ok(GlobalChainState {
-            next_tx_id: next_tx_id,
+            next_tx_id,
             confirmations_required: conf_req,
             btc_tip,
             safe_anchor: btc_tip,
@@ -204,7 +206,7 @@ impl ApprovingAdapter for EvmApprovingAdapter {
                 .map_err(|e| anyhow!("decode failed for first_h={first_h}: {e}"))?;
 
             let preflight =
-                preflight_commit_global(&self.ctx, header80_bytes.clone().into(), first_h).await;
+                preflight_commit_global(&self.ctx, header80_bytes.clone(), first_h).await;
 
             if !preflight.static_ok {
                 let err = preflight.static_err.unwrap_or_default();
@@ -259,8 +261,7 @@ impl ApprovingAdapter for EvmApprovingAdapter {
         let anchor80_bytes = decode_header80(&anchor80)
             .map_err(|e| anyhow!("decode failed for anchor_h={anchor_h}: {e}"))?;
 
-        let preflight =
-            preflight_commit_global(&self.ctx, anchor80_bytes.clone().into(), anchor_h).await;
+        let preflight = preflight_commit_global(&self.ctx, anchor80_bytes.clone(), anchor_h).await;
 
         if !preflight.static_ok {
             let err = preflight.static_err.unwrap_or_default();
@@ -539,15 +540,14 @@ impl ApprovingAdapter for EvmApprovingAdapter {
             }
 
             let end_height = proof_end + (conf_req_bn - U256::from(1));
-            if last_height > end_height {
-                if c_op
+            if last_height > end_height
+                && c_op
                     .refund_after_no_proof_native_to_bitcoin(tx_id)
                     .call()
                     .await
                     .is_ok()
-                {
-                    candidates.push((tx_id, "refundAfterNoProof_NativeTokentoBTC".to_string()));
-                }
+            {
+                candidates.push((tx_id, "refundAfterNoProof_NativeTokentoBTC".to_string()));
             }
         }
 
@@ -573,15 +573,13 @@ impl ApprovingAdapter for EvmApprovingAdapter {
                 {
                     candidates.push((tx_id, "refundAfterNoProof_NativeTokentoBTC".to_string()));
                 }
-            } else {
-                if c_op
-                    .claim_native_after_operator_expired(tx_id)
-                    .call()
-                    .await
-                    .is_ok()
-                {
-                    candidates.push((tx_id, "claimNative_AfterOperatorExpired".to_string()));
-                }
+            } else if c_op
+                .claim_native_after_operator_expired(tx_id)
+                .call()
+                .await
+                .is_ok()
+            {
+                candidates.push((tx_id, "claimNative_AfterOperatorExpired".to_string()));
             }
         }
 
@@ -888,8 +886,7 @@ impl ApprovingAdapter for EvmApprovingAdapter {
             // 2. Preflight check
             let header80_bytes = decode_header80(&header80)
                 .map_err(|e| anyhow!("failed to decode header80 at height {h}: {e}"))?;
-            let preflight =
-                preflight_commit_global(&self.ctx, header80_bytes.clone().into(), h).await;
+            let preflight = preflight_commit_global(&self.ctx, header80_bytes.clone(), h).await;
 
             if !preflight.static_ok {
                 let err_msg = preflight
@@ -901,7 +898,7 @@ impl ApprovingAdapter for EvmApprovingAdapter {
                 if err_msg.contains("height-rewrite") {
                     info!(
                         height = %h,
-                        "ℹ️ height already stored, skipping"
+                        "height already stored, skipping"
                     );
                     new_tip = h; // still advance tip (assume it's stored)
                     continue;

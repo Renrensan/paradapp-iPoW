@@ -39,3 +39,16 @@ run = "docker compose down"
 [tasks.docker-compose-logs]
 description = "Follow logs for all services"
 run = "docker compose logs -f"
+
+[tasks.fmt]
+description = "Check Rust code formatting"
+run = "cargo fmt"
+
+[tasks.clippy]
+description = "Run Rust linter (clippy)"
+run = "cargo clippy --all-targets --all-features -- -D warnings"
+
+[tasks.lint]
+description = "Run all Rust linters"
+depends = ["fmt", "clippy"]
+

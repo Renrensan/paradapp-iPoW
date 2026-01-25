@@ -6,10 +6,10 @@ use async_trait::async_trait;
 use ethers::{abi::Address, types::U256};
 use futures::try_join;
 use paradapp_core::{
-    btc::btc::{btc_tip_height, check_work_le, decode_header80, header80_by_height},
+    btc::btc_service::{btc_tip_height, check_work_le, decode_header80, header80_by_height},
     consts::{transaction_phase::TransactionPhase, transaction_type::TransactionType},
     context::CoreContext,
-    traits::streaming::{StreamTarget, StreamingAdapter},
+    traits::streaming_adapter::{StreamTarget, StreamingAdapter},
 };
 use std::{collections::HashSet, sync::Arc, thread::sleep, time::Duration};
 use tracing::info;
@@ -88,18 +88,18 @@ impl StreamingAdapter for EvmStreamingAdapter {
             })?;
             let pf = preflight_commit_global(&self.ctx, header80_bytes.clone(), next_height).await;
 
-            if !pf.static_ok {
-                if let Some(err_str) = pf.static_err {
-                    let reason = err_str.to_lowercase();
+            if !pf.static_ok
+                && let Some(err_str) = pf.static_err
+            {
+                let reason = err_str.to_lowercase();
 
-                    if reason.contains("height-rewrite") {
-                        info!(height = next_height, "height already stored, skipping.");
-                        continue;
-                    }
-
-                    info!(reason = %reason, "commitGlobalBTCHeader80 would revert");
-                    return Err(anyhow::anyhow!(reason));
+                if reason.contains("height-rewrite") {
+                    info!(height = next_height, "height already stored, skipping.");
+                    continue;
                 }
+
+                info!(reason = %reason, "commitGlobalBTCHeader80 would revert");
+                return Err(anyhow::anyhow!(reason));
             }
 
             // 6. Actual transaction send
@@ -126,7 +126,7 @@ impl StreamingAdapter for EvmStreamingAdapter {
         info!(
             pushed = pushed,
             effective_target = effective_target,
-            "✅ [GLOBAL] streamed headers"
+            "[GLOBAL] streamed headers"
         );
 
         Ok(())
@@ -195,7 +195,7 @@ impl StreamingAdapter for EvmStreamingAdapter {
             native_to_btc.into_iter().chain(btc_to_native).collect();
 
         let mut set: HashSet<U256> = tx_ids_waiting_user_action.into_iter().collect();
-        set.extend(tx_ids_active_waiting_proof.into_iter());
+        set.extend(tx_ids_active_waiting_proof);
 
         let tx_ids: Vec<U256> = set.into_iter().collect();
 

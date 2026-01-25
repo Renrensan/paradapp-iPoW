@@ -1,16 +1,15 @@
+use crate::common::converting::converting_orchestrator::ConvertingOrchestrator;
 use std::time::Duration;
 use tokio::signal;
 use tracing::{error, info};
 
-use super::streaming::StreamingOrchestrator;
-
-pub struct StreamingBot {
-    orchestrator: StreamingOrchestrator,
+pub struct ConvertingBot<A: paradapp_core::traits::converting_adapter::ConvertingAdapter> {
+    orchestrator: ConvertingOrchestrator<A>,
     interval: Duration,
 }
 
-impl StreamingBot {
-    pub fn new(orchestrator: StreamingOrchestrator, interval_secs: u64) -> Self {
+impl<A: paradapp_core::traits::converting_adapter::ConvertingAdapter> ConvertingBot<A> {
+    pub fn new(orchestrator: ConvertingOrchestrator<A>, interval_secs: u64) -> Self {
         Self {
             orchestrator,
             interval: Duration::from_secs(interval_secs),

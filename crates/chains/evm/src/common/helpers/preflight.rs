@@ -3,7 +3,6 @@ use tracing::{error, info};
 
 use crate::dependencies::context::EvmContext;
 
-
 pub struct PreflightResult {
     pub static_ok: bool,
     pub static_err: Option<String>,
@@ -15,11 +14,7 @@ pub async fn preflight_commit_global(
 ) -> PreflightResult {
     let call = ctx
         .c_op
-        .commit_global_bitcoin_header_80(
-            header80_bytes,
-            U256::from(height),
-            vec![],
-        );
+        .commit_global_bitcoin_header_80(header80_bytes, U256::from(height), vec![]);
 
     match call.call().await {
         Ok(_) => {

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use ethers_core::types::U256;
 use paradapp_core::{
     consts::{transaction_phase::TransactionPhase, transaction_type::TransactionType},
-    traits::approving::ApprovingAdapter,
+    traits::approving_adapter::ApprovingAdapter,
 };
 
 use anyhow::Result;
