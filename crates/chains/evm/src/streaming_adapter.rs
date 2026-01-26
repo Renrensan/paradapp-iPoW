@@ -3,7 +3,10 @@ use crate::{
 };
 use anyhow::Result;
 use async_trait::async_trait;
-use ethers::{abi::Address, types::U256};
+use ethers::{
+    abi::Address,
+    types::{Bytes, U256},
+};
 use futures::try_join;
 use paradapp_core::{
     btc::btc_service::{btc_tip_height, check_work_le, decode_header80, header80_by_height},
@@ -150,6 +153,7 @@ impl StreamingAdapter for EvmStreamingAdapter {
             TransactionType::NATIVE_TO_BITCOIN,
             TransactionPhase::WAITING_USER_ACTION,
             Address::zero(),
+            Bytes::new(),
             from,
             to_tx_id,
             max_results_u256,
@@ -159,6 +163,7 @@ impl StreamingAdapter for EvmStreamingAdapter {
             TransactionType::BITCOIN_TO_NATIVE,
             TransactionPhase::WAITING_USER_ACTION,
             Address::zero(),
+            Bytes::new(),
             from,
             to_tx_id,
             max_results_u256,
@@ -174,6 +179,7 @@ impl StreamingAdapter for EvmStreamingAdapter {
             TransactionType::NATIVE_TO_BITCOIN,
             TransactionPhase::WAITING_USER_ACTION,
             Address::zero(),
+            Bytes::new(),
             from,
             to_tx_id,
             max_results_u256,
@@ -183,6 +189,7 @@ impl StreamingAdapter for EvmStreamingAdapter {
             TransactionType::BITCOIN_TO_NATIVE,
             TransactionPhase::WAITING_USER_ACTION,
             Address::zero(),
+            Bytes::new(),
             from,
             to_tx_id,
             max_results_u256,

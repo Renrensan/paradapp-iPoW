@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use ethers::types::{Address, U256};
+use ethers::types::{Address, Bytes, U256};
 use paradapp_core::{
     btc::btc_service::{
         derive_address_from_mnemonic, send_all_btc_from_account_to_dev, send_to_user_program,
@@ -199,6 +199,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
                 TransactionType::NATIVE_TO_BITCOIN,
                 TransactionPhase::ACTIVE_WAITING_PROOF,
                 user_filter,
+                Bytes::new(),
                 U256::one(),
                 to_tx_id,
                 U256::from(500),
@@ -255,6 +256,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
                 TransactionType::BITCOIN_TO_NATIVE,
                 TransactionPhase::COMPLETED,
                 Address::zero(),
+                Bytes::new(),
                 U256::one(),
                 to_tx_id,
                 U256::from(500),

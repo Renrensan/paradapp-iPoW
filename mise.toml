@@ -40,6 +40,10 @@ run = "docker compose down"
 description = "Follow logs for all services"
 run = "docker compose logs -f"
 
+[tasks.docker-push]
+description = "Push to dockerhub repository"
+run = "docker push renrensan/paradapp-interoperability-service"
+
 [tasks.fmt]
 description = "Check Rust code formatting"
 run = "cargo fmt"

@@ -19,6 +19,13 @@ pub mod paradapp_convert {
             constructor: ::core::option::Option::Some(::ethers::core::abi::ethabi::Constructor {
                 inputs: ::std::vec![
                     ::ethers::core::abi::ethabi::Param {
+                        name: ::std::borrow::ToOwned::to_owned("_nativeDecimals"),
+                        kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                        internal_type: ::core::option::Option::Some(
+                            ::std::borrow::ToOwned::to_owned("uint256"),
+                        ),
+                    },
+                    ::ethers::core::abi::ethabi::Param {
                         name: ::std::borrow::ToOwned::to_owned("_selfNetworkId"),
                         kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
                         internal_type: ::core::option::Option::Some(
@@ -103,6 +110,22 @@ pub mod paradapp_convert {
                     },],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("BTC_DECIMALS"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("BTC_DECIMALS"),
+                        inputs: ::std::vec![],
+                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::string::String::new(),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("uint256"),
+                            ),
+                        },],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                    },],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("CONFIRMATIONS_REQUIRED"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("CONFIRMATIONS_REQUIRED",),
@@ -170,6 +193,22 @@ pub mod paradapp_convert {
                     ::std::borrow::ToOwned::to_owned("MIN_TIMESPAN_SEC"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("MIN_TIMESPAN_SEC"),
+                        inputs: ::std::vec![],
+                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::string::String::new(),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("uint256"),
+                            ),
+                        },],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("NATIVE_DECIMALS"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("NATIVE_DECIMALS"),
                         inputs: ::std::vec![],
                         outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
                             name: ::std::string::String::new(),
@@ -439,6 +478,13 @@ pub mod paradapp_convert {
                                 kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
                                 internal_type: ::core::option::Option::Some(
                                     ::std::borrow::ToOwned::to_owned("uint256"),
+                                ),
+                            },
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("userProgram"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("bytes"),
                                 ),
                             },
                             ::ethers::core::abi::ethabi::Param {
@@ -959,6 +1005,13 @@ pub mod paradapp_convert {
                                 kind: ::ethers::core::abi::ethabi::ParamType::Address,
                                 internal_type: ::core::option::Option::Some(
                                     ::std::borrow::ToOwned::to_owned("address"),
+                                ),
+                            },
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("userProgramFilter"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("bytes"),
                                 ),
                             },
                             ::ethers::core::abi::ethabi::Param {
@@ -1547,6 +1600,28 @@ pub mod paradapp_convert {
                             kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
                             internal_type: ::core::option::Option::Some(
                                 ::std::borrow::ToOwned::to_owned("uint256"),
+                            ),
+                        },],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("usedParadappPrograms"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("usedParadappPrograms",),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::string::String::new(),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Bytes,
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("bytes"),
+                            ),
+                        },],
+                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::string::String::new(),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Bool,
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("bool"),
                             ),
                         },],
                         constant: ::core::option::Option::None,
@@ -2409,6 +2484,13 @@ pub mod paradapp_convert {
                     },],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("ProgramAlreadyUsed"),
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("ProgramAlreadyUsed"),
+                        inputs: ::std::vec![],
+                    },],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("ProgramOutOfBounds"),
                     ::std::vec![::ethers::core::abi::ethabi::AbiError {
                         name: ::std::borrow::ToOwned::to_owned("ProgramOutOfBounds"),
@@ -2581,6 +2663,14 @@ pub mod paradapp_convert {
                 .method_hash([102, 55, 227, 140], ())
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `BTC_DECIMALS` (0x8e32388e) function
+        pub fn btc_decimals(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+            self.0
+                .method_hash([142, 50, 56, 142], ())
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `CONFIRMATIONS_REQUIRED` (0xede42057) function
         pub fn confirmations_required(
             &self,
@@ -2619,6 +2709,14 @@ pub mod paradapp_convert {
         ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
             self.0
                 .method_hash([217, 217, 111, 3], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `NATIVE_DECIMALS` (0xe66bf2d7) function
+        pub fn native_decimals(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+            self.0
+                .method_hash([230, 107, 242, 215], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `PROOF_BLOCKS_WINDOW` (0x4f29043b) function
@@ -2736,11 +2834,12 @@ pub mod paradapp_convert {
                 .method_hash([227, 192, 136, 233], tx_id)
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `commitBitcoinToNative` (0x43db1cb6) function
+        ///Calls the contract's `commitBitcoinToNative` (0x96b5f34c) function
         pub fn commit_bitcoin_to_native(
             &self,
             bitcoin_amount: ::ethers::core::types::U256,
             network_id: ::ethers::core::types::U256,
+            user_program: ::ethers::core::types::Bytes,
             dest_address: ::ethers::core::types::Address,
             network_address: ::ethers::core::types::Bytes,
             duty_window_seconds: ::ethers::core::types::U256,
@@ -2750,10 +2849,11 @@ pub mod paradapp_convert {
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash(
-                    [67, 219, 28, 182],
+                    [150, 181, 243, 76],
                     (
                         bitcoin_amount,
                         network_id,
+                        user_program,
                         dest_address,
                         network_address,
                         duty_window_seconds,
@@ -2888,12 +2988,13 @@ pub mod paradapp_convert {
                 .method_hash([117, 147, 167, 58], tx_id)
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `getTxIdsByFilter` (0xc5e9cdec) function
+        ///Calls the contract's `getTxIdsByFilter` (0x470842c4) function
         pub fn get_tx_ids_by_filter(
             &self,
             type_filter: u8,
             phase_filter: u8,
             user_filter: ::ethers::core::types::Address,
+            user_program_filter: ::ethers::core::types::Bytes,
             from_tx_id: ::ethers::core::types::U256,
             to_tx_id: ::ethers::core::types::U256,
             max_results: ::ethers::core::types::U256,
@@ -2903,11 +3004,12 @@ pub mod paradapp_convert {
         > {
             self.0
                 .method_hash(
-                    [197, 233, 205, 236],
+                    [71, 8, 66, 196],
                     (
                         type_filter,
                         phase_filter,
                         user_filter,
+                        user_program_filter,
                         from_tx_id,
                         to_tx_id,
                         max_results,
@@ -3139,6 +3241,15 @@ pub mod paradapp_convert {
         ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
             self.0
                 .method_hash([125, 111, 145, 182], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `usedParadappPrograms` (0x5c0510ea) function
+        pub fn used_paradapp_programs(
+            &self,
+            p0: ::ethers::core::types::Bytes,
+        ) -> ::ethers::contract::builders::ContractCall<M, bool> {
+            self.0
+                .method_hash([92, 5, 16, 234], p0)
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `usedProofs` (0xc30a0f25) function
@@ -3922,6 +4033,19 @@ pub mod paradapp_convert {
     )]
     #[etherror(name = "PrevAndTipUnmatch", abi = "PrevAndTipUnmatch()")]
     pub struct PrevAndTipUnmatch;
+    ///Custom Error type `ProgramAlreadyUsed` with signature `ProgramAlreadyUsed()` and selector `0xfaefc6fe`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(name = "ProgramAlreadyUsed", abi = "ProgramAlreadyUsed()")]
+    pub struct ProgramAlreadyUsed;
     ///Custom Error type `ProgramOutOfBounds` with signature `ProgramOutOfBounds()` and selector `0x565ba85f`
     #[derive(
         Clone,
@@ -4183,6 +4307,7 @@ pub mod paradapp_convert {
         OracleDecimalsIncorrect(OracleDecimalsIncorrect),
         OracleZeroPrice(OracleZeroPrice),
         PrevAndTipUnmatch(PrevAndTipUnmatch),
+        ProgramAlreadyUsed(ProgramAlreadyUsed),
         ProgramOutOfBounds(ProgramOutOfBounds),
         SlippageNotAllowed(SlippageNotAllowed),
         TransactionOverflow(TransactionOverflow),
@@ -4395,6 +4520,11 @@ pub mod paradapp_convert {
                 return Ok(Self::PrevAndTipUnmatch(decoded));
             }
             if let Ok(decoded) =
+                <ProgramAlreadyUsed as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::ProgramAlreadyUsed(decoded));
+            }
+            if let Ok(decoded) =
                 <ProgramOutOfBounds as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::ProgramOutOfBounds(decoded));
@@ -4540,6 +4670,9 @@ pub mod paradapp_convert {
                 }
                 Self::OracleZeroPrice(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::PrevAndTipUnmatch(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ProgramAlreadyUsed(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::ProgramOutOfBounds(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -4744,6 +4877,11 @@ pub mod paradapp_convert {
                     true
                 }
                 _ if selector
+                    == <ProgramAlreadyUsed as ::ethers::contract::EthError>::selector() =>
+                {
+                    true
+                }
+                _ if selector
                     == <ProgramOutOfBounds as ::ethers::contract::EthError>::selector() =>
                 {
                     true
@@ -4856,6 +4994,7 @@ pub mod paradapp_convert {
                 Self::OracleDecimalsIncorrect(element) => ::core::fmt::Display::fmt(element, f),
                 Self::OracleZeroPrice(element) => ::core::fmt::Display::fmt(element, f),
                 Self::PrevAndTipUnmatch(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ProgramAlreadyUsed(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ProgramOutOfBounds(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SlippageNotAllowed(element) => ::core::fmt::Display::fmt(element, f),
                 Self::TransactionOverflow(element) => ::core::fmt::Display::fmt(element, f),
@@ -5116,6 +5255,11 @@ pub mod paradapp_convert {
     impl ::core::convert::From<PrevAndTipUnmatch> for ParadappConvertErrors {
         fn from(value: PrevAndTipUnmatch) -> Self {
             Self::PrevAndTipUnmatch(value)
+        }
+    }
+    impl ::core::convert::From<ProgramAlreadyUsed> for ParadappConvertErrors {
+        fn from(value: ProgramAlreadyUsed) -> Self {
+            Self::ProgramAlreadyUsed(value)
         }
     }
     impl ::core::convert::From<ProgramOutOfBounds> for ParadappConvertErrors {
@@ -5763,6 +5907,19 @@ pub mod paradapp_convert {
     )]
     #[ethcall(name = "BPS_DENOM", abi = "BPS_DENOM()")]
     pub struct BpsDenomCall;
+    ///Container type for all input parameters for the `BTC_DECIMALS` function with signature `BTC_DECIMALS()` and selector `0x8e32388e`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "BTC_DECIMALS", abi = "BTC_DECIMALS()")]
+    pub struct BtcDecimalsCall;
     ///Container type for all input parameters for the `CONFIRMATIONS_REQUIRED` function with signature `CONFIRMATIONS_REQUIRED()` and selector `0xede42057`
     #[derive(
         Clone,
@@ -5828,6 +5985,19 @@ pub mod paradapp_convert {
     )]
     #[ethcall(name = "MIN_TIMESPAN_SEC", abi = "MIN_TIMESPAN_SEC()")]
     pub struct MinTimespanSecCall;
+    ///Container type for all input parameters for the `NATIVE_DECIMALS` function with signature `NATIVE_DECIMALS()` and selector `0xe66bf2d7`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "NATIVE_DECIMALS", abi = "NATIVE_DECIMALS()")]
+    pub struct NativeDecimalsCall;
     ///Container type for all input parameters for the `PROOF_BLOCKS_WINDOW` function with signature `PROOF_BLOCKS_WINDOW()` and selector `0x4f29043b`
     #[derive(
         Clone,
@@ -6008,7 +6178,7 @@ pub mod paradapp_convert {
     pub struct CloseNoBitcoinBitcoinToNativeCall {
         pub tx_id: ::ethers::core::types::U256,
     }
-    ///Container type for all input parameters for the `commitBitcoinToNative` function with signature `commitBitcoinToNative(uint256,uint256,address,bytes,uint256,bytes,uint256,uint16)` and selector `0x43db1cb6`
+    ///Container type for all input parameters for the `commitBitcoinToNative` function with signature `commitBitcoinToNative(uint256,uint256,bytes,address,bytes,uint256,bytes,uint256,uint16)` and selector `0x96b5f34c`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -6021,11 +6191,12 @@ pub mod paradapp_convert {
     )]
     #[ethcall(
         name = "commitBitcoinToNative",
-        abi = "commitBitcoinToNative(uint256,uint256,address,bytes,uint256,bytes,uint256,uint16)"
+        abi = "commitBitcoinToNative(uint256,uint256,bytes,address,bytes,uint256,bytes,uint256,uint16)"
     )]
     pub struct CommitBitcoinToNativeCall {
         pub bitcoin_amount: ::ethers::core::types::U256,
         pub network_id: ::ethers::core::types::U256,
+        pub user_program: ::ethers::core::types::Bytes,
         pub dest_address: ::ethers::core::types::Address,
         pub network_address: ::ethers::core::types::Bytes,
         pub duty_window_seconds: ::ethers::core::types::U256,
@@ -6202,7 +6373,7 @@ pub mod paradapp_convert {
     pub struct GetConversionWithPhaseCall {
         pub tx_id: ::ethers::core::types::U256,
     }
-    ///Container type for all input parameters for the `getTxIdsByFilter` function with signature `getTxIdsByFilter(uint8,uint8,address,uint256,uint256,uint256)` and selector `0xc5e9cdec`
+    ///Container type for all input parameters for the `getTxIdsByFilter` function with signature `getTxIdsByFilter(uint8,uint8,address,bytes,uint256,uint256,uint256)` and selector `0x470842c4`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -6215,12 +6386,13 @@ pub mod paradapp_convert {
     )]
     #[ethcall(
         name = "getTxIdsByFilter",
-        abi = "getTxIdsByFilter(uint8,uint8,address,uint256,uint256,uint256)"
+        abi = "getTxIdsByFilter(uint8,uint8,address,bytes,uint256,uint256,uint256)"
     )]
     pub struct GetTxIdsByFilterCall {
         pub type_filter: u8,
         pub phase_filter: u8,
         pub user_filter: ::ethers::core::types::Address,
+        pub user_program_filter: ::ethers::core::types::Bytes,
         pub from_tx_id: ::ethers::core::types::U256,
         pub to_tx_id: ::ethers::core::types::U256,
         pub max_results: ::ethers::core::types::U256,
@@ -6558,6 +6730,19 @@ pub mod paradapp_convert {
     )]
     #[ethcall(name = "totalReservedNative", abi = "totalReservedNative()")]
     pub struct TotalReservedNativeCall;
+    ///Container type for all input parameters for the `usedParadappPrograms` function with signature `usedParadappPrograms(bytes)` and selector `0x5c0510ea`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "usedParadappPrograms", abi = "usedParadappPrograms(bytes)")]
+    pub struct UsedParadappProgramsCall(pub ::ethers::core::types::Bytes);
     ///Container type for all input parameters for the `usedProofs` function with signature `usedProofs(bytes32)` and selector `0xc30a0f25`
     #[derive(
         Clone,
@@ -6591,11 +6776,13 @@ pub mod paradapp_convert {
     pub enum ParadappConvertCalls {
         ApprovalWindowSec(ApprovalWindowSecCall),
         BpsDenom(BpsDenomCall),
+        BtcDecimals(BtcDecimalsCall),
         ConfirmationsRequired(ConfirmationsRequiredCall),
         DepositBlocksWindow(DepositBlocksWindowCall),
         DiffPeriod(DiffPeriodCall),
         MaxTimespanSec(MaxTimespanSecCall),
         MinTimespanSec(MinTimespanSecCall),
+        NativeDecimals(NativeDecimalsCall),
         ProofBlocksWindow(ProofBlocksWindowCall),
         ReserveMarginBps(ReserveMarginBpsCall),
         RetargetPeriodSec(RetargetPeriodSecCall),
@@ -6643,6 +6830,7 @@ pub mod paradapp_convert {
         TotalHeldCommitFees(TotalHeldCommitFeesCall),
         TotalLockedDeposits(TotalLockedDepositsCall),
         TotalReservedNative(TotalReservedNativeCall),
+        UsedParadappPrograms(UsedParadappProgramsCall),
         UsedProofs(UsedProofsCall),
         WindowsFor(WindowsForCall),
     }
@@ -6658,6 +6846,9 @@ pub mod paradapp_convert {
             }
             if let Ok(decoded) = <BpsDenomCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::BpsDenom(decoded));
+            }
+            if let Ok(decoded) = <BtcDecimalsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::BtcDecimals(decoded));
             }
             if let Ok(decoded) =
                 <ConfirmationsRequiredCall as ::ethers::core::abi::AbiDecode>::decode(data)
@@ -6681,6 +6872,11 @@ pub mod paradapp_convert {
                 <MinTimespanSecCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::MinTimespanSec(decoded));
+            }
+            if let Ok(decoded) =
+                <NativeDecimalsCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::NativeDecimals(decoded));
             }
             if let Ok(decoded) =
                 <ProofBlocksWindowCall as ::ethers::core::abi::AbiDecode>::decode(data)
@@ -6904,6 +7100,11 @@ pub mod paradapp_convert {
             {
                 return Ok(Self::TotalReservedNative(decoded));
             }
+            if let Ok(decoded) =
+                <UsedParadappProgramsCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::UsedParadappPrograms(decoded));
+            }
             if let Ok(decoded) = <UsedProofsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::UsedProofs(decoded));
             }
@@ -6918,6 +7119,7 @@ pub mod paradapp_convert {
             match self {
                 Self::ApprovalWindowSec(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::BpsDenom(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::BtcDecimals(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::ConfirmationsRequired(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -6927,6 +7129,7 @@ pub mod paradapp_convert {
                 Self::DiffPeriod(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::MaxTimespanSec(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::MinTimespanSec(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NativeDecimals(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::ProofBlocksWindow(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::ReserveMarginBps(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::RetargetPeriodSec(element) => ::ethers::core::abi::AbiEncode::encode(element),
@@ -7016,6 +7219,9 @@ pub mod paradapp_convert {
                 Self::TotalReservedNative(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::UsedParadappPrograms(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::UsedProofs(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::WindowsFor(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
@@ -7026,11 +7232,13 @@ pub mod paradapp_convert {
             match self {
                 Self::ApprovalWindowSec(element) => ::core::fmt::Display::fmt(element, f),
                 Self::BpsDenom(element) => ::core::fmt::Display::fmt(element, f),
+                Self::BtcDecimals(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ConfirmationsRequired(element) => ::core::fmt::Display::fmt(element, f),
                 Self::DepositBlocksWindow(element) => ::core::fmt::Display::fmt(element, f),
                 Self::DiffPeriod(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MaxTimespanSec(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MinTimespanSec(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NativeDecimals(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ProofBlocksWindow(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ReserveMarginBps(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RetargetPeriodSec(element) => ::core::fmt::Display::fmt(element, f),
@@ -7090,6 +7298,7 @@ pub mod paradapp_convert {
                 Self::TotalHeldCommitFees(element) => ::core::fmt::Display::fmt(element, f),
                 Self::TotalLockedDeposits(element) => ::core::fmt::Display::fmt(element, f),
                 Self::TotalReservedNative(element) => ::core::fmt::Display::fmt(element, f),
+                Self::UsedParadappPrograms(element) => ::core::fmt::Display::fmt(element, f),
                 Self::UsedProofs(element) => ::core::fmt::Display::fmt(element, f),
                 Self::WindowsFor(element) => ::core::fmt::Display::fmt(element, f),
             }
@@ -7103,6 +7312,11 @@ pub mod paradapp_convert {
     impl ::core::convert::From<BpsDenomCall> for ParadappConvertCalls {
         fn from(value: BpsDenomCall) -> Self {
             Self::BpsDenom(value)
+        }
+    }
+    impl ::core::convert::From<BtcDecimalsCall> for ParadappConvertCalls {
+        fn from(value: BtcDecimalsCall) -> Self {
+            Self::BtcDecimals(value)
         }
     }
     impl ::core::convert::From<ConfirmationsRequiredCall> for ParadappConvertCalls {
@@ -7128,6 +7342,11 @@ pub mod paradapp_convert {
     impl ::core::convert::From<MinTimespanSecCall> for ParadappConvertCalls {
         fn from(value: MinTimespanSecCall) -> Self {
             Self::MinTimespanSec(value)
+        }
+    }
+    impl ::core::convert::From<NativeDecimalsCall> for ParadappConvertCalls {
+        fn from(value: NativeDecimalsCall) -> Self {
+            Self::NativeDecimals(value)
         }
     }
     impl ::core::convert::From<ProofBlocksWindowCall> for ParadappConvertCalls {
@@ -7365,6 +7584,11 @@ pub mod paradapp_convert {
             Self::TotalReservedNative(value)
         }
     }
+    impl ::core::convert::From<UsedParadappProgramsCall> for ParadappConvertCalls {
+        fn from(value: UsedParadappProgramsCall) -> Self {
+            Self::UsedParadappPrograms(value)
+        }
+    }
     impl ::core::convert::From<UsedProofsCall> for ParadappConvertCalls {
         fn from(value: UsedProofsCall) -> Self {
             Self::UsedProofs(value)
@@ -7399,6 +7623,18 @@ pub mod paradapp_convert {
         Hash,
     )]
     pub struct BpsDenomReturn(pub ::ethers::core::types::U256);
+    ///Container type for all return fields from the `BTC_DECIMALS` function with signature `BTC_DECIMALS()` and selector `0x8e32388e`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct BtcDecimalsReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `CONFIRMATIONS_REQUIRED` function with signature `CONFIRMATIONS_REQUIRED()` and selector `0xede42057`
     #[derive(
         Clone,
@@ -7459,6 +7695,18 @@ pub mod paradapp_convert {
         Hash,
     )]
     pub struct MinTimespanSecReturn(pub ::ethers::core::types::U256);
+    ///Container type for all return fields from the `NATIVE_DECIMALS` function with signature `NATIVE_DECIMALS()` and selector `0xe66bf2d7`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct NativeDecimalsReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `PROOF_BLOCKS_WINDOW` function with signature `PROOF_BLOCKS_WINDOW()` and selector `0x4f29043b`
     #[derive(
         Clone,
@@ -7654,7 +7902,7 @@ pub mod paradapp_convert {
         pub c: Conversion,
         pub phase: u8,
     }
-    ///Container type for all return fields from the `getTxIdsByFilter` function with signature `getTxIdsByFilter(uint8,uint8,address,uint256,uint256,uint256)` and selector `0xc5e9cdec`
+    ///Container type for all return fields from the `getTxIdsByFilter` function with signature `getTxIdsByFilter(uint8,uint8,address,bytes,uint256,uint256,uint256)` and selector `0x470842c4`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -7868,6 +8116,18 @@ pub mod paradapp_convert {
         Hash,
     )]
     pub struct TotalReservedNativeReturn(pub ::ethers::core::types::U256);
+    ///Container type for all return fields from the `usedParadappPrograms` function with signature `usedParadappPrograms(bytes)` and selector `0x5c0510ea`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct UsedParadappProgramsReturn(pub bool);
     ///Container type for all return fields from the `usedProofs` function with signature `usedProofs(bytes32)` and selector `0xc30a0f25`
     #[derive(
         Clone,

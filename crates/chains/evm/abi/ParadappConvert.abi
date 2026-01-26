@@ -3,6 +3,11 @@
 		"inputs": [
 			{
 				"internalType": "uint256",
+				"name": "_nativeDecimals",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
 				"name": "_selfNetworkId",
 				"type": "uint256"
 			},
@@ -273,6 +278,11 @@
 	{
 		"inputs": [],
 		"name": "PrevAndTipUnmatch",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ProgramAlreadyUsed",
 		"type": "error"
 	},
 	{
@@ -851,6 +861,19 @@
 	},
 	{
 		"inputs": [],
+		"name": "BTC_DECIMALS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "CONFIRMATIONS_REQUIRED",
 		"outputs": [
 			{
@@ -904,6 +927,19 @@
 	{
 		"inputs": [],
 		"name": "MIN_TIMESPAN_SEC",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "NATIVE_DECIMALS",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -1111,6 +1147,11 @@
 				"internalType": "uint256",
 				"name": "networkId",
 				"type": "uint256"
+			},
+			{
+				"internalType": "bytes",
+				"name": "userProgram",
+				"type": "bytes"
 			},
 			{
 				"internalType": "address",
@@ -1579,6 +1620,11 @@
 				"type": "address"
 			},
 			{
+				"internalType": "bytes",
+				"name": "userProgramFilter",
+				"type": "bytes"
+			},
+			{
 				"internalType": "uint256",
 				"name": "fromTxId",
 				"type": "uint256"
@@ -2028,6 +2074,25 @@
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes",
+				"name": "",
+				"type": "bytes"
+			}
+		],
+		"name": "usedParadappPrograms",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
 			}
 		],
 		"stateMutability": "view",
