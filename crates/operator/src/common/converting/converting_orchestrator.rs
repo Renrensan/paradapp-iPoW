@@ -28,13 +28,7 @@ impl<A: ConvertingAdapter> ConvertingOrchestrator<A> {
         fields(network = %self.network)
     )]
     pub async fn run_once(&self) -> Result<()> {
-        // === 1) Check RPC Health ===
-        if let Err(e) = self.adapter.check_rpc_health().await {
-            warn!(error = %e, "Skipping this cycle — RPC health check failed");
-            return Ok(());
-        }
-
-        // === 2) Determine latest tx id ===
+        // Determine latest tx id
         let next_tx_id = self.adapter.next_tx_id().await?;
         let to_tx_id = next_tx_id.saturating_sub(U256::one());
 
@@ -43,15 +37,43 @@ impl<A: ConvertingAdapter> ConvertingOrchestrator<A> {
             return Ok(());
         }
 
-        // === 3) Get conversions needing processing ===
+        // Get conversions needing processing
         let ready_h2b = self.adapter.find_native_to_btc_ready(to_tx_id).await?;
         let ready_b2h = self.adapter.find_btc_to_native_completed(to_tx_id).await?;
+
         if ready_h2b.is_empty() && ready_b2h.is_empty() {
             info!("No conversions requiring off-chain work this pass.");
         }
 
-        // === 4) Handle NATIVE→BTC ===
+        // Handle NATIVE→BTC
+        // Collect tx_ids
+        let tx_ids: Vec<U256> = ready_h2b.iter().map(|(tx_id, _)| *tx_id).collect();
+
+        // Fetch processed tx_id -> btc_txid
+        let processed_map = self.adapter.get_processed_native_to_btc(&tx_ids).await?;
+
         for (tx_id, conv) in ready_h2b {
+            // Case A: BTC already sent → check confirmation & submit proof
+            if let Some(btc_txid) = processed_map.get(&tx_id) {
+                match self
+                    .adapter
+                    .check_confirmation_and_build_proof(tx_id, btc_txid)
+                    .await?
+                {
+                    Some(proof) => {
+                        if let Err(err) = self.adapter.submit_merkle_proof(tx_id, proof).await {
+                            warn!("Error submitting merkle proof txId={}: {:?}", tx_id, err);
+                        }
+                    }
+                    None => {
+                        // Not confirmed yet, retry later
+                    }
+                }
+
+                continue;
+            }
+
+            // Case B: Not processed yet → send BTC
             if let Err(err) = self
                 .adapter
                 .handle_native_to_btc_conversion(tx_id, conv)
@@ -64,7 +86,7 @@ impl<A: ConvertingAdapter> ConvertingOrchestrator<A> {
             }
         }
 
-        // === 5) Handle BTC→NATIVE ===
+        // Handle BTC→NATIVE
         for (tx_id, conv) in ready_b2h {
             if let Err(err) = self
                 .adapter
@@ -78,13 +100,13 @@ impl<A: ConvertingAdapter> ConvertingOrchestrator<A> {
             }
         }
 
-        // === 6) Liquidity Check ===
+        // Liquidity Check
         let native_liq = self.adapter.read_liquidity().await?;
         self.adapter
             .maybe_rebalance_contract_liquidity(native_liq)
             .await?;
 
-        // === 7) BTC hot wallet rebalance ===
+        // BTC hot wallet rebalance
         maybe_rebalance_btc_wallets(&self.core_ctx).await?;
 
         info!("Done conversion pass.");

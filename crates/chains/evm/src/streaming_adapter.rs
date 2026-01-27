@@ -149,6 +149,7 @@ impl StreamingAdapter for EvmStreamingAdapter {
         let from = U256::one();
         let max_results_u256 = U256::from(max_results);
 
+        // ---- WAITING_USER_ACTION ----
         let native_to_btc_fut = contract.get_tx_ids_by_filter(
             TransactionType::NATIVE_TO_BITCOIN,
             TransactionPhase::WAITING_USER_ACTION,
@@ -170,14 +171,15 @@ impl StreamingAdapter for EvmStreamingAdapter {
         );
 
         let (native_to_btc, btc_to_native) =
-            try_join!(native_to_btc_fut.call(), btc_to_native_fut.call(),)?;
+            try_join!(native_to_btc_fut.call(), btc_to_native_fut.call())?;
 
         let tx_ids_waiting_user_action: Vec<U256> =
             native_to_btc.into_iter().chain(btc_to_native).collect();
 
+        // ---- ACTIVE_WAITING_PROOF ----
         let native_to_btc_call = contract.get_tx_ids_by_filter(
             TransactionType::NATIVE_TO_BITCOIN,
-            TransactionPhase::WAITING_USER_ACTION,
+            TransactionPhase::ACTIVE_WAITING_PROOF,
             Address::zero(),
             Bytes::new(),
             from,
@@ -187,7 +189,7 @@ impl StreamingAdapter for EvmStreamingAdapter {
 
         let btc_to_native_call = contract.get_tx_ids_by_filter(
             TransactionType::BITCOIN_TO_NATIVE,
-            TransactionPhase::WAITING_USER_ACTION,
+            TransactionPhase::ACTIVE_WAITING_PROOF,
             Address::zero(),
             Bytes::new(),
             from,
@@ -196,11 +198,12 @@ impl StreamingAdapter for EvmStreamingAdapter {
         );
 
         let (native_to_btc, btc_to_native) =
-            try_join!(native_to_btc_call.call(), btc_to_native_call.call(),)?;
+            try_join!(native_to_btc_call.call(), btc_to_native_call.call())?;
 
         let tx_ids_active_waiting_proof: Vec<U256> =
             native_to_btc.into_iter().chain(btc_to_native).collect();
 
+        // ---- MERGE & DEDUP ----
         let mut set: HashSet<U256> = tx_ids_waiting_user_action.into_iter().collect();
         set.extend(tx_ids_active_waiting_proof);
 
@@ -279,7 +282,7 @@ impl StreamingAdapter for EvmStreamingAdapter {
             });
         }
 
-        let target_plus = target + 2;
+        let target_plus = target + 1;
 
         info!(
             tx_id = %tx_id,

@@ -1,9 +1,10 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use ethers::types::{Address, Bytes, U256};
 use paradapp_core::{
     btc::btc_service::{
+        BitcoinMerkleProofPayload, check_confirmation_and_build_proof,
         derive_address_from_mnemonic, send_all_btc_from_account_to_dev, send_to_user_program,
     },
     consts::{transaction_phase::TransactionPhase, transaction_type::TransactionType},
@@ -52,13 +53,42 @@ impl ConvertingAdapter for EvmConvertingAdapter {
         let btc_ok = {
             let url = format!("{}/blocks/tip/height", self.core_ctx.cfg.esplora_base);
 
-            match self.core_ctx.http.get(url).send().await {
+            match self.core_ctx.http.get(&url).send().await {
                 Ok(resp) => match resp.text().await {
-                    Ok(text) => text.parse::<u32>().is_ok(),
-                    Err(_) => false,
+                    Ok(text) => match text.parse::<u32>() {
+                        Ok(height) => {
+                            info!(
+                                url = %url,
+                                height,
+                                "Bitcoin Esplora health check OK"
+                            );
+                            true
+                        }
+                        Err(e) => {
+                            warn!(
+                                url = %url,
+                                response = %text,
+                                error = %e,
+                                "Bitcoin Esplora returned invalid height"
+                            );
+                            false
+                        }
+                    },
+                    Err(e) => {
+                        error!(
+                            url = %url,
+                            error = %e,
+                            "Bitcoin Esplora failed to read response body"
+                        );
+                        false
+                    }
                 },
                 Err(e) => {
-                    error!(error = %e, "Bitcoin Esplora health failed");
+                    error!(
+                        url = %url,
+                        error = %e,
+                        "Bitcoin Esplora request failed"
+                    );
                     false
                 }
             }
@@ -208,6 +238,13 @@ impl ConvertingAdapter for EvmConvertingAdapter {
             .await
             .map_err(anyhow::Error::from)?;
 
+        info!(
+            to_tx_id = %to_tx_id,
+            count = active.len(),
+            tx_ids = ?active,
+            "Contract returned ACTIVE_WAITING_PROOF Native→BTC txs"
+        );
+
         let mut ready = Vec::new();
 
         for tx_id in active {
@@ -236,9 +273,10 @@ impl ConvertingAdapter for EvmConvertingAdapter {
 
         if !ready.is_empty() {
             info!(
-                "Found {} Native→BTC conversions with user deposit, awaiting BTC payout: {:?}",
-                ready.len(),
-                ready.iter().map(|r| r.0).collect::<Vec<_>>()
+                to_tx_id = %to_tx_id,
+                count = ready.len(),
+                tx_ids = ?ready.iter().map(|r| r.0).collect::<Vec<_>>(),
+                "Found Native→BTC conversions with user deposit, awaiting BTC payout"
             );
         }
 
@@ -264,6 +302,13 @@ impl ConvertingAdapter for EvmConvertingAdapter {
             .call()
             .await
             .map_err(anyhow::Error::from)?;
+
+        info!(
+            to_tx_id = %to_tx_id,
+            count = completed.len(),
+            tx_ids = ?completed,
+            "Contract returned COMPLETED BTC→Native txs"
+        );
 
         let mut ready = Vec::new();
 
@@ -322,9 +367,10 @@ impl ConvertingAdapter for EvmConvertingAdapter {
 
         if !ready.is_empty() {
             info!(
-                "Found {} BTC→Native conversions completed (user got Native): {:?}",
-                ready.len(),
-                ready.iter().map(|r| r.0).collect::<Vec<_>>()
+                to_tx_id = %to_tx_id,
+                count = ready.len(),
+                tx_ids = ?ready.iter().map(|r| r.0).collect::<Vec<_>>(),
+                "Found BTC→Native conversions completed (user got Native)"
             );
         }
 
@@ -448,5 +494,87 @@ impl ConvertingAdapter for EvmConvertingAdapter {
         }
 
         Ok(())
+    }
+
+    async fn check_confirmation_and_build_proof(
+        &self,
+        tx_id: U256,
+        btc_txid: &str,
+    ) -> Result<Option<BitcoinMerkleProofPayload>> {
+        check_confirmation_and_build_proof(&self.core_ctx, tx_id, btc_txid).await
+    }
+
+    async fn submit_merkle_proof(
+        &self,
+        tx_id: U256,
+        proof: BitcoinMerkleProofPayload,
+    ) -> Result<()> {
+        let call = self.ctx.c_op.submit_bitcoin_merkle_proof_with_tx(
+            tx_id,
+            proof.legacy_tx,
+            proof.vout_index,
+            proof.block_hash_le,
+            proof.block_height,
+            proof.branch,
+            proof.index,
+        );
+
+        let pending = call.send().await?;
+        let tx_hash = pending.tx_hash();
+
+        info!(
+            "✅ Merkle proof submitted txId={} | contract_tx_hash={:?}",
+            proof.tx_id, tx_hash
+        );
+
+        Ok(())
+    }
+
+    async fn get_processed_native_to_btc(&self, tx_ids: &[U256]) -> Result<HashMap<U256, String>> {
+        // Short-circuit: nothing to check
+        if tx_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        // Convert U256 -> i64 (same as old logic)
+        let tx_ids_i64: Vec<i64> = tx_ids
+            .iter()
+            .map(|id| id.to_string().parse::<i64>())
+            .collect::<Result<_, _>>()?;
+
+        // Build dynamic IN (...) placeholders
+        let placeholders = std::iter::repeat_n("?", tx_ids_i64.len())
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let sql = format!(
+            r#"
+            SELECT tx_id, btc_tx_id
+            FROM processed_conversions
+            WHERE tx_id IN ({})
+              AND processed = 1
+              AND btc_tx_id IS NOT NULL
+            "#,
+            placeholders
+        );
+
+        let mut query = sqlx::query(&sql);
+
+        for id in &tx_ids_i64 {
+            query = query.bind(id);
+        }
+
+        let rows = query.fetch_all(&self.sqlite_storage).await?;
+
+        let mut result = HashMap::new();
+
+        for row in rows {
+            let tx_id_i64: i64 = row.get("tx_id");
+            let btc_tx_id: String = row.get("btc_tx_id");
+
+            result.insert(U256::from(tx_id_i64), btc_tx_id);
+        }
+
+        Ok(result)
     }
 }

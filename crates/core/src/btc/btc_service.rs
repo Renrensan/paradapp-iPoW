@@ -575,6 +575,94 @@ pub async fn build_proof_bundle(
     })
 }
 
+#[derive(Debug, serde:: Deserialize)]
+pub struct TxStatus {
+    pub confirmed: bool,
+
+    pub block_height: Option<u64>,
+    pub block_hash: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct BitcoinMerkleProofPayload {
+    pub tx_id: U256,
+    pub legacy_tx: ethers::types::Bytes,
+    pub vout_index: U256,
+    pub block_hash_le: [u8; 32],
+    pub block_height: U256,
+    pub branch: Vec<[u8; 32]>,
+    pub index: U256,
+}
+pub async fn check_confirmation_and_build_proof(
+    ctx: &CoreContext,
+    tx_id: U256,
+    btc_txid: &str,
+) -> Result<Option<BitcoinMerkleProofPayload>> {
+    // ---- 1) Check BTC confirmation ----
+    let status_url = format!("{}/tx/{}/status", ctx.cfg.esplora_base, btc_txid);
+    let res = ctx.http.get(&status_url).send().await?;
+
+    if !res.status().is_success() {
+        info!("Mempool API error for txid {}, will retry later", btc_txid);
+        return Ok(None);
+    }
+
+    let status: TxStatus = res.json().await?;
+
+    if !status.confirmed {
+        info!("BTC tx {} not confirmed yet", btc_txid);
+        return Ok(None);
+    }
+
+    info!("BTC tx {} confirmed! Building merkle proof…", btc_txid);
+
+    // ---- 2) Extract block info ----
+    let block_height = status
+        .block_height
+        .ok_or_else(|| anyhow!("missing block_height"))?;
+
+    let block_hash_be = status
+        .block_hash
+        .as_ref()
+        .ok_or_else(|| anyhow!("missing block_hash"))?;
+
+    // ---- 3) Build proof bundle ----
+    // vout_index is fixed to 0 in your tx structure
+    let vout_index_usize: usize = 0;
+
+    let proof =
+        build_proof_bundle(ctx, btc_txid, vout_index_usize, block_hash_be, block_height).await?;
+
+    // ---- 4) Convert fields to contract-ready types ----
+    let legacy_tx =
+        ethers::types::Bytes::from(hex::decode(proof.legacy_0x.trim_start_matches("0x"))?);
+
+    let mut block_hash_le = [0u8; 32];
+    block_hash_le.copy_from_slice(&hex::decode(proof.block_hash_le.trim_start_matches("0x"))?);
+
+    let branch = proof
+        .branch
+        .iter()
+        .map(|h| {
+            let mut node = [0u8; 32];
+            let decoded = hex::decode(h.trim_start_matches("0x"))?;
+            node.copy_from_slice(&decoded);
+            Ok::<_, anyhow::Error>(node)
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    // ---- 5) Return payload (no side effects) ----
+    Ok(Some(BitcoinMerkleProofPayload {
+        tx_id,
+        legacy_tx,
+        vout_index: U256::from(proof.vout_index),
+        block_hash_le,
+        block_height: U256::from(proof.block_height),
+        branch,
+        index: U256::from(proof.index),
+    }))
+}
+
 pub fn derive_address_from_script_bytes(
     ctx: &CoreContext,
     script_bytes: &[u8],

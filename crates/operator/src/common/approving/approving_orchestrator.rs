@@ -25,12 +25,6 @@ impl ApprovingOrchestrator {
         fields(network = %self.network)
     )]
     pub async fn run_once(&self) -> Result<()> {
-        // === Check RPC Health ===
-        if let Err(e) = self.adapter.check_rpc_health().await {
-            warn!(error = %e, "Skipping this cycle — RPC health check failed");
-            return Ok(());
-        }
-
         // === Fetch pending approvals ===
         let pending_txids = match self.adapter.get_pending_txids(500).await {
             Ok(txids) if !txids.is_empty() => txids,
@@ -49,6 +43,12 @@ impl ApprovingOrchestrator {
             tx_ids = ?pending_txids,
             "Found conversions waiting for operator approval"
         );
+
+        // === Check RPC Health ===
+        if let Err(e) = self.adapter.check_rpc_health().await {
+            warn!(error = %e, "Skipping this cycle — RPC health check failed");
+            return Ok(());
+        }
 
         // === Fetch chain state ===
         let mut state = self.adapter.get_global_chain_state().await?;

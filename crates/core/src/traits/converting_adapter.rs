@@ -1,6 +1,10 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use ethers::types::U256;
+
+use crate::btc::btc_service::BitcoinMerkleProofPayload;
 
 #[async_trait]
 pub trait ConvertingAdapter: Send + Sync {
@@ -37,4 +41,18 @@ pub trait ConvertingAdapter: Send + Sync {
         tx_id: U256,
         conv: Self::Conversion,
     ) -> Result<()>;
+
+    async fn check_confirmation_and_build_proof(
+        &self,
+        tx_id: U256,
+        btc_txid: &str,
+    ) -> Result<Option<BitcoinMerkleProofPayload>>;
+
+    async fn submit_merkle_proof(
+        &self,
+        tx_id: U256,
+        proof: BitcoinMerkleProofPayload,
+    ) -> Result<()>;
+
+    async fn get_processed_native_to_btc(&self, tx_ids: &[U256]) -> Result<HashMap<U256, String>>;
 }
