@@ -7,9 +7,12 @@ use paradapp_core::{
         BitcoinMerkleProofPayload, check_confirmation_and_build_proof,
         derive_address_from_mnemonic, send_all_btc_from_account_to_dev, send_to_user_program,
     },
-    consts::{transaction_phase::TransactionPhase, transaction_type::TransactionType},
+    consts::{
+        supported_network_enum::SupportedNetwork, transaction_phase::TransactionPhase,
+        transaction_type::TransactionType,
+    },
     context::CoreContext,
-    traits::converting_adapter::ConvertingAdapter,
+    traits::{chain_helper_adapter::ChainHelperAdapter, converting_adapter::ConvertingAdapter},
 };
 use sqlx::{Row, SqlitePool};
 use tracing::{error, info, warn};
@@ -25,6 +28,7 @@ pub struct EvmConvertingAdapter {
     pub ctx: Arc<EvmContext>,
     pub core_ctx: Arc<CoreContext>,
     pub sqlite_storage: SqlitePool,
+    pub helper: Arc<dyn ChainHelperAdapter>,
 }
 
 #[async_trait]
@@ -219,10 +223,17 @@ impl ConvertingAdapter for EvmConvertingAdapter {
     async fn find_native_to_btc_ready(
         &self,
         to_tx_id: U256,
+        dest_network: Option<SupportedNetwork>,
     ) -> Result<Vec<(U256, Self::Conversion)>> {
         let user_filter = Address::zero();
+        let mut ready = Vec::new();
 
-        let active: Vec<U256> = self
+        let (dest_network_u256, use_network_filter): (U256, bool) = match dest_network {
+            Some(net) => (U256::from(net as u8), true),
+            None => (U256::zero(), false), // ignored when use_network_filter == false
+        };
+        // ---------- Native → BTC ----------
+        let active_native_to_btc: Vec<U256> = self
             .ctx
             .contract
             .get_tx_ids_by_filter(
@@ -230,6 +241,8 @@ impl ConvertingAdapter for EvmConvertingAdapter {
                 TransactionPhase::ACTIVE_WAITING_PROOF,
                 user_filter,
                 Bytes::new(),
+                dest_network_u256,
+                use_network_filter,
                 U256::one(),
                 to_tx_id,
                 U256::from(500),
@@ -240,14 +253,12 @@ impl ConvertingAdapter for EvmConvertingAdapter {
 
         info!(
             to_tx_id = %to_tx_id,
-            count = active.len(),
-            tx_ids = ?active,
+            count = active_native_to_btc.len(),
+            tx_ids = ?active_native_to_btc,
             "Contract returned ACTIVE_WAITING_PROOF Native→BTC txs"
         );
 
-        let mut ready = Vec::new();
-
-        for tx_id in active {
+        for tx_id in active_native_to_btc {
             let conv = self
                 .ctx
                 .c_op
@@ -271,12 +282,59 @@ impl ConvertingAdapter for EvmConvertingAdapter {
             ready.push((tx_id, conv));
         }
 
+        // ---------- Native → Native Out ----------
+        let active_native_to_native_out: Vec<U256> = self
+            .ctx
+            .contract
+            .get_tx_ids_by_filter(
+                TransactionType::NATIVE_TO_NATIVE_OUT,
+                TransactionPhase::ACTIVE_WAITING_PROOF,
+                user_filter,
+                Bytes::new(),
+                dest_network_u256,
+                use_network_filter,
+                U256::one(),
+                to_tx_id,
+                U256::from(500),
+            )
+            .call()
+            .await
+            .map_err(anyhow::Error::from)?;
+
+        info!(
+            to_tx_id = %to_tx_id,
+            count = active_native_to_native_out.len(),
+            tx_ids = ?active_native_to_native_out,
+            "Contract returned ACTIVE_WAITING_PROOF Native→NativeOut txs"
+        );
+
+        for tx_id in active_native_to_native_out {
+            let conv = self
+                .ctx
+                .c_op
+                .get_conversion_with_phase(tx_id)
+                .call()
+                .await?
+                .0;
+
+            // Same readiness rules
+            if !conv.approved || conv.completed || conv.refunded {
+                continue;
+            }
+
+            if !conv.deposited {
+                continue;
+            }
+
+            ready.push((tx_id, conv));
+        }
+
         if !ready.is_empty() {
             info!(
                 to_tx_id = %to_tx_id,
                 count = ready.len(),
                 tx_ids = ?ready.iter().map(|r| r.0).collect::<Vec<_>>(),
-                "Found Native→BTC conversions with user deposit, awaiting BTC payout"
+                "Found ready Native→BTC and Native→NativeOut conversions awaiting payout"
             );
         }
 
@@ -286,22 +344,39 @@ impl ConvertingAdapter for EvmConvertingAdapter {
     async fn find_btc_to_native_completed(
         &self,
         to_tx_id: U256,
+        dest_network: Option<SupportedNetwork>,
     ) -> Result<Vec<(U256, Self::Conversion)>> {
-        let completed: Vec<U256> = self
-            .ctx
-            .contract
-            .get_tx_ids_by_filter(
-                TransactionType::BITCOIN_TO_NATIVE,
-                TransactionPhase::COMPLETED,
-                Address::zero(),
-                Bytes::new(),
-                U256::one(),
-                to_tx_id,
-                U256::from(500),
-            )
-            .call()
-            .await
-            .map_err(anyhow::Error::from)?;
+        let mut completed = Vec::new();
+
+        let (dest_network_u256, use_network_filter): (U256, bool) = match dest_network {
+            Some(net) => (U256::from(net as u8), true),
+            None => (U256::zero(), false), // ignored when use_network_filter == false
+        };
+
+        for tx_type in [
+            TransactionType::BITCOIN_TO_NATIVE,
+            TransactionType::NATIVE_TO_NATIVE_OUT,
+        ] {
+            let mut ids: Vec<U256> = self
+                .ctx
+                .contract
+                .get_tx_ids_by_filter(
+                    tx_type,
+                    TransactionPhase::COMPLETED,
+                    Address::zero(),
+                    Bytes::new(),
+                    dest_network_u256,
+                    use_network_filter,
+                    U256::one(),
+                    to_tx_id,
+                    U256::from(500),
+                )
+                .call()
+                .await
+                .map_err(anyhow::Error::from)?;
+
+            completed.append(&mut ids);
+        }
 
         info!(
             to_tx_id = %to_tx_id,

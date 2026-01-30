@@ -1,0 +1,11 @@
+[package]
+name = "paradapp-interop"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+paradapp-core = { path = "../core" }
+anyhow = "1.0.100"
+async-trait = "0.1.89"
+ethers = "2.0.14"
+tracing = "0.1.44"

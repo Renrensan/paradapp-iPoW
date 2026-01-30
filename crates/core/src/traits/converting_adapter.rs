@@ -4,7 +4,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use ethers::types::U256;
 
-use crate::btc::btc_service::BitcoinMerkleProofPayload;
+use crate::{
+    btc::btc_service::BitcoinMerkleProofPayload, consts::supported_network_enum::SupportedNetwork,
+};
 
 #[async_trait]
 pub trait ConvertingAdapter: Send + Sync {
@@ -23,11 +25,13 @@ pub trait ConvertingAdapter: Send + Sync {
     async fn find_native_to_btc_ready(
         &self,
         to_tx_id: U256,
+        dest_network: Option<SupportedNetwork>,
     ) -> Result<Vec<(U256, Self::Conversion)>>;
 
     async fn find_btc_to_native_completed(
         &self,
         to_tx_id: U256,
+        dest_network: Option<SupportedNetwork>,
     ) -> Result<Vec<(U256, Self::Conversion)>>;
 
     async fn handle_native_to_btc_conversion(

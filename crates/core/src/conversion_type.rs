@@ -1,0 +1,22 @@
+#[derive(Debug, Clone)]
+pub struct ConversionResult {
+    pub user: ::ethers::core::types::Address,
+    pub is_native_to_bitcoin: bool,
+    pub slippage: u16,
+    pub user_program: ::ethers::core::types::Bytes,
+    pub paradapp_receive_program: ::ethers::core::types::Bytes,
+    pub network_address: ::ethers::core::types::Bytes,
+    pub network_id: ::ethers::core::types::U256,
+    pub native_amount: ::ethers::core::types::U256,
+    pub bitcoin_amount: ::ethers::core::types::U256,
+    pub created_at: ::ethers::core::types::U256,
+    pub approved_at: ::ethers::core::types::U256,
+    pub deposited_at: ::ethers::core::types::U256,
+    pub commit_fee: ::ethers::core::types::U256,
+    pub approved: bool,
+    pub deposited: bool,
+    pub completed: bool,
+    pub refunded: bool,
+    pub reserved_native: ::ethers::core::types::U256,
+    pub operator_duty_expires_at: ::ethers::core::types::U256,
+}

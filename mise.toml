@@ -13,16 +13,20 @@ description = "Build all operator binaries in debug mode"
 run = "cargo build"
 
 [tasks.run-all]
-description = "Run operator all network"
-run = "cargo run -- --network all"
+description = "Run monolith operator"
+run = "cargo run -- --mode all"
+
+[tasks.run-bridge-hedera-eth]
+description = "Run bridge between Hedera and Ethereum"
+run = "cargo run -- --mode bridge --src Hedera --dst Ethereum"
 
 [tasks.run-hedera]
 description = "Run operator for Hedera network"
-run = "cargo run -- --network hedera"
+run = "cargo run -- --mode operator --src Hedera"
 
 [tasks.run-ethereum]
 description = "Run operator for Ethereum network"
-run = "cargo run -- --network ethereum"
+run = "cargo run -- --mode operator --src Ethereum"
 
 [tasks.docker-build]
 description = "Build Docker image for paradapp operator"
@@ -55,4 +59,3 @@ run = "cargo clippy --all-targets --all-features -- -D warnings"
 [tasks.lint]
 description = "Run all Rust linters"
 depends = ["fmt", "clippy"]
-

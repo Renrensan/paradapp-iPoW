@@ -1,0 +1,74 @@
+use anyhow::Result;
+use async_trait::async_trait;
+use ethers::types::{Address, Bytes, H160, U256};
+
+use crate::{consts::supported_network_enum::SupportedNetwork, conversion_type::ConversionResult};
+
+/// Parameters for filtering transaction IDs.
+pub struct TxIdFilter {
+    pub type_filter: u8,
+    pub phase_filter: u8,
+    pub user_filter: H160,
+    pub user_program_filter: Bytes,
+    pub dest_network: Option<SupportedNetwork>,
+    pub from_tx_id: U256,
+    pub to_tx_id: U256,
+    pub max_results: U256,
+}
+
+/// Parameters for committing a Bitcoin -> Native conversion.
+pub struct BitcoinToNativeCommitArgs {
+    pub bitcoin_amount: U256,
+    pub network_id: U256,
+    pub user_program: Bytes,
+    pub dest_address: Address,
+    pub network_address: Bytes,
+    pub duty_window_seconds: U256,
+    pub paradapp_receive_program: Bytes,
+    pub locked_anchor_height: U256,
+    pub slippage: u16,
+}
+
+#[derive(Debug, Clone)]
+pub struct AnchorInfo {
+    pub anchor_height: U256,
+    pub epoch_first_height: U256,
+}
+
+pub struct GlobalChainState {
+    pub next_tx_id: U256,
+    pub confirmations_required: u64,
+    pub global_tip: u64,
+    pub safe_anchor: u64,
+    pub active_open: u64,
+    pub btc_tip: u64,
+}
+#[async_trait]
+pub trait ChainHelperAdapter: Send + Sync {
+    async fn check_rpc_health(&self) -> Result<()>;
+
+    async fn stream_headers_to_height(
+        &self,
+        current_tip: u64,
+        up_to_height: u64,
+        max_count: u64,
+    ) -> Result<u64>;
+
+    async fn jump_to_anchor_from_zero_active(&self, global_tip: u64, anchor_h: u64) -> Result<u64>;
+
+    async fn global_tip_height(&self) -> Result<U256>;
+
+    async fn min_anchor_height(&self) -> Result<U256>;
+
+    async fn get_tx_ids_by_filter(&self, filter: TxIdFilter) -> Result<Vec<U256>>;
+
+    async fn next_tx_id(&self) -> Result<U256>;
+
+    async fn commit_bitcoin_to_native(&self, args: BitcoinToNativeCommitArgs) -> Result<()>;
+
+    async fn anchor_info(&self, tx_id: U256) -> Result<AnchorInfo>;
+
+    async fn get_conversion_info(&self, tx_id: U256) -> Result<ConversionResult>;
+
+    async fn get_global_chain_state(&self) -> Result<GlobalChainState>;
+}

@@ -6,94 +6,32 @@ use ethers::{
     utils::hex,
 };
 use paradapp_core::{
-    btc::btc_service::{
-        btc_tip_height, decode_header80, derive_p2wpkh_address, header80_by_height,
+    btc::btc_service::derive_p2wpkh_address,
+    consts::{
+        supported_network_enum::SupportedNetwork, transaction_phase::TransactionPhase,
+        transaction_type::TransactionType,
     },
-    consts::{transaction_phase::TransactionPhase, transaction_type::TransactionType},
     context::CoreContext,
-    traits::approving_adapter::{ApprovingAdapter, GlobalChainState},
+    traits::{
+        approving_adapter::ApprovingAdapter,
+        chain_helper_adapter::{ChainHelperAdapter, TxIdFilter},
+    },
 };
 use sqlx::SqlitePool;
 use tracing::{error, info, warn};
 
-use crate::{
-    bindings::paradapp_convert::Conversion, common::helpers::preflight::preflight_commit_global,
-    dependencies::context::EvmContext,
-};
-use anyhow::{Context, Result, anyhow};
+use crate::{bindings::paradapp_convert::Conversion, dependencies::context::EvmContext};
+use anyhow::{Result, anyhow};
 
 pub struct EvmApprovingAdapter {
     pub ctx: Arc<EvmContext>,
     pub core_ctx: Arc<CoreContext>,
     pub sqlite_storage: SqlitePool,
+    pub helper: Arc<dyn ChainHelperAdapter>,
 }
 
 #[async_trait]
 impl ApprovingAdapter for EvmApprovingAdapter {
-    async fn check_rpc_health(&self) -> Result<()> {
-        // EVM RPC ===
-        let evm_ok = match self
-            .ctx
-            .provider
-            .request::<(), ethers::types::U64>("eth_blockNumber", ())
-            .await
-        {
-            Ok(bn) => {
-                info!(block_number = %bn, "EVM RPC alive");
-                true
-            }
-            Err(e) => {
-                error!(error = %e, "EVM RPC health check failed");
-                false
-            }
-        };
-
-        // === Bitcoin Esplora ===
-        let btc_ok = {
-            let url = format!("{}/blocks/tip/height", self.core_ctx.cfg.esplora_base);
-
-            match self.core_ctx.http.get(url).send().await {
-                Ok(resp) => match resp.text().await {
-                    Ok(text) => text.parse::<u32>().is_ok(),
-                    Err(_) => false,
-                },
-                Err(e) => {
-                    error!(error = %e, "Bitcoin Esplora health failed");
-                    false
-                }
-            }
-        };
-
-        if !evm_ok || !btc_ok {
-            anyhow::bail!("one or more upstream RPCs are down");
-        }
-
-        Ok(())
-    }
-
-    fn epoch_start(&self, height: u64) -> u64 {
-        height - (height % 2016)
-    }
-
-    async fn get_global_chain_state(&self) -> Result<GlobalChainState> {
-        let contract = &self.ctx.contract;
-
-        let next_tx_id = contract.next_tx_id().call().await?;
-        let conf_req = contract.confirmations_required().call().await?.as_u64();
-        let global_tip = contract.global_tip_height().call().await?.as_u64();
-        let active_open = contract.active_open_conversions().call().await?.as_u64();
-        let btc_tip = btc_tip_height(&self.core_ctx).await?;
-
-        Ok(GlobalChainState {
-            next_tx_id,
-            confirmations_required: conf_req,
-            btc_tip,
-            safe_anchor: btc_tip,
-            global_tip,
-            active_open,
-        })
-    }
-
     async fn get_or_create_index_for_tx(&self, tx_id: U256) -> Result<u32> {
         let pool: &SqlitePool = &self.sqlite_storage;
         let tx_id_str = tx_id.to_string();
@@ -165,152 +103,6 @@ impl ApprovingAdapter for EvmApprovingAdapter {
         Ok((idx, address, script))
     }
 
-    async fn jump_to_anchor_from_zero_active(&self, global_tip: u64, anchor_h: u64) -> Result<u64> {
-        info!(
-            input_global_tip = %global_tip,
-            input_anchor_h = %anchor_h,
-            "jump_to_anchor_from_zero_active called"
-        );
-
-        if anchor_h <= global_tip {
-            info!(
-                anchor_h = %anchor_h,
-                global_tip = %global_tip,
-                "No jump needed — anchor already <= global tip"
-            );
-            return Ok(global_tip);
-        }
-
-        let first_h = self.epoch_start(anchor_h);
-        info!(
-            calculated_first_h = %first_h,
-            target_anchor_h = %anchor_h,
-            current_global_tip = %global_tip,
-            "Planning jump: first_h={} → anchor_h={}",
-            first_h, anchor_h
-        );
-
-        let mut committed_up_to: u64 = global_tip;
-
-        // === 1. Commit epoch-first header ===
-        if first_h > global_tip && first_h > 0 {
-            info!(height = %first_h, "Attempting to commit epoch-first header");
-
-            let (_, header80) = header80_by_height(&self.core_ctx, first_h)
-                .await
-                .with_context(|| {
-                    format!("Failed to fetch epoch-first header at height {first_h}")
-                })?;
-
-            let header80_bytes = decode_header80(&header80)
-                .map_err(|e| anyhow!("decode failed for first_h={first_h}: {e}"))?;
-
-            let preflight =
-                preflight_commit_global(&self.ctx, header80_bytes.clone(), first_h).await;
-
-            if !preflight.static_ok {
-                let err = preflight.static_err.unwrap_or_default();
-                if err.to_string().to_lowercase().contains("height-rewrite") {
-                    info!(height = %first_h, "Epoch-first already committed (height-rewrite)");
-                    committed_up_to = committed_up_to.max(first_h);
-                } else {
-                    return Err(anyhow!("Preflight failed for epoch-first {first_h}: {err}"));
-                }
-            } else {
-                match self
-                    .ctx
-                    .c_op
-                    .commit_global_bitcoin_header_80(header80_bytes, U256::from(first_h), vec![])
-                    .send()
-                    .await
-                {
-                    Ok(pending) => {
-                        info!(
-                            tx_hash = ?pending.tx_hash(),
-                            height = %first_h,
-                            "Epoch-first header TX BROADCASTED"
-                        );
-                        committed_up_to = committed_up_to.max(first_h);
-                    }
-                    Err(e) => {
-                        warn!(
-                            height = %first_h,
-                            error = %e,
-                            "Failed to broadcast epoch-first — will retry"
-                        );
-                        // Do NOT advance tip
-                    }
-                }
-            }
-        } else {
-            info!(
-                first_h = %first_h,
-                global_tip = %global_tip,
-                "Skipping epoch-first: already at or beyond"
-            );
-            committed_up_to = committed_up_to.max(first_h);
-        }
-
-        // === 2. Commit actual anchor header ===
-        info!(height = %anchor_h, "Now committing anchor header");
-
-        let (_, anchor80) = header80_by_height(&self.core_ctx, anchor_h)
-            .await
-            .with_context(|| format!("Failed to fetch anchor header {anchor_h}"))?;
-
-        let anchor80_bytes = decode_header80(&anchor80)
-            .map_err(|e| anyhow!("decode failed for anchor_h={anchor_h}: {e}"))?;
-
-        let preflight = preflight_commit_global(&self.ctx, anchor80_bytes.clone(), anchor_h).await;
-
-        if !preflight.static_ok {
-            let err = preflight.static_err.unwrap_or_default();
-            let err_msg = err.to_string().to_lowercase();
-            if err_msg.contains("height-rewrite") {
-                info!(height = %anchor_h, "Anchor already stored (height-rewrite)");
-            } else if err_msg.contains("no-jump-while-active") {
-                warn!(height = %anchor_h, "no-jump-while-active triggered — possible race!");
-                return Ok(committed_up_to);
-            } else {
-                return Err(anyhow!("Preflight failed for anchor {anchor_h}: {err}"));
-            }
-        } else {
-            match self
-                .ctx
-                .c_op
-                .commit_global_bitcoin_header_80(anchor80_bytes, U256::from(anchor_h), vec![])
-                .send()
-                .await
-            {
-                Ok(pending) => {
-                    info!(
-                        tx_hash = ?pending.tx_hash(),
-                        height = %anchor_h,
-                        "ANCHOR HEADER TX BROADCASTED — jump successful"
-                    );
-                    committed_up_to = anchor_h; // Critical: update to anchor_h, not first_h!
-                }
-                Err(e) => {
-                    warn!(
-                        height = %anchor_h,
-                        error = %e,
-                        "Failed to broadcast anchor header — will retry next cycle"
-                    );
-                    // Do not advance
-                }
-            }
-        }
-
-        info!(
-            final_committed_up_to = %committed_up_to,
-            original_global_tip = %global_tip,
-            target_anchor = %anchor_h,
-            "jump_to_anchor_from_zero_active finished"
-        );
-
-        Ok(committed_up_to)
-    }
-
     async fn get_tx_ids_by_phase(
         &self,
         phase: u8,
@@ -318,11 +110,15 @@ impl ApprovingAdapter for EvmApprovingAdapter {
         from_tx_id: U256,
         to_tx_id: U256,
         max_results: U256,
+        dest_network: Option<SupportedNetwork>,
     ) -> Result<Vec<U256>> {
         // Zero address = wildcard user
         let user_filter = Address::zero();
 
-        // Call Solidity method `getTxIdsByFilter`
+        let (dest_network_u256, use_network_filter): (U256, bool) = match dest_network {
+            Some(net) => (U256::from(net as u8), true),
+            None => (U256::zero(), false), // ignored when use_network_filter == false
+        };
         let tx_ids_bn: Vec<U256> = self
             .ctx
             .contract
@@ -331,6 +127,8 @@ impl ApprovingAdapter for EvmApprovingAdapter {
                 phase,
                 user_filter,
                 Bytes::new(),
+                dest_network_u256,
+                use_network_filter,
                 from_tx_id,
                 to_tx_id,
                 max_results,
@@ -458,6 +256,7 @@ impl ApprovingAdapter for EvmApprovingAdapter {
         &self,
         to_tx_id: U256,
         conf_req: u64,
+        dest_network: Option<SupportedNetwork>,
     ) -> Result<Vec<(U256, String)>> {
         let conf_req_bn = U256::from(conf_req);
 
@@ -466,34 +265,64 @@ impl ApprovingAdapter for EvmApprovingAdapter {
 
         use futures::try_join;
 
+        // Filter params
+        let user_filter = Address::zero();
+        let user_program_filter = Bytes::new();
+
         // --- ACTIVE_WAITING_PROOF ---
-        let (native_to_btc, btc_to_native) = try_join!(
-            self.get_tx_ids_by_phase(
-                TransactionPhase::ACTIVE_WAITING_PROOF,
-                TransactionType::NATIVE_TO_BITCOIN,
+        let (native_to_btc, btc_to_native, native_to_native_in, native_to_native_out) = try_join!(
+            self.helper.get_tx_ids_by_filter(TxIdFilter {
+                type_filter: TransactionType::NATIVE_TO_BITCOIN,
+                phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
+                user_filter,
+                user_program_filter,
+                dest_network: None,
                 from_tx_id,
                 to_tx_id,
                 max_results,
-            ),
+            }),
             self.get_tx_ids_by_phase(
                 TransactionPhase::ACTIVE_WAITING_PROOF,
                 TransactionType::BITCOIN_TO_NATIVE,
                 from_tx_id,
                 to_tx_id,
                 max_results,
+                dest_network
+            ),
+            self.get_tx_ids_by_phase(
+                TransactionPhase::ACTIVE_WAITING_PROOF,
+                TransactionType::NATIVE_TO_NATIVE_IN,
+                from_tx_id,
+                to_tx_id,
+                max_results,
+                dest_network
+            ),
+            self.get_tx_ids_by_phase(
+                TransactionPhase::ACTIVE_WAITING_PROOF,
+                TransactionType::NATIVE_TO_NATIVE_OUT,
+                from_tx_id,
+                to_tx_id,
+                max_results,
+                dest_network
             ),
         )?;
 
-        let active_txs: Vec<U256> = native_to_btc.into_iter().chain(btc_to_native).collect();
+        let active_txs: Vec<U256> = native_to_btc
+            .into_iter()
+            .chain(btc_to_native)
+            .chain(native_to_native_in)
+            .chain(native_to_native_out)
+            .collect();
 
         // --- OPERATOR_DUTY_EXPIRED ---
-        let (native_to_btc, btc_to_native) = try_join!(
+        let (native_to_btc, btc_to_native, native_to_native_in, native_to_native_out) = try_join!(
             self.get_tx_ids_by_phase(
                 TransactionPhase::OPERATOR_DUTY_EXPIRED,
                 TransactionType::NATIVE_TO_BITCOIN,
                 from_tx_id,
                 to_tx_id,
                 max_results,
+                dest_network,
             ),
             self.get_tx_ids_by_phase(
                 TransactionPhase::OPERATOR_DUTY_EXPIRED,
@@ -501,10 +330,32 @@ impl ApprovingAdapter for EvmApprovingAdapter {
                 from_tx_id,
                 to_tx_id,
                 max_results,
+                dest_network,
+            ),
+            self.get_tx_ids_by_phase(
+                TransactionPhase::OPERATOR_DUTY_EXPIRED,
+                TransactionType::NATIVE_TO_NATIVE_IN,
+                from_tx_id,
+                to_tx_id,
+                max_results,
+                dest_network,
+            ),
+            self.get_tx_ids_by_phase(
+                TransactionPhase::OPERATOR_DUTY_EXPIRED,
+                TransactionType::NATIVE_TO_NATIVE_OUT,
+                from_tx_id,
+                to_tx_id,
+                max_results,
+                dest_network,
             ),
         )?;
 
-        let duty_expired_txs: Vec<U256> = native_to_btc.into_iter().chain(btc_to_native).collect();
+        let duty_expired_txs: Vec<U256> = native_to_btc
+            .into_iter()
+            .chain(btc_to_native)
+            .chain(native_to_native_in)
+            .chain(native_to_native_out)
+            .collect();
 
         let mut seen = std::collections::HashSet::<U256>::new();
         let mut candidates: Vec<(U256, String)> = Vec::new();
@@ -681,7 +532,11 @@ impl ApprovingAdapter for EvmApprovingAdapter {
         Ok(())
     }
 
-    async fn get_pending_txids(&self, max_results: u32) -> Result<Vec<U256>> {
+    async fn get_pending_txids(
+        &self,
+        max_results: u32,
+        dest_network: Option<SupportedNetwork>,
+    ) -> Result<Vec<U256>> {
         let contract = self.ctx.contract.clone();
 
         let next_tx_id: U256 = contract.next_tx_id().call().await?;
@@ -691,13 +546,18 @@ impl ApprovingAdapter for EvmApprovingAdapter {
 
         // toTxId = nextTxId - 1
         let to_tx_id = next_tx_id - U256::from(1u64);
-
+        let (dest_network_u256, use_network_filter): (U256, bool) = match dest_network {
+            Some(net) => (U256::from(net as u8), true),
+            None => (U256::zero(), false), // ignored when use_network_filter == false
+        };
         let mut tx_ids: Vec<U256> = contract
             .get_tx_ids_by_filter(
                 TransactionType::NATIVE_TO_BITCOIN,
                 TransactionPhase::WAITING_OPERATOR_APPROVAL,
                 Address::zero(),
                 Bytes::new(),
+                dest_network_u256,
+                use_network_filter,
                 U256::from(1u64),
                 to_tx_id,
                 U256::from(max_results),
@@ -711,6 +571,8 @@ impl ApprovingAdapter for EvmApprovingAdapter {
                 TransactionPhase::WAITING_OPERATOR_APPROVAL,
                 Address::zero(),
                 Bytes::new(),
+                dest_network_u256,
+                use_network_filter,
                 U256::from(1u64),
                 to_tx_id,
                 U256::from(max_results),
@@ -719,6 +581,43 @@ impl ApprovingAdapter for EvmApprovingAdapter {
             .await?;
 
         tx_ids.append(&mut btc_to_native_tx_ids);
+
+        Ok(tx_ids)
+    }
+
+    async fn get_pending_native_to_native_out_txids(
+        &self,
+        max_results: u32,
+        dest_network: Option<SupportedNetwork>,
+    ) -> Result<Vec<U256>> {
+        let contract = self.ctx.contract.clone();
+
+        let next_tx_id: U256 = contract.next_tx_id().call().await?;
+        if next_tx_id <= U256::from(1u64) {
+            return Ok(vec![]);
+        }
+
+        // toTxId = nextTxId - 1
+        let to_tx_id = next_tx_id - U256::from(1u64);
+
+        let (dest_network_u256, use_network_filter): (U256, bool) = match dest_network {
+            Some(net) => (U256::from(net as u8), true),
+            None => (U256::zero(), false), // ignored when use_network_filter == false
+        };
+        let tx_ids: Vec<U256> = contract
+            .get_tx_ids_by_filter(
+                TransactionType::NATIVE_TO_NATIVE_OUT,
+                TransactionPhase::WAITING_OPERATOR_APPROVAL,
+                Address::zero(),
+                Bytes::new(),
+                dest_network_u256,
+                use_network_filter,
+                U256::from(1u64),
+                to_tx_id,
+                U256::from(max_results),
+            )
+            .call()
+            .await?;
 
         Ok(tx_ids)
     }
@@ -736,7 +635,7 @@ impl ApprovingAdapter for EvmApprovingAdapter {
             _user_program,
             _paradapp_receive_program,
             _network_address,
-            _network_id,
+            network_id,
             _native_amount,
             _bitcoin_amount,
             _created_at,
@@ -810,10 +709,30 @@ impl ApprovingAdapter for EvmApprovingAdapter {
             }
         }
 
+        // If is native to bitcoin and there are network id params it must be native to native out requests
+        if is_native_to_bitcoin && network_id != U256::zero() {
+            if let Some(static_program) = &self.core_ctx.cfg.paradapp_receive_program {
+                script_arg =
+                    hex::decode(static_program.trim_start_matches("0x")).unwrap_or_default();
+
+                info!(
+                    tx_id = %tx_id,
+                    "Native→BTC tx using static receive program from PARADAPP_RECEIVE_PROGRAM"
+                );
+            } else {
+                info!(
+                    tx_id = %tx_id,
+                    "Cannot approve Native→BTC tx – missing PARADAPP_RECEIVE_PROGRAM"
+                );
+
+                return Err(anyhow!("missing receive program for Native→BTC"));
+            }
+        }
+
         info!(
             tx_id = %tx_id,
             is_native_to_bitcoin = %is_native_to_bitcoin,
-            "🧷 Trying to approve transaction"
+            "Trying to approve transaction"
         );
 
         // Convert hex strings (anchor80 / first80) to Bytes
@@ -856,97 +775,5 @@ impl ApprovingAdapter for EvmApprovingAdapter {
             }
         }
         Ok(())
-    }
-
-    async fn stream_headers_to_height(
-        &self,
-        current_tip: u64,
-        up_to_height: u64,
-        max_count: u64,
-    ) -> Result<u64> {
-        let start = current_tip + 1;
-        let end = std::cmp::min(up_to_height, current_tip + max_count);
-        if end < start {
-            return Ok(current_tip);
-        }
-
-        info!(
-            start = %start,
-            end = %end,
-            "Streaming headers from height {} to {} (contiguous, approve-bot)",
-            start, end
-        );
-
-        let mut new_tip = current_tip;
-        let c_op = self.ctx.c_op.clone();
-
-        for h in start..=end {
-            // 1. Fetch header80
-            let (_, header80) = header80_by_height(&self.core_ctx, h)
-                .await
-                .with_context(|| format!("Failed to fetch header80 for height {h}"))?;
-
-            // 2. Preflight check
-            let header80_bytes = decode_header80(&header80)
-                .map_err(|e| anyhow!("failed to decode header80 at height {h}: {e}"))?;
-            let preflight = preflight_commit_global(&self.ctx, header80_bytes.clone(), h).await;
-
-            if !preflight.static_ok {
-                let err_msg = preflight
-                    .static_err
-                    .map(|e| e.to_string())
-                    .unwrap_or_default()
-                    .to_lowercase();
-
-                if err_msg.contains("height-rewrite") {
-                    info!(
-                        height = %h,
-                        "height already stored, skipping"
-                    );
-                    new_tip = h; // still advance tip (assume it's stored)
-                    continue;
-                } else if err_msg.contains("no-jump-while-active") {
-                    warn!(
-                        height = %h,
-                        "no-jump-while-active, stopping stream"
-                    );
-                    return Ok(new_tip);
-                } else {
-                    error!(
-                        height = %h,
-                        error = %err_msg,
-                        "commitGlobalBTCHeader80 failed"
-                    );
-                    return Ok(new_tip);
-                }
-            }
-
-            // 3. Commit the header
-            match c_op
-                .commit_global_bitcoin_header_80(header80_bytes, U256::from(h), Vec::<U256>::new())
-                .send()
-                .await
-            {
-                Ok(pending_tx) => {
-                    if let Some(_receipt) = pending_tx.await? {
-                        info!(height = %h, "Global header stored");
-                        new_tip = h;
-                    } else {
-                        warn!(height = %h, "Tx for height was dropped/not mined");
-                    }
-                }
-                Err(e) => {
-                    // Likely nonce/gas issue — log and stop
-                    error!(
-                        height = h,
-                        error = %e,
-                        "Failed to send commit tx for height"
-                    );
-                    return Ok(new_tip);
-                }
-            }
-        }
-
-        Ok(new_tip)
     }
 }

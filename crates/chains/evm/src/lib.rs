@@ -3,5 +3,7 @@ pub mod bindings;
 pub mod common;
 pub mod converting_adapter;
 pub mod dependencies;
+pub mod helper;
 pub mod network;
+pub mod stack;
 pub mod streaming_adapter;

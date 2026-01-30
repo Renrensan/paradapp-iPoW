@@ -1626,6 +1626,16 @@
 			},
 			{
 				"internalType": "uint256",
+				"name": "networkIdFilter",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "useNetworkIdFilter",
+				"type": "bool"
+			},
+			{
+				"internalType": "uint256",
 				"name": "fromTxId",
 				"type": "uint256"
 			},
@@ -1685,6 +1695,11 @@
 				"internalType": "bool",
 				"name": "set",
 				"type": "bool"
+			},
+			{
+				"internalType": "uint64",
+				"name": "arrivalTime",
+				"type": "uint64"
 			}
 		],
 		"stateMutability": "view",

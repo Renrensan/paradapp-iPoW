@@ -10,9 +10,15 @@ use ethers::{
 use futures::try_join;
 use paradapp_core::{
     btc::btc_service::{btc_tip_height, check_work_le, decode_header80, header80_by_height},
-    consts::{transaction_phase::TransactionPhase, transaction_type::TransactionType},
+    consts::{
+        supported_network_enum::SupportedNetwork, transaction_phase::TransactionPhase,
+        transaction_type::TransactionType,
+    },
     context::CoreContext,
-    traits::streaming_adapter::{StreamTarget, StreamingAdapter},
+    traits::{
+        chain_helper_adapter::ChainHelperAdapter,
+        streaming_adapter::{StreamTarget, StreamingAdapter},
+    },
 };
 use std::{collections::HashSet, sync::Arc, thread::sleep, time::Duration};
 use tracing::info;
@@ -20,6 +26,7 @@ use tracing::info;
 pub struct EvmStreamingAdapter {
     pub ctx: Arc<EvmContext>,
     pub core_ctx: Arc<CoreContext>,
+    pub helper: Arc<dyn ChainHelperAdapter>,
 }
 
 #[async_trait]
@@ -135,7 +142,11 @@ impl StreamingAdapter for EvmStreamingAdapter {
         Ok(())
     }
 
-    async fn get_active_tx_ids(&self, max_results: u64) -> Result<Vec<U256>> {
+    async fn get_active_tx_ids(
+        &self,
+        max_results: u64,
+        dest_network: Option<SupportedNetwork>,
+    ) -> Result<Vec<U256>> {
         let contract = &self.ctx.contract;
 
         // 1. nextTxId()
@@ -149,12 +160,18 @@ impl StreamingAdapter for EvmStreamingAdapter {
         let from = U256::one();
         let max_results_u256 = U256::from(max_results);
 
+        let (dest_network_u256, use_network_filter): (U256, bool) = match dest_network {
+            Some(net) => (U256::from(net as u8), true),
+            None => (U256::zero(), false), // ignored when use_network_filter == false
+        };
         // ---- WAITING_USER_ACTION ----
         let native_to_btc_fut = contract.get_tx_ids_by_filter(
             TransactionType::NATIVE_TO_BITCOIN,
             TransactionPhase::WAITING_USER_ACTION,
             Address::zero(),
             Bytes::new(),
+            dest_network_u256,
+            use_network_filter,
             from,
             to_tx_id,
             max_results_u256,
@@ -165,6 +182,8 @@ impl StreamingAdapter for EvmStreamingAdapter {
             TransactionPhase::WAITING_USER_ACTION,
             Address::zero(),
             Bytes::new(),
+            dest_network_u256,
+            use_network_filter,
             from,
             to_tx_id,
             max_results_u256,
@@ -182,6 +201,8 @@ impl StreamingAdapter for EvmStreamingAdapter {
             TransactionPhase::ACTIVE_WAITING_PROOF,
             Address::zero(),
             Bytes::new(),
+            dest_network_u256,
+            use_network_filter,
             from,
             to_tx_id,
             max_results_u256,
@@ -192,6 +213,8 @@ impl StreamingAdapter for EvmStreamingAdapter {
             TransactionPhase::ACTIVE_WAITING_PROOF,
             Address::zero(),
             Bytes::new(),
+            dest_network_u256,
+            use_network_filter,
             from,
             to_tx_id,
             max_results_u256,
