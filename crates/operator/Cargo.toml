@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 paradapp-core = { path = "../core" }
+paradapp-interop = {path = "../interop"}
 paradapp-chain-evm = { path = "../chains/evm" }
 anyhow = "1"
 tokio = { version = "1", features = ["full"] }

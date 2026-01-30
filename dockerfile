@@ -11,6 +11,8 @@ COPY crates/core/src/lib.rs crates/core/src/lib.rs
 COPY crates/chains/evm/Cargo.toml crates/chains/evm/Cargo.toml
 COPY crates/chains/evm/src/lib.rs crates/chains/evm/src/lib.rs
 COPY crates/operator/Cargo.toml crates/operator/Cargo.toml
+COPY crates/interop/Cargo.toml crates/interop/Cargo.toml
+COPY crates/interop/src/lib.rs crates/interop/src/lib.rs
 COPY crates/operator/src/main.rs crates/operator/src/main.rs
 
 

@@ -1015,6 +1015,20 @@ pub mod paradapp_convert {
                                 ),
                             },
                             ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("networkIdFilter"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("uint256"),
+                                ),
+                            },
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("useNetworkIdFilter",),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Bool,
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("bool"),
+                                ),
+                            },
+                            ::ethers::core::abi::ethabi::Param {
                                 name: ::std::borrow::ToOwned::to_owned("fromTxId"),
                                 kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
                                 internal_type: ::core::option::Option::Some(
@@ -1096,6 +1110,13 @@ pub mod paradapp_convert {
                                 kind: ::ethers::core::abi::ethabi::ParamType::Bool,
                                 internal_type: ::core::option::Option::Some(
                                     ::std::borrow::ToOwned::to_owned("bool"),
+                                ),
+                            },
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("arrivalTime"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("uint64"),
                                 ),
                             },
                         ],
@@ -2988,13 +3009,15 @@ pub mod paradapp_convert {
                 .method_hash([117, 147, 167, 58], tx_id)
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `getTxIdsByFilter` (0x470842c4) function
+        ///Calls the contract's `getTxIdsByFilter` (0x34c3af1c) function
         pub fn get_tx_ids_by_filter(
             &self,
             type_filter: u8,
             phase_filter: u8,
             user_filter: ::ethers::core::types::Address,
             user_program_filter: ::ethers::core::types::Bytes,
+            network_id_filter: ::ethers::core::types::U256,
+            use_network_id_filter: bool,
             from_tx_id: ::ethers::core::types::U256,
             to_tx_id: ::ethers::core::types::U256,
             max_results: ::ethers::core::types::U256,
@@ -3004,12 +3027,14 @@ pub mod paradapp_convert {
         > {
             self.0
                 .method_hash(
-                    [71, 8, 66, 196],
+                    [52, 195, 175, 28],
                     (
                         type_filter,
                         phase_filter,
                         user_filter,
                         user_program_filter,
+                        network_id_filter,
+                        use_network_id_filter,
                         from_tx_id,
                         to_tx_id,
                         max_results,
@@ -3021,7 +3046,7 @@ pub mod paradapp_convert {
         pub fn global_headers(
             &self,
             p0: [u8; 32],
-        ) -> ::ethers::contract::builders::ContractCall<M, ([u8; 32], [u8; 32], u32, u32, bool)>
+        ) -> ::ethers::contract::builders::ContractCall<M, ([u8; 32], [u8; 32], u32, u32, bool, u64)>
         {
             self.0
                 .method_hash([217, 161, 157, 53], p0)
@@ -6373,7 +6398,7 @@ pub mod paradapp_convert {
     pub struct GetConversionWithPhaseCall {
         pub tx_id: ::ethers::core::types::U256,
     }
-    ///Container type for all input parameters for the `getTxIdsByFilter` function with signature `getTxIdsByFilter(uint8,uint8,address,bytes,uint256,uint256,uint256)` and selector `0x470842c4`
+    ///Container type for all input parameters for the `getTxIdsByFilter` function with signature `getTxIdsByFilter(uint8,uint8,address,bytes,uint256,bool,uint256,uint256,uint256)` and selector `0x34c3af1c`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -6386,13 +6411,15 @@ pub mod paradapp_convert {
     )]
     #[ethcall(
         name = "getTxIdsByFilter",
-        abi = "getTxIdsByFilter(uint8,uint8,address,bytes,uint256,uint256,uint256)"
+        abi = "getTxIdsByFilter(uint8,uint8,address,bytes,uint256,bool,uint256,uint256,uint256)"
     )]
     pub struct GetTxIdsByFilterCall {
         pub type_filter: u8,
         pub phase_filter: u8,
         pub user_filter: ::ethers::core::types::Address,
         pub user_program_filter: ::ethers::core::types::Bytes,
+        pub network_id_filter: ::ethers::core::types::U256,
+        pub use_network_id_filter: bool,
         pub from_tx_id: ::ethers::core::types::U256,
         pub to_tx_id: ::ethers::core::types::U256,
         pub max_results: ::ethers::core::types::U256,
@@ -7902,7 +7929,7 @@ pub mod paradapp_convert {
         pub c: Conversion,
         pub phase: u8,
     }
-    ///Container type for all return fields from the `getTxIdsByFilter` function with signature `getTxIdsByFilter(uint8,uint8,address,bytes,uint256,uint256,uint256)` and selector `0x470842c4`
+    ///Container type for all return fields from the `getTxIdsByFilter` function with signature `getTxIdsByFilter(uint8,uint8,address,bytes,uint256,bool,uint256,uint256,uint256)` and selector `0x34c3af1c`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -7933,6 +7960,7 @@ pub mod paradapp_convert {
         pub n_bits: u32,
         pub timestamp: u32,
         pub set: bool,
+        pub arrival_time: u64,
     }
     ///Container type for all return fields from the `globalHeightToHashLE` function with signature `globalHeightToHashLE(uint256)` and selector `0x4b271f5d`
     #[derive(

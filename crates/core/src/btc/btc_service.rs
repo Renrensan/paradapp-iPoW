@@ -22,6 +22,10 @@ use serde_json::Value;
 use std::str::FromStr;
 use tracing::{error, info, warn};
 
+pub fn epoch_start(height: u64) -> u64 {
+    height - (height % 2016)
+}
+
 pub fn parse_human_btc(x: impl ToString) -> Result<U256> {
     let s = x.to_string();
     let v = parse_units(s, 8)?;
