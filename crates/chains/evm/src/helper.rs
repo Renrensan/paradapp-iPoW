@@ -533,4 +533,31 @@ impl ChainHelperAdapter for EvmChainHelper {
             active_open,
         })
     }
+
+    async fn estimate_bitcoin_from_native(&self, native_amount: U256) -> Result<U256> {
+        let c_op = self.ctx.c_op.clone();
+
+        match c_op
+            .estimate_bitcoin_from_native(native_amount)
+            .call()
+            .await
+        {
+            Ok(estimated_btc) => {
+                info!(
+                    native_amount = %native_amount,
+                    estimated_btc = %estimated_btc,
+                    "Estimated Bitcoin from native"
+                );
+                Ok(estimated_btc)
+            }
+            Err(e) => {
+                error!(
+                    error = %e,
+                    native_amount = %native_amount,
+                    "Failed to estimate Bitcoin from native"
+                );
+                Err(anyhow::anyhow!(e))
+            }
+        }
+    }
 }

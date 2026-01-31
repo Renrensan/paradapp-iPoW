@@ -71,4 +71,6 @@ pub trait ChainHelperAdapter: Send + Sync {
     async fn get_conversion_info(&self, tx_id: U256) -> Result<ConversionResult>;
 
     async fn get_global_chain_state(&self) -> Result<GlobalChainState>;
+
+    async fn estimate_bitcoin_from_native(&self, native_amount: U256) -> Result<U256>;
 }
