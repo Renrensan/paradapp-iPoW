@@ -147,10 +147,14 @@ impl InteropResolverTrait for InteropResolver {
             let anchor = self.source_helper.anchor_info(tx_id).await?;
             let dest_address = Address::from_slice(&conv.network_address.as_ref()[..20]);
             let network_address = Bytes::from(conv.user.as_bytes().to_vec());
+            let estimated_bitcoin_amount = self
+                .dest_helper
+                .estimate_bitcoin_from_native(conv.native_amount)
+                .await?;
 
             self.dest_helper
                 .commit_bitcoin_to_native(BitcoinToNativeCommitArgs {
-                    bitcoin_amount: conv.bitcoin_amount,
+                    bitcoin_amount: estimated_bitcoin_amount,
                     network_id: conv.network_id,
                     user_program: Bytes::new(),
                     dest_address,
@@ -386,11 +390,11 @@ impl InteropResolverTrait for InteropResolver {
                 .commit_bitcoin_to_native(BitcoinToNativeCommitArgs {
                     bitcoin_amount: estimated_bitcoin_amount,
                     network_id: conv.network_id,
-                    user_program: conv.user_program.clone(),
+                    user_program: Bytes::new(),
                     dest_address,
                     network_address,
                     duty_window_seconds: conv.operator_duty_expires_at,
-                    paradapp_receive_program: Bytes::new(),
+                    paradapp_receive_program: conv.user_program.clone(),
                     locked_anchor_height: anchor.anchor_height,
                     slippage: conv.slippage,
                 })
