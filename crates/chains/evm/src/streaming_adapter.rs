@@ -7,7 +7,6 @@ use ethers::{
     abi::Address,
     types::{Bytes, U256},
 };
-use futures::try_join;
 use paradapp_core::{
     btc::btc_service::{btc_tip_height, check_work_le, decode_header80, header80_by_height},
     consts::{
@@ -165,66 +164,36 @@ impl StreamingAdapter for EvmStreamingAdapter {
             None => (U256::zero(), false), // ignored when use_network_filter == false
         };
         // ---- WAITING_USER_ACTION ----
-        let native_to_btc_fut = contract.get_tx_ids_by_filter(
-            TransactionType::NATIVE_TO_BITCOIN,
-            TransactionPhase::WAITING_USER_ACTION,
-            Address::zero(),
-            Bytes::new(),
-            dest_network_u256,
-            use_network_filter,
-            from,
-            to_tx_id,
-            max_results_u256,
-        );
-
-        let btc_to_native_fut = contract.get_tx_ids_by_filter(
-            TransactionType::BITCOIN_TO_NATIVE,
-            TransactionPhase::WAITING_USER_ACTION,
-            Address::zero(),
-            Bytes::new(),
-            dest_network_u256,
-            use_network_filter,
-            from,
-            to_tx_id,
-            max_results_u256,
-        );
-
-        let (native_to_btc, btc_to_native) =
-            try_join!(native_to_btc_fut.call(), btc_to_native_fut.call())?;
-
-        let tx_ids_waiting_user_action: Vec<U256> =
-            native_to_btc.into_iter().chain(btc_to_native).collect();
+        let tx_ids_waiting_user_action: Vec<U256> = contract
+            .get_tx_ids_by_filter(
+                TransactionType::ANY,
+                TransactionPhase::WAITING_USER_ACTION,
+                Address::zero(),
+                Bytes::new(),
+                dest_network_u256,
+                use_network_filter,
+                from,
+                to_tx_id,
+                max_results_u256,
+            )
+            .call()
+            .await?;
 
         // ---- ACTIVE_WAITING_PROOF ----
-        let native_to_btc_call = contract.get_tx_ids_by_filter(
-            TransactionType::NATIVE_TO_BITCOIN,
-            TransactionPhase::ACTIVE_WAITING_PROOF,
-            Address::zero(),
-            Bytes::new(),
-            dest_network_u256,
-            use_network_filter,
-            from,
-            to_tx_id,
-            max_results_u256,
-        );
-
-        let btc_to_native_call = contract.get_tx_ids_by_filter(
-            TransactionType::BITCOIN_TO_NATIVE,
-            TransactionPhase::ACTIVE_WAITING_PROOF,
-            Address::zero(),
-            Bytes::new(),
-            dest_network_u256,
-            use_network_filter,
-            from,
-            to_tx_id,
-            max_results_u256,
-        );
-
-        let (native_to_btc, btc_to_native) =
-            try_join!(native_to_btc_call.call(), btc_to_native_call.call())?;
-
-        let tx_ids_active_waiting_proof: Vec<U256> =
-            native_to_btc.into_iter().chain(btc_to_native).collect();
+        let tx_ids_active_waiting_proof: Vec<U256> = contract
+            .get_tx_ids_by_filter(
+                TransactionType::ANY,
+                TransactionPhase::ACTIVE_WAITING_PROOF,
+                Address::zero(),
+                Bytes::new(),
+                dest_network_u256,
+                use_network_filter,
+                from,
+                to_tx_id,
+                max_results_u256,
+            )
+            .call()
+            .await?;
 
         // ---- MERGE & DEDUP ----
         let mut set: HashSet<U256> = tx_ids_waiting_user_action.into_iter().collect();
@@ -232,6 +201,9 @@ impl StreamingAdapter for EvmStreamingAdapter {
 
         let tx_ids: Vec<U256> = set.into_iter().collect();
 
+        if !tx_ids.is_empty() {
+            info!("streaming for tx ids: {:?}", tx_ids);
+        }
         Ok(tx_ids)
     }
 

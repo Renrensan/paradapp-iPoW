@@ -13,7 +13,7 @@ use paradapp_core::traits::chain_helper_adapter::{
 };
 use paradapp_core::traits::interop_resolver::InteropResolver as InteropResolverTrait;
 use paradapp_core::traits::streaming_adapter::StreamingAdapter;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 pub struct InteropResolver {
     pub source_helper: Arc<dyn ChainHelperAdapter>,
@@ -104,7 +104,6 @@ impl InteropResolverTrait for InteropResolver {
             return Ok(());
         }
 
-        // Logic mirrors the destination chain logic in attempt_approve_one_tx_and_open_tunnel
         let min_anchor_dest = self.dest_helper.min_anchor_height().await?;
         let global_tip_src = self.source_helper.global_tip_height().await?;
 
@@ -121,10 +120,12 @@ impl InteropResolverTrait for InteropResolver {
                     .get_active_tx_ids(1000, Some(self.dest_network))
                     .await?;
                 if !active_ids.is_empty() {
+                    debug!(tx_id = %tx_id, "dest active_ids not empty, skipping tick");
                     return Ok(());
                 }
 
                 if dest_chain_state.active_open == 0 {
+                    info!(source_tx_id = %tx_id, "calling jump_to_anchor_from_zero_active on dest");
                     self.dest_helper
                         .jump_to_anchor_from_zero_active(
                             dest_chain_state.global_tip,
@@ -132,7 +133,8 @@ impl InteropResolverTrait for InteropResolver {
                         )
                         .await?;
                 } else {
-                    // Discovery/Stream logic (Skipped for brevity, same as your prototype)
+                    // Discovery/Stream logic
+                    info!(source_tx_id = %tx_id, "calling stream_headers_to_height on dest");
                     self.dest_helper
                         .stream_headers_to_height(
                             dest_chain_state.global_tip,
@@ -153,6 +155,7 @@ impl InteropResolverTrait for InteropResolver {
                 .await?;
             let network_id = U256::from(self.source_helper.network() as u8);
 
+            info!(source_tx_id = %tx_id, "attempt commit_bitcoin_to_native on dest (open tunnel)");
             self.dest_helper
                 .commit_bitcoin_to_native(BitcoinToNativeCommitArgs {
                     bitcoin_amount: estimated_bitcoin_amount,
@@ -167,7 +170,7 @@ impl InteropResolverTrait for InteropResolver {
                 })
                 .await?;
 
-            info!(tx_id = %tx_id, "Tunnel opened for WAITING_USER_ACTION tx");
+            info!(source_tx_id = %tx_id, "Tunnel opened for WAITING_USER_ACTION tx");
         }
 
         Ok(())
@@ -234,7 +237,7 @@ impl InteropResolverTrait for InteropResolver {
                     );
 
                     if user_close_cost > 0 && (source_stream_gap as usize) > user_close_cost {
-                        info!("Cheaper to user-close than stream → executing");
+                        info!(source_tx_id = %tx_id,"Cheaper to user-close than stream → executing on source chain");
 
                         let candidates: Vec<(U256, &'static str)> = user_close_candidates
                             .into_iter()
@@ -251,7 +254,7 @@ impl InteropResolverTrait for InteropResolver {
 
                         let refreshed = self.source_helper.get_global_chain_state().await?;
                         if refreshed.active_open == 0 {
-                            info!("All active closed → jumping to safe anchor");
+                            info!(source_tx_id = %tx_id,"All active closed → jumping to safe anchor on source chain");
                             self.source_helper
                                 .jump_to_anchor_from_zero_active(
                                     refreshed.global_tip,
@@ -260,7 +263,7 @@ impl InteropResolverTrait for InteropResolver {
                                 .await?;
                         }
                     } else {
-                        info!("Streaming headers is cheaper");
+                        info!(source_tx_id = %tx_id,"Streaming headers is cheaper on source chain");
                         self.source_helper
                             .stream_headers_to_height(
                                 source_chain_state.global_tip,
