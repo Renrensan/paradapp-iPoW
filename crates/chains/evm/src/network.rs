@@ -1,9 +1,22 @@
+use paradapp_core::consts::supported_network_enum::SupportedNetwork;
+
 #[derive(Debug, Clone, Copy)]
 pub enum EvmNetwork {
     EthereumSepolia,
     Hedera,
 }
 
+// 1. Trait Implementation for conversion
+impl From<EvmNetwork> for SupportedNetwork {
+    fn from(network: EvmNetwork) -> Self {
+        match network {
+            EvmNetwork::EthereumSepolia => SupportedNetwork::ETH,
+            EvmNetwork::Hedera => SupportedNetwork::HEDERA,
+        }
+    }
+}
+
+// 2. Standard Implementation for your helper methods
 impl EvmNetwork {
     pub fn chain_id(&self) -> u64 {
         match self {

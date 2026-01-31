@@ -47,6 +47,8 @@ pub struct GlobalChainState {
 pub trait ChainHelperAdapter: Send + Sync {
     async fn check_rpc_health(&self) -> Result<()>;
 
+    fn network(&self) -> SupportedNetwork;
+
     async fn stream_headers_to_height(
         &self,
         current_tip: u64,

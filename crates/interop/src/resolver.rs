@@ -151,11 +151,12 @@ impl InteropResolverTrait for InteropResolver {
                 .dest_helper
                 .estimate_bitcoin_from_native(conv.native_amount)
                 .await?;
+            let network_id = U256::from(self.source_helper.network() as u8);
 
             self.dest_helper
                 .commit_bitcoin_to_native(BitcoinToNativeCommitArgs {
                     bitcoin_amount: estimated_bitcoin_amount,
-                    network_id: conv.network_id,
+                    network_id,
                     user_program: Bytes::new(),
                     dest_address,
                     network_address,
@@ -385,11 +386,12 @@ impl InteropResolverTrait for InteropResolver {
                 .dest_helper
                 .estimate_bitcoin_from_native(conv.native_amount)
                 .await?;
+            let network_id = U256::from(self.source_helper.network() as u8);
 
             self.dest_helper
                 .commit_bitcoin_to_native(BitcoinToNativeCommitArgs {
                     bitcoin_amount: estimated_bitcoin_amount,
-                    network_id: conv.network_id,
+                    network_id,
                     user_program: Bytes::new(),
                     dest_address,
                     network_address,

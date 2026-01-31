@@ -11,6 +11,7 @@ use crate::{
 use anyhow::anyhow;
 use paradapp_core::{
     btc::btc_service::{btc_tip_height, decode_header80, epoch_start, header80_by_height},
+    consts::supported_network_enum::SupportedNetwork,
     context::CoreContext,
     conversion_type::ConversionResult,
     traits::chain_helper_adapter::{
@@ -71,6 +72,10 @@ impl ChainHelperAdapter for EvmChainHelper {
         }
 
         Ok(())
+    }
+
+    fn network(&self) -> SupportedNetwork {
+        self.ctx.cfg.network.into()
     }
 
     async fn stream_headers_to_height(
