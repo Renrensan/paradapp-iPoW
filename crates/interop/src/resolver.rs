@@ -152,11 +152,11 @@ impl InteropResolverTrait for InteropResolver {
                 .commit_bitcoin_to_native(BitcoinToNativeCommitArgs {
                     bitcoin_amount: conv.bitcoin_amount,
                     network_id: conv.network_id,
-                    user_program: conv.user_program.clone(),
+                    user_program: Bytes::new(),
                     dest_address,
                     network_address,
                     duty_window_seconds: conv.operator_duty_expires_at,
-                    paradapp_receive_program: Bytes::new(),
+                    paradapp_receive_program: conv.user_program.clone(),
                     locked_anchor_height: anchor.anchor_height,
                     slippage: conv.slippage,
                 })

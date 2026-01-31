@@ -9,6 +9,7 @@ pub struct EvmConfig {
     pub operator_private_key: String,
     pub contract_address: String,
     pub enable_onchain_lp_topup: String,
+    pub btc_root_xpub: String,
 }
 
 impl EvmConfig {
@@ -27,12 +28,17 @@ impl EvmConfig {
         let enable_onchain_lp_topup: String =
             env::var("ENABLE_ONCHAIN_LP_TOPUP").unwrap_or_else(|_| "false".to_string());
 
+        let btc_root_xpub = env::var(network.btc_root_xpub_env())
+            .or_else(|_| env::var("BTC_ROOT_XPUB"))
+            .expect("Missing BTC root xpub env var");
+
         Self {
             network,
             rpc_url,
             operator_private_key,
             contract_address,
             enable_onchain_lp_topup,
+            btc_root_xpub,
         }
     }
 }

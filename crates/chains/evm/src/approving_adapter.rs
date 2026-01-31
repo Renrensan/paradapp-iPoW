@@ -75,21 +75,8 @@ impl ApprovingAdapter for EvmApprovingAdapter {
     async fn get_or_create_receive_program_for_tx(
         &self,
         tx_id: U256,
+        xpub: &str,
     ) -> Result<(u32, String, Vec<u8>)> {
-        // --------------------------------------------------
-        // Load XPUB from core config
-        // --------------------------------------------------
-        let xpub = self
-            .core_ctx
-            .cfg
-            .btc_root_xpub
-            .as_ref()
-            .ok_or_else(|| anyhow!("BTC_ROOT_XPUB not set"))?;
-
-        if xpub.is_empty() {
-            return Err(anyhow!("BTC_ROOT_XPUB is empty"));
-        }
-
         // --------------------------------------------------
         // Get or create deterministic receive index
         // --------------------------------------------------
@@ -653,62 +640,32 @@ impl ApprovingAdapter for EvmApprovingAdapter {
         // 2. Decide scriptArg
         let mut script_arg: Vec<u8> = Vec::new();
 
+        let xpub_str: &str = &self.ctx.cfg.btc_root_xpub;
+
         if !is_native_to_bitcoin {
-            if let Some(xpub) = &self.core_ctx.cfg.btc_root_xpub {
-                if !xpub.is_empty() {
-                    match self.get_or_create_receive_program_for_tx(tx_id).await {
-                        Ok((index, address, script_buf)) => {
-                            script_arg = script_buf.clone();
-                            info!(
-                                tx_id = %tx_id,
-                                address = address,
-                                index = index,
-                                "BTC→Native txId={} assigned BTC addr={} (index={})",
-                                tx_id, address, index
-                            );
-                        }
-                        Err(err) => {
-                            info!(
-                                tx_id = %tx_id,
-                                "Cannot approve BTC→Native txId={} – failed deriving address: {err}",
-                                tx_id
-                            );
-                            return Ok(());
-                        }
-                    }
-                } else if let Some(static_program) = &self.core_ctx.cfg.paradapp_receive_program {
-                    script_arg =
-                        hex::decode(static_program.trim_start_matches("0x")).unwrap_or_default();
+            match self
+                .get_or_create_receive_program_for_tx(tx_id, xpub_str)
+                .await
+            {
+                Ok((index, address, script_buf)) => {
+                    script_arg = script_buf.clone();
                     info!(
                         tx_id = %tx_id,
-                        "BTC→Native txId={} using static receive program from PARADAPP_RECEIVE_PROGRAM",
-                        tx_id
+                        address = %address,
+                        index = index,
+                        "BTC→Native assigned BTC addr via XPUB"
                     );
-                } else {
-                    info!(
-                        tx_id = %tx_id,
-                        "Cannot approve BTC→Native txId={} – no BTC_ROOT_XPUB or PARADAPP_RECEIVE_PROGRAM",
-                        tx_id
-                    );
-                    return Err(anyhow!("missing receive program for BTC→Native"));
                 }
-            } else if let Some(static_program) = &self.core_ctx.cfg.paradapp_receive_program {
-                script_arg = hex::decode(static_program.trim_start_matches("0x"))?;
-                info!(
-                    tx_id = %tx_id,
-                    "BTC→Native txId={} using static receive program from PARADAPP_RECEIVE_PROGRAM",
-                    tx_id
-                );
-            } else {
-                info!(
-                    tx_id = %tx_id,
-                    "Cannot approve BTC→Native txId={} – no BTC_ROOT_XPUB or PARADAPP_RECEIVE_PROGRAM",
-                    tx_id
-                );
-                return Err(anyhow!("missing receive program for BTC→Native"));
+                Err(err) => {
+                    warn!(
+                        tx_id = %tx_id,
+                        error = %err,
+                        "Cannot approve BTC→Native – failed deriving address from XPUB"
+                    );
+                    return Ok(());
+                }
             }
         }
-
         // If is native to bitcoin and there are network id params it must be native to native out requests
         if is_native_to_bitcoin && network_id != U256::zero() {
             if let Some(static_program) = &self.core_ctx.cfg.paradapp_receive_program {

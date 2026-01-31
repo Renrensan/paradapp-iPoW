@@ -39,4 +39,11 @@ impl EvmNetwork {
             Self::Hedera => "hedera",
         }
     }
+
+    pub fn btc_root_xpub_env(&self) -> &'static str {
+        match self {
+            Self::EthereumSepolia => "ETH_SEPOLIA_BTC_ROOT_XPUB",
+            Self::Hedera => "HEDERA_BTC_ROOT_XPUB",
+        }
+    }
 }

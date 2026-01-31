@@ -20,6 +20,7 @@ pub trait ApprovingAdapter: Send + Sync {
     async fn get_or_create_receive_program_for_tx(
         &self,
         tx_id: U256,
+        xpub: &str,
     ) -> Result<(u32, String, Vec<u8>)>;
 
     async fn get_tx_ids_by_phase(
