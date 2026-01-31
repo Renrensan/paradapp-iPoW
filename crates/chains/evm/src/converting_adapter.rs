@@ -355,7 +355,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
 
         for tx_type in [
             TransactionType::BITCOIN_TO_NATIVE,
-            TransactionType::NATIVE_TO_NATIVE_OUT,
+            TransactionType::NATIVE_TO_NATIVE_IN,
         ] {
             let mut ids: Vec<U256> = self
                 .ctx
