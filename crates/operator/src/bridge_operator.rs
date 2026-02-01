@@ -1,7 +1,4 @@
-use paradapp_chain_evm::stack::EvmStack;
-use paradapp_core::{
-    consts::supported_network_enum::SupportedNetwork, traits::interop_resolver::InteropResolver,
-};
+use paradapp_core::{traits::chain_stack::ChainStack, traits::interop_resolver::InteropResolver};
 use std::sync::Arc;
 use tracing::{info, warn};
 
@@ -9,8 +6,11 @@ pub struct BridgeOperator;
 
 impl BridgeOperator {
     /// Spawns the bridge loop between two specific chains
-    pub async fn run(src_stack: Arc<EvmStack>, dst_stack: Arc<EvmStack>) -> anyhow::Result<()> {
-        let bridge_name = format!("{}_to_{}", src_stack.network_id, dst_stack.network_id);
+    pub async fn run(
+        src_stack: Arc<dyn ChainStack>,
+        dst_stack: Arc<dyn ChainStack>,
+    ) -> anyhow::Result<()> {
+        let bridge_name = format!("{}_to_{}", src_stack.network_id(), dst_stack.network_id());
         info!(bridge = %bridge_name, "Bridge Operator loop started");
 
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(15));
@@ -28,34 +28,21 @@ impl BridgeOperator {
         name = "operator_crosschain_bridging",
         skip(src, dst),
         fields(
-            source = %src.network_id,
-            dest = %dst.network_id
+            source = %src.network_id(),
+            dest = %dst.network_id()
         )
     )]
-    async fn tick_interop(src: Arc<EvmStack>, dst: Arc<EvmStack>) -> anyhow::Result<()> {
+    async fn tick_interop(
+        src: Arc<dyn ChainStack>,
+        dst: Arc<dyn ChainStack>,
+    ) -> anyhow::Result<()> {
         let duty_seconds = 24 * 60 * 60;
 
-        let dest_network_enum = match dst.network_id.as_str() {
-            "hedera" => SupportedNetwork::HEDERA,
-            "ethereum" => SupportedNetwork::ETH,
-            _ => {
-                return Err(anyhow::anyhow!(
-                    "Unsupported destination network for bridge: {}",
-                    dst.network_id
-                ));
-            }
-        };
-
+        let dest_network = dst.network_enum();
         let resolver = paradapp_interop::resolver::InteropResolver {
-            source_helper: src.helper.clone(),
-            source_approver: src.approving.clone(),
-            source_streaming: src.streaming.clone(),
-
-            dest_helper: dst.helper.clone(),
-            dest_approver: dst.approving.clone(),
-            dest_streaming: dst.streaming.clone(),
-
-            dest_network: dest_network_enum,
+            source: src,
+            dest: dst,
+            dest_network: dest_network,
         };
 
         resolver.run_once(duty_seconds).await?;

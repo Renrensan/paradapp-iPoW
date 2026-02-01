@@ -1,6 +1,3 @@
-use sqlx::SqlitePool;
-use std::sync::Arc;
-
 use crate::approving_adapter::EvmApprovingAdapter;
 use crate::converting_adapter::EvmConvertingAdapter;
 use crate::dependencies::config::EvmConfig;
@@ -9,13 +6,20 @@ use crate::dependencies::db::sqlite::SqliteStorage;
 use crate::helper::EvmChainHelper;
 use crate::network::EvmNetwork;
 use crate::streaming_adapter::EvmStreamingAdapter;
-
-// Core Trait Imports
+use async_trait::async_trait;
+use paradapp_core::consts::supported_network_enum::SupportedNetwork;
 use paradapp_core::context::CoreContext;
+use paradapp_core::traits::approving_adapter::ApprovingAdapter;
 use paradapp_core::traits::chain_helper_adapter::ChainHelperAdapter;
+use paradapp_core::traits::chain_stack::ChainStack;
+use paradapp_core::traits::converting_adapter::ConvertingAdapter;
+use paradapp_core::traits::streaming_adapter::StreamingAdapter;
+use sqlx::SqlitePool;
+use std::sync::Arc;
 
 pub struct EvmStack {
     pub network_id: String,
+    pub network_enum: SupportedNetwork,
     pub helper: Arc<EvmChainHelper>,
     pub streaming: Arc<EvmStreamingAdapter>,
     pub approving: Arc<EvmApprovingAdapter>,
@@ -26,6 +30,7 @@ pub struct EvmStack {
 impl EvmStack {
     pub async fn init(network: EvmNetwork, core_ctx: Arc<CoreContext>) -> anyhow::Result<Self> {
         let network_name = network.string_identifier().to_string();
+        let network_enum: SupportedNetwork = network.into();
 
         // 1. Initialize Context
         let cfg = EvmConfig::load(network);
@@ -64,11 +69,43 @@ impl EvmStack {
 
         Ok(Self {
             network_id: network_name,
+            network_enum,
             helper,
             streaming,
             approving,
             converting,
             sqlite_pool: sqlite_pool.clone(),
         })
+    }
+}
+
+#[async_trait]
+impl ChainStack for EvmStack {
+    fn converting(&self) -> Arc<dyn ConvertingAdapter> {
+        self.converting.clone()
+    }
+
+    fn approving(&self) -> Arc<dyn ApprovingAdapter> {
+        self.approving.clone()
+    }
+
+    fn streaming(&self) -> Arc<dyn StreamingAdapter> {
+        self.streaming.clone()
+    }
+
+    fn helper(&self) -> Arc<dyn ChainHelperAdapter> {
+        self.helper.clone()
+    }
+
+    fn network_id(&self) -> &str {
+        &self.network_id
+    }
+
+    fn network_enum(&self) -> SupportedNetwork {
+        self.network_enum
+    }
+
+    fn core_context(&self) -> Arc<CoreContext> {
+        self.converting.core_ctx.clone()
     }
 }

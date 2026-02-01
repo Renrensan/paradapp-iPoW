@@ -1,14 +1,8 @@
 use ethers_core::types::U256;
-use paradapp_chain_evm::stack::EvmStack;
 use paradapp_core::{
     btc::btc_service::maybe_rebalance_btc_wallets,
     consts::{transaction_phase::TransactionPhase, transaction_type::TransactionType},
-    traits::{
-        approving_adapter::ApprovingAdapter,
-        chain_helper_adapter::{ChainHelperAdapter, GlobalChainState},
-        converting_adapter::ConvertingAdapter,
-        streaming_adapter::StreamingAdapter,
-    },
+    traits::{chain_helper_adapter::GlobalChainState, chain_stack::ChainStack},
 };
 use std::sync::Arc;
 use tracing::{error, info, warn};
@@ -16,8 +10,8 @@ use tracing::{error, info, warn};
 pub struct LocalOperator;
 
 impl LocalOperator {
-    pub async fn run(stack: Arc<EvmStack>) -> anyhow::Result<()> {
-        let network_id = stack.network_id.clone();
+    pub async fn run(stack: Arc<dyn ChainStack>) -> anyhow::Result<()> {
+        let network_id = stack.network_id().to_string();
         info!(network = %network_id, "Launching Local Operator tasks in parallel...");
 
         // Approving Loop
@@ -27,7 +21,7 @@ impl LocalOperator {
             loop {
                 interval.tick().await;
                 if let Err(e) = Self::tick_approving(approving_stack.clone()).await {
-                    warn!(network = %approving_stack.network_id, error = %e, "Approving task failed");
+                    warn!(network = %approving_stack.network_id(), error = %e, "Approving task failed");
                 }
             }
         });
@@ -39,7 +33,7 @@ impl LocalOperator {
             loop {
                 interval.tick().await;
                 if let Err(e) = Self::tick_streaming(streaming_stack.clone()).await {
-                    warn!(network = %streaming_stack.network_id, error = %e, "Streaming task failed");
+                    warn!(network = %streaming_stack.network_id(), error = %e, "Streaming task failed");
                 }
             }
         });
@@ -51,7 +45,7 @@ impl LocalOperator {
             loop {
                 interval.tick().await;
                 if let Err(e) = Self::tick_converting(converting_stack.clone()).await {
-                    warn!(network = %converting_stack.network_id, error = %e, "Converting task failed");
+                    warn!(network = %converting_stack.network_id(), error = %e, "Converting task failed");
                 }
             }
         });
@@ -72,13 +66,13 @@ impl LocalOperator {
     #[tracing::instrument(
         name = "operator_approving",
         skip(stack),
-        fields(network = %stack.network_id)
+        fields(network = %stack.network_id())
     )]
-    async fn tick_approving(stack: Arc<EvmStack>) -> anyhow::Result<()> {
+    async fn tick_approving(stack: Arc<dyn ChainStack>) -> anyhow::Result<()> {
         let duty_seconds = 24 * 60 * 60;
 
         // 1. Fetch pending approvals
-        let pending_txids = match stack.approving.get_pending_txids(500, None).await {
+        let pending_txids = match stack.approving().get_pending_txids(500, None).await {
             Ok(txids) if !txids.is_empty() => txids,
             Ok(_) => {
                 info!("No pending conversions to approve this cycle.");
@@ -96,18 +90,18 @@ impl LocalOperator {
         );
 
         // 2. Check RPC Health
-        if let Err(e) = stack.helper.check_rpc_health().await {
+        if let Err(e) = stack.helper().check_rpc_health().await {
             warn!(error = %e, "Skipping cycle — RPC health check failed");
             return Ok(());
         }
 
         // 3. Operator timeout closes
-        let mut state = stack.helper.get_global_chain_state().await?;
+        let mut state = stack.helper().get_global_chain_state().await?;
         if state.next_tx_id > U256::one() {
             let to_tx_id = state.next_tx_id - U256::one();
 
             let active = stack
-                .approving
+                .approving()
                 .get_tx_ids_by_phase(
                     TransactionPhase::ACTIVE_WAITING_PROOF,
                     TransactionType::ANY,
@@ -120,7 +114,7 @@ impl LocalOperator {
                 .unwrap_or_default();
 
             let waiting_user = stack
-                .approving
+                .approving()
                 .get_tx_ids_by_phase(
                     TransactionPhase::WAITING_USER_ACTION,
                     TransactionType::BITCOIN_TO_NATIVE,
@@ -136,7 +130,7 @@ impl LocalOperator {
             for tx_id in active.into_iter().chain(waiting_user) {
                 if seen.insert(tx_id) {
                     let _ = stack
-                        .approving
+                        .approving()
                         .handle_operator_closes_for_active(tx_id, state.confirmations_required)
                         .await;
                 }
@@ -146,7 +140,7 @@ impl LocalOperator {
         // 4. Refresh and Sync
         /// Extracted sync decision logic
         async fn handle_sync_logic(
-            stack: Arc<EvmStack>,
+            stack: Arc<dyn ChainStack>,
             state: GlobalChainState,
         ) -> anyhow::Result<()> {
             let stream_gap = state.safe_anchor.saturating_sub(state.global_tip);
@@ -159,12 +153,12 @@ impl LocalOperator {
             if state.active_open == 0 {
                 info!("No active conversions → jumping to safe anchor");
                 stack
-                    .helper
+                    .helper()
                     .jump_to_anchor_from_zero_active(state.global_tip, state.safe_anchor)
                     .await?;
             } else {
                 let candidates = stack
-                    .approving
+                    .approving()
                     .discover_user_close_candidates(
                         state.next_tx_id - U256::one(),
                         state.confirmations_required,
@@ -190,15 +184,15 @@ impl LocalOperator {
                         .collect();
 
                     stack
-                        .approving
+                        .approving()
                         .execute_user_closes(mapped_candidates)
                         .await?;
 
                     // Check if we can jump now
-                    let refreshed = stack.helper.get_global_chain_state().await?;
+                    let refreshed = stack.helper().get_global_chain_state().await?;
                     if refreshed.active_open == 0 {
                         stack
-                            .helper
+                            .helper()
                             .jump_to_anchor_from_zero_active(
                                 refreshed.global_tip,
                                 refreshed.safe_anchor,
@@ -211,7 +205,7 @@ impl LocalOperator {
                         "Streaming headers is cheaper or only option"
                     );
                     stack
-                        .helper
+                        .helper()
                         .stream_headers_to_height(state.global_tip, state.safe_anchor, 200)
                         .await?;
                 }
@@ -219,7 +213,7 @@ impl LocalOperator {
             Ok(())
         }
 
-        state = stack.helper.get_global_chain_state().await?;
+        state = stack.helper().get_global_chain_state().await?;
         if let Err(e) = handle_sync_logic(stack.clone(), state).await {
             warn!(error = %e, "Sync / jump logic failed — skipping approvals");
             return Ok(());
@@ -227,7 +221,7 @@ impl LocalOperator {
 
         // 5. Final Approvals
         for tx_id in pending_txids {
-            if let Err(e) = stack.approving.approve_one_tx(tx_id, duty_seconds).await {
+            if let Err(e) = stack.approving().approve_one_tx(tx_id, duty_seconds).await {
                 warn!(tx_id = %tx_id, error = %e, "Failed to approve tx");
             }
         }
@@ -239,11 +233,11 @@ impl LocalOperator {
     #[tracing::instrument(
         name = "operator_streaming",
         skip(stack),
-        fields(network = %stack.network_id)
+        fields(network = %stack.network_id())
     )]
-    async fn tick_streaming(stack: Arc<EvmStack>) -> anyhow::Result<()> {
+    async fn tick_streaming(stack: Arc<dyn ChainStack>) -> anyhow::Result<()> {
         // 1. Get all currently active transaction IDs on this chain
-        let active_ids = stack.streaming.get_active_tx_ids(1000, None).await?;
+        let active_ids = stack.streaming().get_active_tx_ids(1000, None).await?;
         if active_ids.is_empty() {
             info!("No active conversions found – nothing to stream this pass.");
             return Ok(());
@@ -256,7 +250,7 @@ impl LocalOperator {
 
         // 2. Determine which transactions actually need header updates
         for tx_id in active_ids {
-            let stream_target = stack.streaming.compute_stream_target(tx_id).await?;
+            let stream_target = stack.streaming().compute_stream_target(tx_id).await?;
 
             if !stream_target.needed {
                 info!(tx_id = %tx_id, reason = %stream_target.reason, "txId does not need streaming.");
@@ -291,7 +285,7 @@ impl LocalOperator {
 
         // 4. Trigger the block header relay logic via the adapter
         stack
-            .streaming
+            .streaming()
             .push_headers_global(max_target, needed_tx_ids)
             .await?;
 
@@ -302,11 +296,11 @@ impl LocalOperator {
     #[tracing::instrument(
         name = "operator_converting",
         skip(stack),
-        fields(network = %stack.network_id)
+        fields(network = %stack.network_id())
     )]
-    async fn tick_converting(stack: Arc<EvmStack>) -> anyhow::Result<()> {
+    async fn tick_converting(stack: Arc<dyn ChainStack>) -> anyhow::Result<()> {
         // 1. Determine latest tx id
-        let next_tx_id = stack.converting.next_tx_id().await?;
+        let next_tx_id = stack.converting().next_tx_id().await?;
         let to_tx_id = next_tx_id.saturating_sub(U256::one());
 
         if to_tx_id == U256::zero() {
@@ -316,11 +310,11 @@ impl LocalOperator {
 
         // 2. Get conversions needing processing
         let ready_h2b = stack
-            .converting
+            .converting()
             .find_native_to_btc_ready(to_tx_id, None)
             .await?;
         let ready_b2h = stack
-            .converting
+            .converting()
             .find_btc_to_native_completed(to_tx_id, None)
             .await?;
 
@@ -331,7 +325,7 @@ impl LocalOperator {
         // 3. Handle NATIVE → BTC
         let h2b_tx_ids: Vec<U256> = ready_h2b.iter().map(|(id, _)| *id).collect();
         let processed_map = stack
-            .converting
+            .converting()
             .get_processed_native_to_btc(&h2b_tx_ids)
             .await?;
 
@@ -339,12 +333,13 @@ impl LocalOperator {
             // Case A: BTC already sent → check confirmation & submit proof
             if let Some(btc_txid) = processed_map.get(&tx_id) {
                 match stack
-                    .converting
+                    .converting()
                     .check_confirmation_and_build_proof(tx_id, btc_txid)
                     .await?
                 {
                     Some(proof) => {
-                        if let Err(err) = stack.converting.submit_merkle_proof(tx_id, proof).await {
+                        if let Err(err) = stack.converting().submit_merkle_proof(tx_id, proof).await
+                        {
                             warn!(%tx_id, ?err, "Error submitting merkle proof");
                         }
                     }
@@ -355,7 +350,7 @@ impl LocalOperator {
 
             // Case B: Not processed yet → send BTC
             if let Err(err) = stack
-                .converting
+                .converting()
                 .handle_native_to_btc_conversion(tx_id, conv)
                 .await
             {
@@ -366,7 +361,7 @@ impl LocalOperator {
         // 4. Handle BTC → NATIVE
         for (tx_id, conv) in ready_b2h {
             if let Err(err) = stack
-                .converting
+                .converting()
                 .handle_btc_to_native_conversion(tx_id, conv)
                 .await
             {
@@ -375,16 +370,14 @@ impl LocalOperator {
         }
 
         // 5. Liquidity Management
-        let native_liq = stack.converting.read_liquidity().await?;
+        let native_liq = stack.converting().read_liquidity().await?;
         stack
-            .converting
+            .converting()
             .maybe_rebalance_contract_liquidity(native_liq)
             .await?;
 
         // 6. BTC hot wallet rebalance (uses core_ctx from stack)
-        // Note: Assuming maybe_rebalance_btc_wallets is a standalone utility
-        // that takes &CoreContext
-        maybe_rebalance_btc_wallets(&stack.converting.core_ctx).await?;
+        maybe_rebalance_btc_wallets(&stack.core_context()).await?;
 
         info!("Done conversion pass.");
         Ok(())

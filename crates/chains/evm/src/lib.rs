@@ -5,5 +5,5 @@ pub mod converting_adapter;
 pub mod dependencies;
 pub mod helper;
 pub mod network;
-pub mod stack;
+pub mod evm_stack;
 pub mod streaming_adapter;
