@@ -387,8 +387,8 @@ impl ChainProviderAdapter for EvmChainProvider {
     async fn get_tx_ids_by_filter(&self, filter: TxIdFilter) -> Result<Vec<U256>> {
         let contract = self.ctx.contract.clone();
 
-        let user_filter = filter.user_filter.unwrap_or_else(Address::zero);
-        let program_filter = filter.user_program_filter.unwrap_or_else(Bytes::new);
+        let user_filter = filter.user_filter.unwrap_or_default();
+        let program_filter = filter.user_program_filter.unwrap_or_default();
 
         let (dest_network_u256, use_network_filter): (U256, bool) = match filter.dest_network {
             Some(net) => (U256::from(net as u8), true),
