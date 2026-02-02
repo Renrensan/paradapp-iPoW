@@ -16,7 +16,7 @@ impl From<EvmNetwork> for SupportedNetwork {
     }
 }
 
-// 2. Standard Implementation for your helper methods
+// 2. Standard Implementation
 impl EvmNetwork {
     pub fn chain_id(&self) -> u64 {
         match self {

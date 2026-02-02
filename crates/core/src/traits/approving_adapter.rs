@@ -23,16 +23,6 @@ pub trait ApprovingAdapter: Send + Sync {
         xpub: &str,
     ) -> Result<(u32, String, Vec<u8>)>;
 
-    async fn get_tx_ids_by_phase(
-        &self,
-        phase: u8,
-        type_filter: u8,
-        from_tx_id: U256,
-        to_tx_id: U256,
-        max_results: U256,
-        dest_network: Option<SupportedNetwork>,
-    ) -> Result<Vec<U256>>;
-
     async fn handle_operator_closes_for_active(&self, tx_id: U256, conf_req: u64) -> Result<()>;
 
     async fn discover_user_close_candidates(
@@ -46,18 +36,6 @@ pub trait ApprovingAdapter: Send + Sync {
         &self,
         candidates: Vec<(U256, &'static str)>,
     ) -> anyhow::Result<()>;
-
-    async fn get_pending_txids(
-        &self,
-        max_results: u32,
-        dest_network: Option<SupportedNetwork>,
-    ) -> Result<Vec<U256>>;
-
-    async fn get_pending_native_to_native_out_txids(
-        &self,
-        max_results: u32,
-        dest_network: Option<SupportedNetwork>,
-    ) -> Result<Vec<U256>>;
 
     async fn approve_one_tx(&self, tx_id: U256, duty_seconds: u64) -> Result<()>;
 }

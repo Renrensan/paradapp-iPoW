@@ -12,111 +12,50 @@ use paradapp_core::{
         transaction_type::TransactionType,
     },
     context::CoreContext,
-    traits::{chain_helper_adapter::ChainHelperAdapter, converting_adapter::ConvertingAdapter},
+    models::conversion::Conversion,
+    traits::{chain_provider_adapter::ChainProviderAdapter, converting_adapter::ConvertingAdapter},
 };
 use sqlx::{Row, SqlitePool};
 use tracing::{error, info, warn};
 
-use crate::{
-    bindings::paradapp_convert,
-    common::{consts::liquidity::Liquidity, helpers::parse_native_token::parse_human_native_token},
-    dependencies::context::EvmContext,
-};
+use crate::{bindings::paradapp_convert, dependencies::context::EvmContext};
 use anyhow::Result;
 
 pub struct EvmConvertingAdapter {
     pub ctx: Arc<EvmContext>,
     pub core_ctx: Arc<CoreContext>,
     pub sqlite_storage: SqlitePool,
-    pub helper: Arc<dyn ChainHelperAdapter>,
+    pub chain_provider: Arc<dyn ChainProviderAdapter>,
+}
+
+impl EvmConvertingAdapter {
+    fn map_to_core(evm: paradapp_convert::Conversion) -> Conversion {
+        Conversion {
+            user: evm.user,
+            is_native_to_bitcoin: evm.is_native_to_bitcoin,
+            slippage: evm.slippage,
+            user_program: evm.user_program,
+            paradapp_receive_program: evm.paradapp_receive_program,
+            network_address: evm.network_address,
+            network_id: evm.network_id,
+            native_amount: evm.native_amount,
+            bitcoin_amount: evm.bitcoin_amount,
+            created_at: evm.created_at,
+            approved_at: evm.approved_at,
+            deposited_at: evm.deposited_at,
+            commit_fee: evm.commit_fee,
+            approved: evm.approved,
+            deposited: evm.deposited,
+            completed: evm.completed,
+            refunded: evm.refunded,
+            reserved_native: evm.reserved_native,
+            operator_duty_expires_at: evm.operator_duty_expires_at,
+        }
+    }
 }
 
 #[async_trait]
 impl ConvertingAdapter for EvmConvertingAdapter {
-    type Conversion = paradapp_convert::Conversion;
-
-    async fn check_rpc_health(&self) -> Result<()> {
-        // EVM RPC ===
-        let evm_ok = match self
-            .ctx
-            .provider
-            .request::<(), ethers::types::U64>("eth_blockNumber", ())
-            .await
-        {
-            Ok(bn) => {
-                info!(block_number = %bn, "EVM RPC alive");
-                true
-            }
-            Err(e) => {
-                error!(error = %e, "EVM RPC health check failed");
-                false
-            }
-        };
-
-        // === Bitcoin Esplora ===
-        let btc_ok = {
-            let url = format!("{}/blocks/tip/height", self.core_ctx.cfg.esplora_base);
-
-            match self.core_ctx.http.get(&url).send().await {
-                Ok(resp) => match resp.text().await {
-                    Ok(text) => match text.parse::<u32>() {
-                        Ok(height) => {
-                            info!(
-                                url = %url,
-                                height,
-                                "Bitcoin Esplora health check OK"
-                            );
-                            true
-                        }
-                        Err(e) => {
-                            warn!(
-                                url = %url,
-                                response = %text,
-                                error = %e,
-                                "Bitcoin Esplora returned invalid height"
-                            );
-                            false
-                        }
-                    },
-                    Err(e) => {
-                        error!(
-                            url = %url,
-                            error = %e,
-                            "Bitcoin Esplora failed to read response body"
-                        );
-                        false
-                    }
-                },
-                Err(e) => {
-                    error!(
-                        url = %url,
-                        error = %e,
-                        "Bitcoin Esplora request failed"
-                    );
-                    false
-                }
-            }
-        };
-
-        if !evm_ok || !btc_ok {
-            anyhow::bail!("one or more upstream RPCs are down");
-        }
-
-        Ok(())
-    }
-
-    async fn next_tx_id(&self) -> Result<U256> {
-        // ---- Determine latest tx id ----
-        let next_tx_id: U256 = self
-            .ctx
-            .c_op
-            .next_tx_id()
-            .call()
-            .await
-            .map_err(anyhow::Error::from)?;
-        Ok(next_tx_id)
-    }
-
     async fn mark_processed(&self, tx_id: U256, btc_tx_id: Option<String>) -> Result<()> {
         let id_i64: i64 = tx_id.to_string().parse().unwrap();
 
@@ -142,191 +81,78 @@ impl ConvertingAdapter for EvmConvertingAdapter {
         Ok(())
     }
 
-    async fn read_liquidity(&self) -> Result<U256> {
-        let contract = self.ctx.contract.clone();
-
-        let mut native_liq = U256::zero();
-        {
-            let call = contract.native_liquidity();
-            match call.call().await {
-                Ok(v) => {
-                    native_liq = v;
-                }
-                Err(e) => {
-                    info!(
-                        error = %e,
-                        "nativeLiquidity() view not found or failed; treating as 0."
-                    );
-                }
-            }
-        }
-
-        // Format logs with tracing
-        let native_fmt = ethers::utils::format_ether(native_liq);
-
-        info!(
-            native = %native_fmt,
-            raw_native = ?native_liq,
-            "On-chain liquidity"
-        );
-
-        Ok(native_liq)
-    }
-
-    async fn maybe_rebalance_contract_liquidity(&self, native_liq: U256) -> Result<()> {
-        let c_op = self.ctx.c_op.clone();
-        let low_native = parse_human_native_token(Liquidity::HBAR_LIQ_LOW)?;
-        let high_native = parse_human_native_token(Liquidity::HBAR_LIQ_HIGH)?;
-        let enable_topup: bool = self.ctx.cfg.enable_onchain_lp_topup.to_lowercase() == "true";
-
-        if native_liq < low_native {
-            let need_native = low_native - native_liq;
-
-            info!(
-                needed = %ethers::utils::format_ether(need_native),
-                "Native liquidity below low threshold."
-            );
-
-            if enable_topup {
-                info!("addNativeLiquidity: operator wallet → contract");
-
-                let call = c_op.add_native_liquidity().value(need_native);
-                match call.send().await {
-                    Ok(pending) => {
-                        info!(
-                            tx_hash = ?pending.tx_hash(),
-                        "addNativeLiquidity tx broadcasted.")
-                    }
-                    Err(e) => error!(error=%e,"addNativeLiquidity failed"),
-                }
-            } else {
-                info!(
-                    need = %ethers::utils::format_ether(need_native),
-                    "   (SIMULATION ONLY) Withdraw Native Token from exchange → operator wallet → addNativeLiquidity(needNative)."
-                );
-            }
-        } else if native_liq > high_native {
-            let excess = native_liq - high_native;
-
-            info!(
-                excess = %ethers::utils::format_ether(excess),
-                "Native liquidity above high threshold."
-            );
-            info!("   TODO: call withdrawNativeLiquidity() → deposit to exchange.");
-        } else {
-            info!("Native liquidity within range – no rebalance needed.");
-        }
-
-        Ok(())
-    }
-
     async fn find_native_to_btc_ready(
         &self,
         to_tx_id: U256,
         dest_network: Option<SupportedNetwork>,
-    ) -> Result<Vec<(U256, Self::Conversion)>> {
+    ) -> Result<Vec<(U256, Conversion)>> {
         let user_filter = Address::zero();
         let mut ready = Vec::new();
 
         let (dest_network_u256, use_network_filter): (U256, bool) = match dest_network {
             Some(net) => (U256::from(net as u8), true),
-            None => (U256::zero(), false), // ignored when use_network_filter == false
+            None => (U256::zero(), false),
         };
-        // ---------- Native → BTC ----------
-        let active_native_to_btc: Vec<U256> = self
-            .ctx
-            .contract
-            .get_tx_ids_by_filter(
-                TransactionType::NATIVE_TO_BITCOIN,
-                TransactionPhase::ACTIVE_WAITING_PROOF,
-                user_filter,
-                Bytes::new(),
-                dest_network_u256,
-                use_network_filter,
-                U256::one(),
-                to_tx_id,
-                U256::from(500),
-            )
-            .call()
-            .await
-            .map_err(anyhow::Error::from)?;
 
-        info!(
-            to_tx_id = %to_tx_id,
-            count = active_native_to_btc.len(),
-            tx_ids = ?active_native_to_btc,
-            "Contract returned ACTIVE_WAITING_PROOF Native→BTC txs"
-        );
+        let tx_types = [
+            TransactionType::NATIVE_TO_BITCOIN,
+            TransactionType::NATIVE_TO_NATIVE_OUT,
+        ];
 
-        for tx_id in active_native_to_btc {
-            let conv = self
+        for tx_type in tx_types {
+            let active_ids: Vec<U256> = self
                 .ctx
-                .c_op
-                .get_conversion_with_phase(tx_id)
+                .contract
+                .get_tx_ids_by_filter(
+                    tx_type,
+                    TransactionPhase::ACTIVE_WAITING_PROOF,
+                    user_filter,
+                    Bytes::new(),
+                    dest_network_u256,
+                    use_network_filter,
+                    U256::one(),
+                    to_tx_id,
+                    U256::from(500),
+                )
                 .call()
-                .await?
-                .0;
+                .await
+                .map_err(anyhow::Error::from)?;
 
-            if !conv.is_native_to_bitcoin {
+            if active_ids.is_empty() {
                 continue;
             }
 
-            if !conv.approved || conv.completed || conv.refunded {
-                continue;
+            info!(
+                tx_type = ?tx_type,
+                count = active_ids.len(),
+                "Processing active IDs from contract"
+            );
+
+            for tx_id in active_ids {
+                // 1. Fetch the EVM-specific struct
+                let (evm_conv, _) = self
+                    .ctx
+                    .c_op
+                    .get_conversion_with_phase(tx_id)
+                    .call()
+                    .await?;
+
+                // 2. Perform business logic checks
+                if tx_type == TransactionType::NATIVE_TO_BITCOIN && !evm_conv.is_native_to_bitcoin {
+                    continue;
+                }
+
+                if !evm_conv.approved || evm_conv.completed || evm_conv.refunded {
+                    continue;
+                }
+
+                if !evm_conv.deposited {
+                    continue;
+                }
+
+                let core_conv = Self::map_to_core(evm_conv);
+                ready.push((tx_id, core_conv));
             }
-
-            if !conv.deposited {
-                continue;
-            }
-
-            ready.push((tx_id, conv));
-        }
-
-        // ---------- Native → Native Out ----------
-        let active_native_to_native_out: Vec<U256> = self
-            .ctx
-            .contract
-            .get_tx_ids_by_filter(
-                TransactionType::NATIVE_TO_NATIVE_OUT,
-                TransactionPhase::ACTIVE_WAITING_PROOF,
-                user_filter,
-                Bytes::new(),
-                dest_network_u256,
-                use_network_filter,
-                U256::one(),
-                to_tx_id,
-                U256::from(500),
-            )
-            .call()
-            .await
-            .map_err(anyhow::Error::from)?;
-
-        info!(
-            to_tx_id = %to_tx_id,
-            count = active_native_to_native_out.len(),
-            tx_ids = ?active_native_to_native_out,
-            "Contract returned ACTIVE_WAITING_PROOF Native→NativeOut txs"
-        );
-
-        for tx_id in active_native_to_native_out {
-            let conv = self
-                .ctx
-                .c_op
-                .get_conversion_with_phase(tx_id)
-                .call()
-                .await?
-                .0;
-
-            // Same readiness rules
-            if !conv.approved || conv.completed || conv.refunded {
-                continue;
-            }
-
-            if !conv.deposited {
-                continue;
-            }
-
-            ready.push((tx_id, conv));
         }
 
         if !ready.is_empty() {
@@ -334,7 +160,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
                 to_tx_id = %to_tx_id,
                 count = ready.len(),
                 tx_ids = ?ready.iter().map(|r| r.0).collect::<Vec<_>>(),
-                "Found ready Native→BTC and Native→NativeOut conversions awaiting payout"
+                "Found ready conversions awaiting payout (mapped to Core)"
             );
         }
 
@@ -345,7 +171,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
         &self,
         to_tx_id: U256,
         dest_network: Option<SupportedNetwork>,
-    ) -> Result<Vec<(U256, Self::Conversion)>> {
+    ) -> Result<Vec<(U256, Conversion)>> {
         let mut completed = Vec::new();
 
         let (dest_network_u256, use_network_filter): (U256, bool) = match dest_network {
@@ -421,7 +247,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
                 continue;
             }
 
-            let conv = self
+            let evm_conv = self
                 .ctx
                 .c_op
                 .get_conversion_with_phase(*tx_id)
@@ -429,15 +255,15 @@ impl ConvertingAdapter for EvmConvertingAdapter {
                 .await?
                 .0;
 
-            if conv.is_native_to_bitcoin {
+            if evm_conv.is_native_to_bitcoin {
                 continue;
             }
 
-            if !conv.completed || conv.refunded {
+            if !evm_conv.completed || evm_conv.refunded {
                 continue;
             }
 
-            ready.push((*tx_id, conv));
+            ready.push((*tx_id, Self::map_to_core(evm_conv)));
         }
 
         if !ready.is_empty() {
@@ -452,11 +278,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
         Ok(ready)
     }
 
-    async fn handle_native_to_btc_conversion(
-        &self,
-        tx_id: U256,
-        conv: Self::Conversion,
-    ) -> Result<()> {
+    async fn handle_native_to_btc_conversion(&self, tx_id: U256, conv: Conversion) -> Result<()> {
         // Convert Bytes -> Vec<u8> for user program
         let user_program: Vec<u8> = if conv.user_program.0.is_empty() {
             vec![]
@@ -494,11 +316,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
         Ok(())
     }
 
-    async fn handle_btc_to_native_conversion(
-        &self,
-        tx_id: U256,
-        conv: Self::Conversion,
-    ) -> Result<()> {
+    async fn handle_btc_to_native_conversion(&self, tx_id: U256, conv: Conversion) -> Result<()> {
         let btc_human =
             ethers::utils::format_units(conv.bitcoin_amount, 8).unwrap_or_else(|_| "0".into());
         let native_human =
@@ -598,7 +416,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
         let tx_hash = pending.tx_hash();
 
         info!(
-            "✅ Merkle proof submitted txId={} | contract_tx_hash={:?}",
+            "Merkle proof submitted txId={} | contract_tx_hash={:?}",
             proof.tx_id, tx_hash
         );
 

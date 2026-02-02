@@ -1,31 +1,24 @@
 use crate::{
     common::helpers::preflight::preflight_commit_global, dependencies::context::EvmContext,
 };
-use anyhow::Result;
+use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
-use ethers::{
-    abi::Address,
-    types::{Bytes, U256},
-};
+use ethers::types::U256;
 use paradapp_core::{
     btc::btc_service::{btc_tip_height, check_work_le, decode_header80, header80_by_height},
-    consts::{
-        supported_network_enum::SupportedNetwork, transaction_phase::TransactionPhase,
-        transaction_type::TransactionType,
-    },
     context::CoreContext,
     traits::{
-        chain_helper_adapter::ChainHelperAdapter,
+        chain_provider_adapter::ChainProviderAdapter,
         streaming_adapter::{StreamTarget, StreamingAdapter},
     },
 };
-use std::{collections::HashSet, sync::Arc, thread::sleep, time::Duration};
-use tracing::info;
+use std::{sync::Arc, thread::sleep, time::Duration};
+use tracing::{error, info, warn};
 
 pub struct EvmStreamingAdapter {
     pub ctx: Arc<EvmContext>,
     pub core_ctx: Arc<CoreContext>,
-    pub helper: Arc<dyn ChainHelperAdapter>,
+    pub chain_provider: Arc<dyn ChainProviderAdapter>,
 }
 
 #[async_trait]
@@ -141,72 +134,6 @@ impl StreamingAdapter for EvmStreamingAdapter {
         Ok(())
     }
 
-    async fn get_active_tx_ids(
-        &self,
-        max_results: u64,
-        dest_network: Option<SupportedNetwork>,
-    ) -> Result<Vec<U256>> {
-        let contract = &self.ctx.contract;
-
-        // 1. nextTxId()
-        let next_tx_id: U256 = contract.next_tx_id().call().await?;
-        if next_tx_id <= U256::one() {
-            return Ok(vec![]);
-        }
-        let to_tx_id = next_tx_id - U256::one();
-
-        // 2. getTxIdsByFilter()
-        let from = U256::one();
-        let max_results_u256 = U256::from(max_results);
-
-        let (dest_network_u256, use_network_filter): (U256, bool) = match dest_network {
-            Some(net) => (U256::from(net as u8), true),
-            None => (U256::zero(), false), // ignored when use_network_filter == false
-        };
-        // ---- WAITING_USER_ACTION ----
-        let tx_ids_waiting_user_action: Vec<U256> = contract
-            .get_tx_ids_by_filter(
-                TransactionType::ANY,
-                TransactionPhase::WAITING_USER_ACTION,
-                Address::zero(),
-                Bytes::new(),
-                dest_network_u256,
-                use_network_filter,
-                from,
-                to_tx_id,
-                max_results_u256,
-            )
-            .call()
-            .await?;
-
-        // ---- ACTIVE_WAITING_PROOF ----
-        let tx_ids_active_waiting_proof: Vec<U256> = contract
-            .get_tx_ids_by_filter(
-                TransactionType::ANY,
-                TransactionPhase::ACTIVE_WAITING_PROOF,
-                Address::zero(),
-                Bytes::new(),
-                dest_network_u256,
-                use_network_filter,
-                from,
-                to_tx_id,
-                max_results_u256,
-            )
-            .call()
-            .await?;
-
-        // ---- MERGE & DEDUP ----
-        let mut set: HashSet<U256> = tx_ids_waiting_user_action.into_iter().collect();
-        set.extend(tx_ids_active_waiting_proof);
-
-        let tx_ids: Vec<U256> = set.into_iter().collect();
-
-        if !tx_ids.is_empty() {
-            info!("streaming for tx ids: {:?}", tx_ids);
-        }
-        Ok(tx_ids)
-    }
-
     async fn compute_stream_target(&self, tx_id: U256) -> Result<StreamTarget> {
         let c = &self.ctx.contract;
 
@@ -292,5 +219,97 @@ impl StreamingAdapter for EvmStreamingAdapter {
             target_height: target_plus.as_u64(),
             reason: "ok".into(),
         })
+    }
+
+    async fn stream_headers_to_height(
+        &self,
+        current_tip: u64,
+        up_to_height: u64,
+        max_count: u64,
+    ) -> Result<u64> {
+        let start = current_tip + 1;
+        let end = std::cmp::min(up_to_height, current_tip + max_count);
+        if end < start {
+            return Ok(current_tip);
+        }
+
+        info!(
+            start = %start,
+            end = %end,
+            "Streaming headers from height {} to {} (contiguous, approve-bot)",
+            start, end
+        );
+
+        let mut new_tip = current_tip;
+        let c_op = self.ctx.c_op.clone();
+
+        for h in start..=end {
+            // 1. Fetch header80
+            let (_, header80) = header80_by_height(&self.core_ctx, h)
+                .await
+                .with_context(|| format!("Failed to fetch header80 for height {h}"))?;
+
+            // 2. Preflight check
+            let header80_bytes = decode_header80(&header80)
+                .map_err(|e| anyhow!("failed to decode header80 at height {h}: {e}"))?;
+            let preflight = preflight_commit_global(&self.ctx, header80_bytes.clone(), h).await;
+
+            if !preflight.static_ok {
+                let err_msg = preflight
+                    .static_err
+                    .map(|e| e.to_string())
+                    .unwrap_or_default()
+                    .to_lowercase();
+
+                if err_msg.contains("height-rewrite") {
+                    info!(
+                        height = %h,
+                        "height already stored, skipping"
+                    );
+                    new_tip = h; // still advance tip (assume it's stored)
+                    continue;
+                } else if err_msg.contains("no-jump-while-active") {
+                    warn!(
+                        height = %h,
+                        "no-jump-while-active, stopping stream"
+                    );
+                    return Ok(new_tip);
+                } else {
+                    error!(
+                        height = %h,
+                        error = %err_msg,
+                        "commitGlobalBTCHeader80 failed"
+                    );
+                    return Ok(new_tip);
+                }
+            }
+
+            // 3. Commit the header
+            match c_op
+                .commit_global_bitcoin_header_80(header80_bytes, U256::from(h), Vec::<U256>::new())
+                .send()
+                .await
+            {
+                Ok(pending_tx) => {
+                    if let Some(_receipt) = pending_tx.await? {
+                        info!(height = %h, "Global header stored");
+                        new_tip = h;
+                    } else {
+                        warn!(height = %h, "Tx for height was dropped/not mined");
+                    }
+                }
+                Err(e) => {
+                    // Likely nonce/gas issue — log and stop
+                    error!(
+                        height = h,
+                        error = %e,
+                        "Failed to send commit tx for height"
+                    );
+                    return Ok(new_tip);
+                }
+            }
+        }
+
+        Ok(new_tip)
     }
 }
