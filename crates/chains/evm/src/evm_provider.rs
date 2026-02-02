@@ -1,38 +1,54 @@
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use ethers::types::U256;
+use ethers::{
+    abi::Address,
+    types::{Bytes, U256},
+};
 use tracing::{error, info, warn};
 
 use crate::{
-    common::helpers::preflight::preflight_commit_global, dependencies::context::EvmContext,
+    common::{
+        consts::liquidity::Liquidity,
+        helpers::{
+            parse_native_token::parse_human_native_token, preflight::preflight_commit_global,
+        },
+    },
+    dependencies::context::EvmContext,
 };
 use anyhow::anyhow;
 use paradapp_core::{
     btc::btc_service::{btc_tip_height, decode_header80, epoch_start, header80_by_height},
-    consts::supported_network_enum::SupportedNetwork,
+    consts::{
+        supported_network_enum::SupportedNetwork, transaction_phase::TransactionPhase,
+        transaction_type::TransactionType,
+    },
     context::CoreContext,
     conversion_type::ConversionResult,
-    traits::chain_helper_adapter::{
-        AnchorInfo, BitcoinToNativeCommitArgs, ChainHelperAdapter, GlobalChainState, TxIdFilter,
+    traits::chain_provider_adapter::{
+        AnchorInfo, BitcoinToNativeCommitArgs, ChainProviderAdapter, GlobalChainState, TxIdFilter,
     },
 };
 
-/// EVM-specific chain helper that wraps contract binding calls.
-pub struct EvmChainHelper {
+/// EVM-specific chain provider that wraps contract binding calls.
+pub struct EvmChainProvider {
     pub ctx: Arc<EvmContext>,
     pub core_ctx: Arc<CoreContext>,
 }
 
-impl EvmChainHelper {
+impl EvmChainProvider {
     pub fn new(ctx: Arc<EvmContext>, core_ctx: Arc<CoreContext>) -> Self {
         Self { ctx, core_ctx }
     }
 }
 
 #[async_trait]
-impl ChainHelperAdapter for EvmChainHelper {
+impl ChainProviderAdapter for EvmChainProvider {
+    fn network(&self) -> SupportedNetwork {
+        self.ctx.cfg.network.into()
+    }
+
     async fn check_rpc_health(&self) -> Result<()> {
         // EVM RPC ===
         let evm_ok = match self
@@ -74,100 +90,82 @@ impl ChainHelperAdapter for EvmChainHelper {
         Ok(())
     }
 
-    fn network(&self) -> SupportedNetwork {
-        self.ctx.cfg.network.into()
-    }
+    async fn read_liquidity(&self) -> Result<U256> {
+        let contract = self.ctx.contract.clone();
 
-    async fn stream_headers_to_height(
-        &self,
-        current_tip: u64,
-        up_to_height: u64,
-        max_count: u64,
-    ) -> Result<u64> {
-        let start = current_tip + 1;
-        let end = std::cmp::min(up_to_height, current_tip + max_count);
-        if end < start {
-            return Ok(current_tip);
-        }
-
-        info!(
-            start = %start,
-            end = %end,
-            "Streaming headers from height {} to {} (contiguous, approve-bot)",
-            start, end
-        );
-
-        let mut new_tip = current_tip;
-        let c_op = self.ctx.c_op.clone();
-
-        for h in start..=end {
-            // 1. Fetch header80
-            let (_, header80) = header80_by_height(&self.core_ctx, h)
-                .await
-                .with_context(|| format!("Failed to fetch header80 for height {h}"))?;
-
-            // 2. Preflight check
-            let header80_bytes = decode_header80(&header80)
-                .map_err(|e| anyhow!("failed to decode header80 at height {h}: {e}"))?;
-            let preflight = preflight_commit_global(&self.ctx, header80_bytes.clone(), h).await;
-
-            if !preflight.static_ok {
-                let err_msg = preflight
-                    .static_err
-                    .map(|e| e.to_string())
-                    .unwrap_or_default()
-                    .to_lowercase();
-
-                if err_msg.contains("height-rewrite") {
-                    info!(
-                        height = %h,
-                        "height already stored, skipping"
-                    );
-                    new_tip = h; // still advance tip (assume it's stored)
-                    continue;
-                } else if err_msg.contains("no-jump-while-active") {
-                    warn!(
-                        height = %h,
-                        "no-jump-while-active, stopping stream"
-                    );
-                    return Ok(new_tip);
-                } else {
-                    error!(
-                        height = %h,
-                        error = %err_msg,
-                        "commitGlobalBTCHeader80 failed"
-                    );
-                    return Ok(new_tip);
-                }
-            }
-
-            // 3. Commit the header
-            match c_op
-                .commit_global_bitcoin_header_80(header80_bytes, U256::from(h), Vec::<U256>::new())
-                .send()
-                .await
-            {
-                Ok(pending_tx) => {
-                    if let Some(_receipt) = pending_tx.await? {
-                        info!(height = %h, "Global header stored");
-                        new_tip = h;
-                    } else {
-                        warn!(height = %h, "Tx for height was dropped/not mined");
-                    }
+        let mut native_liq = U256::zero();
+        {
+            let call = contract.native_liquidity();
+            match call.call().await {
+                Ok(v) => {
+                    native_liq = v;
                 }
                 Err(e) => {
-                    // Likely nonce/gas issue — log and stop
-                    error!(
-                        height = h,
+                    info!(
                         error = %e,
-                        "Failed to send commit tx for height"
+                        "nativeLiquidity() view not found or failed; treating as 0."
                     );
-                    return Ok(new_tip);
                 }
             }
         }
 
-        Ok(new_tip)
+        // Format logs with tracing
+        let native_fmt = ethers::utils::format_ether(native_liq);
+
+        info!(
+            native = %native_fmt,
+            raw_native = ?native_liq,
+            "On-chain liquidity"
+        );
+
+        Ok(native_liq)
+    }
+
+    async fn maybe_rebalance_contract_liquidity(&self, native_liq: U256) -> Result<()> {
+        let c_op = self.ctx.c_op.clone();
+        let low_native = parse_human_native_token(Liquidity::HBAR_LIQ_LOW)?;
+        let high_native = parse_human_native_token(Liquidity::HBAR_LIQ_HIGH)?;
+        let enable_topup: bool = self.ctx.cfg.enable_onchain_lp_topup.to_lowercase() == "true";
+
+        if native_liq < low_native {
+            let need_native = low_native - native_liq;
+
+            info!(
+                needed = %ethers::utils::format_ether(need_native),
+                "Native liquidity below low threshold."
+            );
+
+            if enable_topup {
+                info!("addNativeLiquidity: operator wallet → contract");
+
+                let call = c_op.add_native_liquidity().value(need_native);
+                match call.send().await {
+                    Ok(pending) => {
+                        info!(
+                            tx_hash = ?pending.tx_hash(),
+                        "addNativeLiquidity tx broadcasted.")
+                    }
+                    Err(e) => error!(error=%e,"addNativeLiquidity failed"),
+                }
+            } else {
+                info!(
+                    need = %ethers::utils::format_ether(need_native),
+                    "   (SIMULATION ONLY) Withdraw Native Token from exchange → operator wallet → addNativeLiquidity(needNative)."
+                );
+            }
+        } else if native_liq > high_native {
+            let excess = native_liq - high_native;
+
+            info!(
+                excess = %ethers::utils::format_ether(excess),
+                "Native liquidity above high threshold."
+            );
+            info!("   TODO: call withdrawNativeLiquidity() → deposit to exchange.");
+        } else {
+            info!("Native liquidity within range – no rebalance needed.");
+        }
+
+        Ok(())
     }
 
     async fn jump_to_anchor_from_zero_active(&self, global_tip: u64, anchor_h: u64) -> Result<u64> {
@@ -389,6 +387,9 @@ impl ChainHelperAdapter for EvmChainHelper {
     async fn get_tx_ids_by_filter(&self, filter: TxIdFilter) -> Result<Vec<U256>> {
         let contract = self.ctx.contract.clone();
 
+        let user_filter = filter.user_filter.unwrap_or_else(Address::zero);
+        let program_filter = filter.user_program_filter.unwrap_or_else(Bytes::new);
+
         let (dest_network_u256, use_network_filter): (U256, bool) = match filter.dest_network {
             Some(net) => (U256::from(net as u8), true),
             None => (U256::zero(), false), // ignored when use_network_filter == false
@@ -397,8 +398,8 @@ impl ChainHelperAdapter for EvmChainHelper {
             .get_tx_ids_by_filter(
                 filter.type_filter,
                 filter.phase_filter,
-                filter.user_filter,
-                filter.user_program_filter,
+                user_filter,
+                program_filter,
                 dest_network_u256,
                 use_network_filter,
                 filter.from_tx_id,
@@ -537,6 +538,125 @@ impl ChainHelperAdapter for EvmChainHelper {
             global_tip,
             active_open,
         })
+    }
+
+    async fn get_active_tx_ids(
+        &self,
+        max_results: u64,
+        dest_network: Option<SupportedNetwork>,
+    ) -> Result<Vec<U256>> {
+        let contract = &self.ctx.contract;
+
+        // 1. nextTxId()
+        let next_tx_id: U256 = contract.next_tx_id().call().await?;
+        if next_tx_id <= U256::one() {
+            return Ok(vec![]);
+        }
+        let to_tx_id = next_tx_id - U256::one();
+
+        // 2. getTxIdsByFilter()
+        let from = U256::one();
+        let max_results_u256 = U256::from(max_results);
+
+        let (dest_network_u256, use_network_filter): (U256, bool) = match dest_network {
+            Some(net) => (U256::from(net as u8), true),
+            None => (U256::zero(), false), // ignored when use_network_filter == false
+        };
+        // ---- WAITING_USER_ACTION ----
+        let tx_ids_waiting_user_action: Vec<U256> = contract
+            .get_tx_ids_by_filter(
+                TransactionType::ANY,
+                TransactionPhase::WAITING_USER_ACTION,
+                Address::zero(),
+                Bytes::new(),
+                dest_network_u256,
+                use_network_filter,
+                from,
+                to_tx_id,
+                max_results_u256,
+            )
+            .call()
+            .await?;
+
+        // ---- ACTIVE_WAITING_PROOF ----
+        let tx_ids_active_waiting_proof: Vec<U256> = contract
+            .get_tx_ids_by_filter(
+                TransactionType::ANY,
+                TransactionPhase::ACTIVE_WAITING_PROOF,
+                Address::zero(),
+                Bytes::new(),
+                dest_network_u256,
+                use_network_filter,
+                from,
+                to_tx_id,
+                max_results_u256,
+            )
+            .call()
+            .await?;
+
+        // ---- MERGE & DEDUP ----
+        let mut set: HashSet<U256> = tx_ids_waiting_user_action.into_iter().collect();
+        set.extend(tx_ids_active_waiting_proof);
+
+        let tx_ids: Vec<U256> = set.into_iter().collect();
+
+        if !tx_ids.is_empty() {
+            info!("streaming for tx ids: {:?}", tx_ids);
+        }
+        Ok(tx_ids)
+    }
+
+    async fn get_pending_txids(
+        &self,
+        max_results: u32,
+        dest_network: Option<SupportedNetwork>,
+    ) -> Result<Vec<U256>> {
+        let contract = self.ctx.contract.clone();
+
+        let next_tx_id: U256 = contract.next_tx_id().call().await?;
+        if next_tx_id <= U256::from(1u64) {
+            return Ok(vec![]);
+        }
+
+        // toTxId = nextTxId - 1
+        let to_tx_id = next_tx_id - U256::from(1u64);
+        let (dest_network_u256, use_network_filter): (U256, bool) = match dest_network {
+            Some(net) => (U256::from(net as u8), true),
+            None => (U256::zero(), false), // ignored when use_network_filter == false
+        };
+        let mut tx_ids: Vec<U256> = contract
+            .get_tx_ids_by_filter(
+                TransactionType::NATIVE_TO_BITCOIN,
+                TransactionPhase::WAITING_OPERATOR_APPROVAL,
+                Address::zero(),
+                Bytes::new(),
+                dest_network_u256,
+                use_network_filter,
+                U256::from(1u64),
+                to_tx_id,
+                U256::from(max_results),
+            )
+            .call()
+            .await?;
+
+        let mut btc_to_native_tx_ids: Vec<U256> = contract
+            .get_tx_ids_by_filter(
+                TransactionType::BITCOIN_TO_NATIVE,
+                TransactionPhase::WAITING_OPERATOR_APPROVAL,
+                Address::zero(),
+                Bytes::new(),
+                dest_network_u256,
+                use_network_filter,
+                U256::from(1u64),
+                to_tx_id,
+                U256::from(max_results),
+            )
+            .call()
+            .await?;
+
+        tx_ids.append(&mut btc_to_native_tx_ids);
+
+        Ok(tx_ids)
     }
 
     async fn estimate_bitcoin_from_native(&self, native_amount: U256) -> Result<U256> {

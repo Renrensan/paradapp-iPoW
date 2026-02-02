@@ -13,23 +13,19 @@ use paradapp_core::{
     },
     context::CoreContext,
     models::conversion::Conversion,
-    traits::{chain_helper_adapter::ChainHelperAdapter, converting_adapter::ConvertingAdapter},
+    traits::{chain_provider_adapter::ChainProviderAdapter, converting_adapter::ConvertingAdapter},
 };
 use sqlx::{Row, SqlitePool};
 use tracing::{error, info, warn};
 
-use crate::{
-    bindings::paradapp_convert,
-    common::{consts::liquidity::Liquidity, helpers::parse_native_token::parse_human_native_token},
-    dependencies::context::EvmContext,
-};
+use crate::{bindings::paradapp_convert, dependencies::context::EvmContext};
 use anyhow::Result;
 
 pub struct EvmConvertingAdapter {
     pub ctx: Arc<EvmContext>,
     pub core_ctx: Arc<CoreContext>,
     pub sqlite_storage: SqlitePool,
-    pub helper: Arc<dyn ChainHelperAdapter>,
+    pub chain_provider: Arc<dyn ChainProviderAdapter>,
 }
 
 impl EvmConvertingAdapter {
@@ -60,88 +56,6 @@ impl EvmConvertingAdapter {
 
 #[async_trait]
 impl ConvertingAdapter for EvmConvertingAdapter {
-    async fn check_rpc_health(&self) -> Result<()> {
-        // EVM RPC ===
-        let evm_ok = match self
-            .ctx
-            .provider
-            .request::<(), ethers::types::U64>("eth_blockNumber", ())
-            .await
-        {
-            Ok(bn) => {
-                info!(block_number = %bn, "EVM RPC alive");
-                true
-            }
-            Err(e) => {
-                error!(error = %e, "EVM RPC health check failed");
-                false
-            }
-        };
-
-        // === Bitcoin Esplora ===
-        let btc_ok = {
-            let url = format!("{}/blocks/tip/height", self.core_ctx.cfg.esplora_base);
-
-            match self.core_ctx.http.get(&url).send().await {
-                Ok(resp) => match resp.text().await {
-                    Ok(text) => match text.parse::<u32>() {
-                        Ok(height) => {
-                            info!(
-                                url = %url,
-                                height,
-                                "Bitcoin Esplora health check OK"
-                            );
-                            true
-                        }
-                        Err(e) => {
-                            warn!(
-                                url = %url,
-                                response = %text,
-                                error = %e,
-                                "Bitcoin Esplora returned invalid height"
-                            );
-                            false
-                        }
-                    },
-                    Err(e) => {
-                        error!(
-                            url = %url,
-                            error = %e,
-                            "Bitcoin Esplora failed to read response body"
-                        );
-                        false
-                    }
-                },
-                Err(e) => {
-                    error!(
-                        url = %url,
-                        error = %e,
-                        "Bitcoin Esplora request failed"
-                    );
-                    false
-                }
-            }
-        };
-
-        if !evm_ok || !btc_ok {
-            anyhow::bail!("one or more upstream RPCs are down");
-        }
-
-        Ok(())
-    }
-
-    async fn next_tx_id(&self) -> Result<U256> {
-        // ---- Determine latest tx id ----
-        let next_tx_id: U256 = self
-            .ctx
-            .c_op
-            .next_tx_id()
-            .call()
-            .await
-            .map_err(anyhow::Error::from)?;
-        Ok(next_tx_id)
-    }
-
     async fn mark_processed(&self, tx_id: U256, btc_tx_id: Option<String>) -> Result<()> {
         let id_i64: i64 = tx_id.to_string().parse().unwrap();
 
@@ -164,84 +78,6 @@ impl ConvertingAdapter for EvmConvertingAdapter {
         }
 
         info!(tx_id = %tx_id, btc_tx_id = ?btc_tx_id, "Transaction marked as processed successfully");
-        Ok(())
-    }
-
-    async fn read_liquidity(&self) -> Result<U256> {
-        let contract = self.ctx.contract.clone();
-
-        let mut native_liq = U256::zero();
-        {
-            let call = contract.native_liquidity();
-            match call.call().await {
-                Ok(v) => {
-                    native_liq = v;
-                }
-                Err(e) => {
-                    info!(
-                        error = %e,
-                        "nativeLiquidity() view not found or failed; treating as 0."
-                    );
-                }
-            }
-        }
-
-        // Format logs with tracing
-        let native_fmt = ethers::utils::format_ether(native_liq);
-
-        info!(
-            native = %native_fmt,
-            raw_native = ?native_liq,
-            "On-chain liquidity"
-        );
-
-        Ok(native_liq)
-    }
-
-    async fn maybe_rebalance_contract_liquidity(&self, native_liq: U256) -> Result<()> {
-        let c_op = self.ctx.c_op.clone();
-        let low_native = parse_human_native_token(Liquidity::HBAR_LIQ_LOW)?;
-        let high_native = parse_human_native_token(Liquidity::HBAR_LIQ_HIGH)?;
-        let enable_topup: bool = self.ctx.cfg.enable_onchain_lp_topup.to_lowercase() == "true";
-
-        if native_liq < low_native {
-            let need_native = low_native - native_liq;
-
-            info!(
-                needed = %ethers::utils::format_ether(need_native),
-                "Native liquidity below low threshold."
-            );
-
-            if enable_topup {
-                info!("addNativeLiquidity: operator wallet → contract");
-
-                let call = c_op.add_native_liquidity().value(need_native);
-                match call.send().await {
-                    Ok(pending) => {
-                        info!(
-                            tx_hash = ?pending.tx_hash(),
-                        "addNativeLiquidity tx broadcasted.")
-                    }
-                    Err(e) => error!(error=%e,"addNativeLiquidity failed"),
-                }
-            } else {
-                info!(
-                    need = %ethers::utils::format_ether(need_native),
-                    "   (SIMULATION ONLY) Withdraw Native Token from exchange → operator wallet → addNativeLiquidity(needNative)."
-                );
-            }
-        } else if native_liq > high_native {
-            let excess = native_liq - high_native;
-
-            info!(
-                excess = %ethers::utils::format_ether(excess),
-                "Native liquidity above high threshold."
-            );
-            info!("   TODO: call withdrawNativeLiquidity() → deposit to exchange.");
-        } else {
-            info!("Native liquidity within range – no rebalance needed.");
-        }
-
         Ok(())
     }
 
@@ -580,7 +416,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
         let tx_hash = pending.tx_hash();
 
         info!(
-            "✅ Merkle proof submitted txId={} | contract_tx_hash={:?}",
+            "Merkle proof submitted txId={} | contract_tx_hash={:?}",
             proof.tx_id, tx_hash
         );
 

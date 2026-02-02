@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ethers::types::{Address, Bytes, H160, U256};
+use ethers::types::{Address, Bytes, U256};
 use paradapp_core::consts::supported_network_enum::SupportedNetwork;
 use paradapp_core::consts::transaction_phase::TransactionPhase;
 use paradapp_core::consts::transaction_type::TransactionType;
-use paradapp_core::traits::chain_helper_adapter::{BitcoinToNativeCommitArgs, TxIdFilter};
+use paradapp_core::traits::chain_provider_adapter::{BitcoinToNativeCommitArgs, TxIdFilter};
 use paradapp_core::traits::chain_stack::ChainStack;
 use paradapp_core::traits::interop_resolver::InteropResolver as InteropResolverTrait;
 use tracing::{debug, info, warn};
@@ -34,7 +34,7 @@ impl InteropResolver {
 #[async_trait]
 impl InteropResolverTrait for InteropResolver {
     async fn run_once(&self, duty_seconds: u64) -> Result<()> {
-        let next_tx_id: U256 = self.source.helper().next_tx_id().await?;
+        let next_tx_id: U256 = self.source.chain_provider().next_tx_id().await?;
         if next_tx_id <= U256::from(1u64) {
             return Ok(());
         }
@@ -69,12 +69,12 @@ impl InteropResolverTrait for InteropResolver {
     // Helper to fetch IDs based on phase
     async fn get_txs_by_phase(&self, to_tx_id: U256, phase: u8, max: u64) -> Result<Vec<U256>> {
         self.source
-            .helper()
+            .chain_provider()
             .get_tx_ids_by_filter(TxIdFilter {
                 type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
                 phase_filter: phase,
-                user_filter: H160::zero(),
-                user_program_filter: Bytes::new(),
+                user_filter: None,
+                user_program_filter: None,
                 dest_network: None,
                 from_tx_id: U256::from(1u64),
                 to_tx_id,
@@ -84,18 +84,23 @@ impl InteropResolverTrait for InteropResolver {
     }
 
     async fn attempt_open_tunnel_only(&self, tx_id: U256) -> Result<()> {
-        let conv = self.source.helper().get_conversion_info(tx_id).await?;
+        let conv = self
+            .source
+            .chain_provider()
+            .get_conversion_info(tx_id)
+            .await?;
 
         // CHECK DESTINATION: Does this user_program already exist on the destination chain?
-        let dest_next_id = self.dest.helper().next_tx_id().await?;
+        let user_program_filter = conv.user_program.clone();
+        let dest_next_id = self.dest.chain_provider().next_tx_id().await?;
         let existing_on_dest = self
             .dest
-            .helper()
+            .chain_provider()
             .get_tx_ids_by_filter(TxIdFilter {
                 type_filter: TransactionType::NATIVE_TO_NATIVE_IN,
                 phase_filter: TransactionPhase::WAITING_USER_ACTION,
-                user_filter: H160::zero(),
-                user_program_filter: conv.user_program.clone(),
+                user_filter: None,
+                user_program_filter: Some(user_program_filter),
                 dest_network: None,
                 from_tx_id: U256::from(1u64),
                 to_tx_id: dest_next_id.saturating_sub(U256::one()),
@@ -108,12 +113,12 @@ impl InteropResolverTrait for InteropResolver {
             return Ok(());
         }
 
-        let min_anchor_dest = self.dest.helper().min_anchor_height().await?;
-        let global_tip_src = self.source.helper().global_tip_height().await?;
+        let min_anchor_dest = self.dest.chain_provider().min_anchor_height().await?;
+        let global_tip_src = self.source.chain_provider().global_tip_height().await?;
 
         if min_anchor_dest <= global_tip_src {
             // Check destination chain stream state (Sync logic)
-            let dest_chain_state = self.dest.helper().get_global_chain_state().await?;
+            let dest_chain_state = self.dest.chain_provider().get_global_chain_state().await?;
             let dest_stream_gap = dest_chain_state
                 .safe_anchor
                 .saturating_sub(dest_chain_state.global_tip);
@@ -121,7 +126,7 @@ impl InteropResolverTrait for InteropResolver {
             if dest_stream_gap > 0 {
                 let active_ids = self
                     .dest
-                    .streaming()
+                    .chain_provider()
                     .get_active_tx_ids(1000, Some(self.dest_network))
                     .await?;
                 if !active_ids.is_empty() {
@@ -132,7 +137,7 @@ impl InteropResolverTrait for InteropResolver {
                 if dest_chain_state.active_open == 0 {
                     info!(source_tx_id = %tx_id, "calling jump_to_anchor_from_zero_active on dest");
                     self.dest
-                        .helper()
+                        .chain_provider()
                         .jump_to_anchor_from_zero_active(
                             dest_chain_state.global_tip,
                             dest_chain_state.safe_anchor,
@@ -142,7 +147,7 @@ impl InteropResolverTrait for InteropResolver {
                     // Discovery/Stream logic
                     info!(source_tx_id = %tx_id, "calling stream_headers_to_height on dest");
                     self.dest
-                        .helper()
+                        .streaming()
                         .stream_headers_to_height(
                             dest_chain_state.global_tip,
                             dest_chain_state.safe_anchor,
@@ -153,16 +158,16 @@ impl InteropResolverTrait for InteropResolver {
             }
 
             // Execute Open Tunnel
-            let anchor = self.source.helper().anchor_info(tx_id).await?;
+            let anchor = self.source.chain_provider().anchor_info(tx_id).await?;
             let dest_address = Address::from_slice(&conv.network_address.as_ref()[..20]);
             let network_address = Bytes::from(conv.user.as_bytes().to_vec());
             let native_amount = conv.native_amount;
             let estimated_bitcoin_amount = self
                 .source
-                .helper()
+                .chain_provider()
                 .estimate_bitcoin_from_native(native_amount)
                 .await?;
-            let network_id = U256::from(self.source.helper().network() as u8);
+            let network_id = U256::from(self.source.chain_provider().network() as u8);
 
             info!(
                 tx_id = %tx_id,
@@ -174,7 +179,7 @@ impl InteropResolverTrait for InteropResolver {
                 "calling commit_bitcoin_to_native on dest"
             );
             self.dest
-                .helper()
+                .chain_provider()
                 .commit_bitcoin_to_native(BitcoinToNativeCommitArgs {
                     bitcoin_amount: estimated_bitcoin_amount,
                     network_id,
@@ -200,7 +205,7 @@ impl InteropResolverTrait for InteropResolver {
         duty_seconds: u64,
     ) -> Result<()> {
         let source_chain_sync_result: Result<()> = (async {
-            let source_chain_state = self.source.helper().get_global_chain_state().await?;
+            let source_chain_state = self.source.chain_provider().get_global_chain_state().await?;
             info!(
                 btc_tip = source_chain_state.btc_tip,
                 global_tip = source_chain_state.global_tip,
@@ -214,7 +219,7 @@ impl InteropResolverTrait for InteropResolver {
 
             if source_stream_gap > 0 {
                 let active_ids = self
-                    .source.streaming()
+                    .source.chain_provider()
                     .get_active_tx_ids(1000, Some(self.dest_network))
                     .await?;
                 if !active_ids.is_empty() {
@@ -229,7 +234,7 @@ impl InteropResolverTrait for InteropResolver {
 
                 if source_chain_state.active_open == 0 {
                     info!("No active conversions in source chain → jumping to safe anchor");
-                    self.source.helper()
+                    self.source.chain_provider()
                         .jump_to_anchor_from_zero_active(
                             source_chain_state.global_tip,
                             source_chain_state.safe_anchor,
@@ -270,10 +275,10 @@ impl InteropResolverTrait for InteropResolver {
 
                         self.source.approving().execute_user_closes(candidates).await?;
 
-                        let refreshed = self.source.helper().get_global_chain_state().await?;
+                        let refreshed = self.source.chain_provider().get_global_chain_state().await?;
                         if refreshed.active_open == 0 {
                             info!(source_tx_id = %tx_id,"All active closed → jumping to safe anchor on source chain");
-                            self.source.helper()
+                            self.source.chain_provider()
                                 .jump_to_anchor_from_zero_active(
                                     refreshed.global_tip,
                                     refreshed.safe_anchor,
@@ -282,7 +287,7 @@ impl InteropResolverTrait for InteropResolver {
                         }
                     } else {
                         info!(source_tx_id = %tx_id,"Streaming headers is cheaper on source chain");
-                        self.source.helper()
+                        self.source.streaming()
                             .stream_headers_to_height(
                                 source_chain_state.global_tip,
                                 source_chain_state.safe_anchor,
@@ -307,8 +312,8 @@ impl InteropResolverTrait for InteropResolver {
         }
 
         // === Only approve if min_anchor_dest <= global_tip_src ===
-        let min_anchor_dest = self.dest.helper().min_anchor_height().await?;
-        let global_tip_src = self.source.helper().global_tip_height().await?;
+        let min_anchor_dest = self.dest.chain_provider().min_anchor_height().await?;
+        let global_tip_src = self.source.chain_provider().global_tip_height().await?;
 
         if min_anchor_dest <= global_tip_src {
             self.source
@@ -326,12 +331,12 @@ impl InteropResolverTrait for InteropResolver {
         }
 
         // === Destination chain logic (open tunnel if anchor ready) ===
-        let min_anchor_dest = self.dest.helper().min_anchor_height().await?;
-        let global_tip_src = self.source.helper().global_tip_height().await?;
+        let min_anchor_dest = self.dest.chain_provider().min_anchor_height().await?;
+        let global_tip_src = self.source.chain_provider().global_tip_height().await?;
 
         if min_anchor_dest <= global_tip_src {
             // Resolve destination state
-            let dest_chain_state = self.dest.helper().get_global_chain_state().await?;
+            let dest_chain_state = self.dest.chain_provider().get_global_chain_state().await?;
             info!(
                 btc_tip = dest_chain_state.btc_tip,
                 global_tip = dest_chain_state.global_tip,
@@ -345,7 +350,7 @@ impl InteropResolverTrait for InteropResolver {
             if dest_stream_gap > 0 {
                 let active_ids = self
                     .dest
-                    .streaming()
+                    .chain_provider()
                     .get_active_tx_ids(1000, Some(self.dest_network))
                     .await?;
                 if !active_ids.is_empty() {
@@ -358,7 +363,7 @@ impl InteropResolverTrait for InteropResolver {
 
                 if dest_chain_state.active_open == 0 {
                     self.dest
-                        .helper()
+                        .chain_provider()
                         .jump_to_anchor_from_zero_active(
                             dest_chain_state.global_tip,
                             dest_chain_state.safe_anchor,
@@ -394,7 +399,7 @@ impl InteropResolverTrait for InteropResolver {
                             .await?;
                     } else {
                         self.dest
-                            .helper()
+                            .streaming()
                             .stream_headers_to_height(
                                 dest_chain_state.global_tip,
                                 dest_chain_state.safe_anchor,
@@ -406,18 +411,22 @@ impl InteropResolverTrait for InteropResolver {
             }
 
             // Open tunnel
-            let conv = self.source.helper().get_conversion_info(tx_id).await?;
-            let anchor = self.source.helper().anchor_info(tx_id).await?;
+            let conv = self
+                .source
+                .chain_provider()
+                .get_conversion_info(tx_id)
+                .await?;
+            let anchor = self.source.chain_provider().anchor_info(tx_id).await?;
 
             let dest_address = Address::from_slice(&conv.network_address.as_ref()[..20]);
             let network_address = Bytes::from(conv.user.as_bytes().to_vec());
             let native_amount = conv.native_amount;
             let estimated_bitcoin_amount = self
                 .source
-                .helper()
+                .chain_provider()
                 .estimate_bitcoin_from_native(native_amount)
                 .await?;
-            let network_id = U256::from(self.source.helper().network() as u8);
+            let network_id = U256::from(self.source.chain_provider().network() as u8);
 
             info!(
                 tx_id = %tx_id,
@@ -429,7 +438,7 @@ impl InteropResolverTrait for InteropResolver {
                 "calling commit_bitcoin_to_native on dest"
             );
             self.dest
-                .helper()
+                .chain_provider()
                 .commit_bitcoin_to_native(BitcoinToNativeCommitArgs {
                     bitcoin_amount: estimated_bitcoin_amount,
                     network_id,

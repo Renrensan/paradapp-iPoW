@@ -8,8 +8,8 @@ use crate::{consts::supported_network_enum::SupportedNetwork, conversion_type::C
 pub struct TxIdFilter {
     pub type_filter: u8,
     pub phase_filter: u8,
-    pub user_filter: H160,
-    pub user_program_filter: Bytes,
+    pub user_filter: Option<H160>,
+    pub user_program_filter: Option<Bytes>,
     pub dest_network: Option<SupportedNetwork>,
     pub from_tx_id: U256,
     pub to_tx_id: U256,
@@ -44,17 +44,14 @@ pub struct GlobalChainState {
     pub btc_tip: u64,
 }
 #[async_trait]
-pub trait ChainHelperAdapter: Send + Sync {
+pub trait ChainProviderAdapter: Send + Sync {
     async fn check_rpc_health(&self) -> Result<()>;
 
     fn network(&self) -> SupportedNetwork;
 
-    async fn stream_headers_to_height(
-        &self,
-        current_tip: u64,
-        up_to_height: u64,
-        max_count: u64,
-    ) -> Result<u64>;
+    async fn read_liquidity(&self) -> Result<U256>;
+
+    async fn maybe_rebalance_contract_liquidity(&self, native_liq: U256) -> Result<()>;
 
     async fn jump_to_anchor_from_zero_active(&self, global_tip: u64, anchor_h: u64) -> Result<u64>;
 
@@ -63,6 +60,18 @@ pub trait ChainHelperAdapter: Send + Sync {
     async fn min_anchor_height(&self) -> Result<U256>;
 
     async fn get_tx_ids_by_filter(&self, filter: TxIdFilter) -> Result<Vec<U256>>;
+
+    async fn get_active_tx_ids(
+        &self,
+        max_results: u64,
+        dest_network: Option<SupportedNetwork>,
+    ) -> Result<Vec<U256>>;
+
+    async fn get_pending_txids(
+        &self,
+        max_results: u32,
+        dest_network: Option<SupportedNetwork>,
+    ) -> Result<Vec<U256>>;
 
     async fn next_tx_id(&self) -> Result<U256>;
 

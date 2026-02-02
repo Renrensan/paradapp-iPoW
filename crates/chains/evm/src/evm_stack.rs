@@ -3,14 +3,14 @@ use crate::converting_adapter::EvmConvertingAdapter;
 use crate::dependencies::config::EvmConfig;
 use crate::dependencies::context::EvmContext;
 use crate::dependencies::db::sqlite::SqliteStorage;
-use crate::helper::EvmChainHelper;
+use crate::evm_provider::EvmChainProvider;
 use crate::network::EvmNetwork;
 use crate::streaming_adapter::EvmStreamingAdapter;
 use async_trait::async_trait;
 use paradapp_core::consts::supported_network_enum::SupportedNetwork;
 use paradapp_core::context::CoreContext;
 use paradapp_core::traits::approving_adapter::ApprovingAdapter;
-use paradapp_core::traits::chain_helper_adapter::ChainHelperAdapter;
+use paradapp_core::traits::chain_provider_adapter::ChainProviderAdapter;
 use paradapp_core::traits::chain_stack::ChainStack;
 use paradapp_core::traits::converting_adapter::ConvertingAdapter;
 use paradapp_core::traits::streaming_adapter::StreamingAdapter;
@@ -20,7 +20,7 @@ use std::sync::Arc;
 pub struct EvmStack {
     pub network_id: String,
     pub network_enum: SupportedNetwork,
-    pub helper: Arc<EvmChainHelper>,
+    pub chain_provider: Arc<EvmChainProvider>,
     pub streaming: Arc<EvmStreamingAdapter>,
     pub approving: Arc<EvmApprovingAdapter>,
     pub converting: Arc<EvmConvertingAdapter>,
@@ -40,37 +40,37 @@ impl EvmStack {
         let sqlite = SqliteStorage::init(network.string_identifier()).await?;
         let sqlite_pool = sqlite.pool();
 
-        // 3. Initialize Helper
-        let helper = Arc::new(EvmChainHelper::new(ctx.clone(), core_ctx.clone()));
+        // 3. Initialize Provider
+        let provider = Arc::new(EvmChainProvider::new(ctx.clone(), core_ctx.clone()));
 
-        // 4. Cast helper to the Trait Object required by your adapters
-        let helper_trait: Arc<dyn ChainHelperAdapter> = helper.clone();
+        // 4. Cast provider to the Trait Object
+        let provider_trait: Arc<dyn ChainProviderAdapter> = provider.clone();
 
         // 5. Initialize Adapters matching your exact struct definition
         let approving = Arc::new(EvmApprovingAdapter {
             ctx: ctx.clone(),
             core_ctx: core_ctx.clone(),
             sqlite_storage: sqlite_pool.clone(),
-            helper: helper_trait.clone(),
+            chain_provider: provider_trait.clone(),
         });
 
         let converting = Arc::new(EvmConvertingAdapter {
             ctx: ctx.clone(),
             core_ctx: core_ctx.clone(),
             sqlite_storage: sqlite_pool.clone(),
-            helper: helper_trait.clone(),
+            chain_provider: provider_trait.clone(),
         });
 
         let streaming = Arc::new(EvmStreamingAdapter {
             ctx: ctx.clone(),
             core_ctx: core_ctx.clone(),
-            helper: helper_trait,
+            chain_provider: provider_trait,
         });
 
         Ok(Self {
             network_id: network_name,
             network_enum,
-            helper,
+            chain_provider: provider,
             streaming,
             approving,
             converting,
@@ -93,8 +93,8 @@ impl ChainStack for EvmStack {
         self.streaming.clone()
     }
 
-    fn helper(&self) -> Arc<dyn ChainHelperAdapter> {
-        self.helper.clone()
+    fn chain_provider(&self) -> Arc<dyn ChainProviderAdapter> {
+        self.chain_provider.clone()
     }
 
     fn network_id(&self) -> &str {

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use ethers::{
-    types::{Address, Bytes, U256},
+    types::{Bytes, U256},
     utils::hex,
 };
 use paradapp_core::{
@@ -14,7 +14,7 @@ use paradapp_core::{
     context::CoreContext,
     traits::{
         approving_adapter::ApprovingAdapter,
-        chain_helper_adapter::{ChainHelperAdapter, TxIdFilter},
+        chain_provider_adapter::{ChainProviderAdapter, TxIdFilter},
     },
 };
 use sqlx::SqlitePool;
@@ -27,7 +27,7 @@ pub struct EvmApprovingAdapter {
     pub ctx: Arc<EvmContext>,
     pub core_ctx: Arc<CoreContext>,
     pub sqlite_storage: SqlitePool,
-    pub helper: Arc<dyn ChainHelperAdapter>,
+    pub chain_provider: Arc<dyn ChainProviderAdapter>,
 }
 
 #[async_trait]
@@ -88,42 +88,6 @@ impl ApprovingAdapter for EvmApprovingAdapter {
         let (idx, address, script) = derive_p2wpkh_address(xpub, index, self.core_ctx.btc_network)?;
 
         Ok((idx, address, script))
-    }
-
-    async fn get_tx_ids_by_phase(
-        &self,
-        phase: u8,
-        type_filter: u8,
-        from_tx_id: U256,
-        to_tx_id: U256,
-        max_results: U256,
-        dest_network: Option<SupportedNetwork>,
-    ) -> Result<Vec<U256>> {
-        // Zero address = wildcard user
-        let user_filter = Address::zero();
-
-        let (dest_network_u256, use_network_filter): (U256, bool) = match dest_network {
-            Some(net) => (U256::from(net as u8), true),
-            None => (U256::zero(), false), // ignored when use_network_filter == false
-        };
-        let tx_ids_bn: Vec<U256> = self
-            .ctx
-            .contract
-            .get_tx_ids_by_filter(
-                type_filter,
-                phase,
-                user_filter,
-                Bytes::new(),
-                dest_network_u256,
-                use_network_filter,
-                from_tx_id,
-                to_tx_id,
-                max_results,
-            )
-            .call()
-            .await?;
-
-        Ok(tx_ids_bn)
     }
 
     async fn handle_operator_closes_for_active(&self, tx_id: U256, conf_req: u64) -> Result<()> {
@@ -252,46 +216,52 @@ impl ApprovingAdapter for EvmApprovingAdapter {
 
         use futures::try_join;
 
-        // Filter params
-        let user_filter = Address::zero();
-        let user_program_filter = Bytes::new();
-
         // --- ACTIVE_WAITING_PROOF ---
         let (native_to_btc, btc_to_native, native_to_native_in, native_to_native_out) = try_join!(
-            self.helper.get_tx_ids_by_filter(TxIdFilter {
+            // 1. Native -> BTC
+            self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
                 type_filter: TransactionType::NATIVE_TO_BITCOIN,
                 phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
-                user_filter,
-                user_program_filter,
+                user_filter: None,
+                user_program_filter: None,
                 dest_network: None,
                 from_tx_id,
                 to_tx_id,
                 max_results,
             }),
-            self.get_tx_ids_by_phase(
-                TransactionPhase::ACTIVE_WAITING_PROOF,
-                TransactionType::BITCOIN_TO_NATIVE,
+            // 2. BTC -> Native
+            self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
+                type_filter: TransactionType::BITCOIN_TO_NATIVE,
+                phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
+                user_filter: None,
+                user_program_filter: None,
+                dest_network, // Pass the Option directly
                 from_tx_id,
                 to_tx_id,
                 max_results,
-                dest_network
-            ),
-            self.get_tx_ids_by_phase(
-                TransactionPhase::ACTIVE_WAITING_PROOF,
-                TransactionType::NATIVE_TO_NATIVE_IN,
+            }),
+            // 3. Native -> Native IN
+            self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
+                type_filter: TransactionType::NATIVE_TO_NATIVE_IN,
+                phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
+                user_filter: None,
+                user_program_filter: None,
+                dest_network,
                 from_tx_id,
                 to_tx_id,
                 max_results,
-                dest_network
-            ),
-            self.get_tx_ids_by_phase(
-                TransactionPhase::ACTIVE_WAITING_PROOF,
-                TransactionType::NATIVE_TO_NATIVE_OUT,
+            }),
+            // 4. Native -> Native OUT
+            self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
+                type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
+                phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
+                user_filter: None,
+                user_program_filter: None,
+                dest_network,
                 from_tx_id,
                 to_tx_id,
                 max_results,
-                dest_network
-            ),
+            }),
         )?;
 
         let active_txs: Vec<U256> = native_to_btc
@@ -301,40 +271,47 @@ impl ApprovingAdapter for EvmApprovingAdapter {
             .chain(native_to_native_out)
             .collect();
 
-        // --- OPERATOR_DUTY_EXPIRED ---
         let (native_to_btc, btc_to_native, native_to_native_in, native_to_native_out) = try_join!(
-            self.get_tx_ids_by_phase(
-                TransactionPhase::OPERATOR_DUTY_EXPIRED,
-                TransactionType::NATIVE_TO_BITCOIN,
+            self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
+                type_filter: TransactionType::NATIVE_TO_BITCOIN,
+                phase_filter: TransactionPhase::OPERATOR_DUTY_EXPIRED,
+                user_filter: None,
+                user_program_filter: None,
+                dest_network: None,
                 from_tx_id,
                 to_tx_id,
                 max_results,
+            }),
+            self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
+                type_filter: TransactionType::BITCOIN_TO_NATIVE,
+                phase_filter: TransactionPhase::OPERATOR_DUTY_EXPIRED,
+                user_filter: None,
+                user_program_filter: None,
                 dest_network,
-            ),
-            self.get_tx_ids_by_phase(
-                TransactionPhase::OPERATOR_DUTY_EXPIRED,
-                TransactionType::BITCOIN_TO_NATIVE,
                 from_tx_id,
                 to_tx_id,
                 max_results,
+            }),
+            self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
+                type_filter: TransactionType::NATIVE_TO_NATIVE_IN,
+                phase_filter: TransactionPhase::OPERATOR_DUTY_EXPIRED,
+                user_filter: None,
+                user_program_filter: None,
                 dest_network,
-            ),
-            self.get_tx_ids_by_phase(
-                TransactionPhase::OPERATOR_DUTY_EXPIRED,
-                TransactionType::NATIVE_TO_NATIVE_IN,
                 from_tx_id,
                 to_tx_id,
                 max_results,
+            }),
+            self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
+                type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
+                phase_filter: TransactionPhase::OPERATOR_DUTY_EXPIRED,
+                user_filter: None,
+                user_program_filter: None,
                 dest_network,
-            ),
-            self.get_tx_ids_by_phase(
-                TransactionPhase::OPERATOR_DUTY_EXPIRED,
-                TransactionType::NATIVE_TO_NATIVE_OUT,
                 from_tx_id,
                 to_tx_id,
                 max_results,
-                dest_network,
-            ),
+            }),
         )?;
 
         let duty_expired_txs: Vec<U256> = native_to_btc
@@ -517,96 +494,6 @@ impl ApprovingAdapter for EvmApprovingAdapter {
         }
 
         Ok(())
-    }
-
-    async fn get_pending_txids(
-        &self,
-        max_results: u32,
-        dest_network: Option<SupportedNetwork>,
-    ) -> Result<Vec<U256>> {
-        let contract = self.ctx.contract.clone();
-
-        let next_tx_id: U256 = contract.next_tx_id().call().await?;
-        if next_tx_id <= U256::from(1u64) {
-            return Ok(vec![]);
-        }
-
-        // toTxId = nextTxId - 1
-        let to_tx_id = next_tx_id - U256::from(1u64);
-        let (dest_network_u256, use_network_filter): (U256, bool) = match dest_network {
-            Some(net) => (U256::from(net as u8), true),
-            None => (U256::zero(), false), // ignored when use_network_filter == false
-        };
-        let mut tx_ids: Vec<U256> = contract
-            .get_tx_ids_by_filter(
-                TransactionType::NATIVE_TO_BITCOIN,
-                TransactionPhase::WAITING_OPERATOR_APPROVAL,
-                Address::zero(),
-                Bytes::new(),
-                dest_network_u256,
-                use_network_filter,
-                U256::from(1u64),
-                to_tx_id,
-                U256::from(max_results),
-            )
-            .call()
-            .await?;
-
-        let mut btc_to_native_tx_ids: Vec<U256> = contract
-            .get_tx_ids_by_filter(
-                TransactionType::BITCOIN_TO_NATIVE,
-                TransactionPhase::WAITING_OPERATOR_APPROVAL,
-                Address::zero(),
-                Bytes::new(),
-                dest_network_u256,
-                use_network_filter,
-                U256::from(1u64),
-                to_tx_id,
-                U256::from(max_results),
-            )
-            .call()
-            .await?;
-
-        tx_ids.append(&mut btc_to_native_tx_ids);
-
-        Ok(tx_ids)
-    }
-
-    async fn get_pending_native_to_native_out_txids(
-        &self,
-        max_results: u32,
-        dest_network: Option<SupportedNetwork>,
-    ) -> Result<Vec<U256>> {
-        let contract = self.ctx.contract.clone();
-
-        let next_tx_id: U256 = contract.next_tx_id().call().await?;
-        if next_tx_id <= U256::from(1u64) {
-            return Ok(vec![]);
-        }
-
-        // toTxId = nextTxId - 1
-        let to_tx_id = next_tx_id - U256::from(1u64);
-
-        let (dest_network_u256, use_network_filter): (U256, bool) = match dest_network {
-            Some(net) => (U256::from(net as u8), true),
-            None => (U256::zero(), false), // ignored when use_network_filter == false
-        };
-        let tx_ids: Vec<U256> = contract
-            .get_tx_ids_by_filter(
-                TransactionType::NATIVE_TO_NATIVE_OUT,
-                TransactionPhase::WAITING_OPERATOR_APPROVAL,
-                Address::zero(),
-                Bytes::new(),
-                dest_network_u256,
-                use_network_filter,
-                U256::from(1u64),
-                to_tx_id,
-                U256::from(max_results),
-            )
-            .call()
-            .await?;
-
-        Ok(tx_ids)
     }
 
     async fn approve_one_tx(&self, tx_id: U256, duty_seconds: u64) -> Result<()> {

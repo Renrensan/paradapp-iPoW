@@ -11,15 +11,7 @@ use crate::{
 
 #[async_trait]
 pub trait ConvertingAdapter: Send + Sync {
-    async fn check_rpc_health(&self) -> Result<()>;
-
-    async fn next_tx_id(&self) -> Result<U256>;
-
     async fn mark_processed(&self, tx_id: U256, btc_tx_id: Option<String>) -> Result<()>;
-
-    async fn read_liquidity(&self) -> Result<U256>;
-
-    async fn maybe_rebalance_contract_liquidity(&self, native_liq: U256) -> anyhow::Result<()>;
 
     async fn find_native_to_btc_ready(
         &self,

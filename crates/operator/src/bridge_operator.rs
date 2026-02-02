@@ -42,7 +42,7 @@ impl BridgeOperator {
         let resolver = paradapp_interop::resolver::InteropResolver {
             source: src,
             dest: dst,
-            dest_network: dest_network,
+            dest_network,
         };
 
         resolver.run_once(duty_seconds).await?;
