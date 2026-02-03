@@ -1008,10 +1008,17 @@ pub mod paradapp_convert {
                                 ),
                             },
                             ::ethers::core::abi::ethabi::Param {
-                                name: ::std::borrow::ToOwned::to_owned("userProgramFilter"),
+                                name: ::std::borrow::ToOwned::to_owned("bitcoinProgramFilter",),
                                 kind: ::ethers::core::abi::ethabi::ParamType::Bytes,
                                 internal_type: ::core::option::Option::Some(
                                     ::std::borrow::ToOwned::to_owned("bytes"),
+                                ),
+                            },
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("searchUserProgram"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Bool,
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("bool"),
                                 ),
                             },
                             ::ethers::core::abi::ethabi::Param {
@@ -1733,30 +1740,6 @@ pub mod paradapp_convert {
             ]),
             events: ::core::convert::From::from([
                 (
-                    ::std::borrow::ToOwned::to_owned("AnchorPinnedAsTip"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("AnchorPinnedAsTip"),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("txId"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: true,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("height"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("hashLE"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
-                                indexed: false,
-                            },
-                        ],
-                        anonymous: false,
-                    },],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("ConversionApproved"),
                     ::std::vec![::ethers::core::abi::ethabi::Event {
                         name: ::std::borrow::ToOwned::to_owned("ConversionApproved"),
@@ -1865,30 +1848,6 @@ pub mod paradapp_convert {
                     },],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("EpochFirstIndexed"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("EpochFirstIndexed"),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("txId"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: true,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("height"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("hashLE"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
-                                indexed: false,
-                            },
-                        ],
-                        anonymous: false,
-                    },],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("FeesUpdated"),
                     ::std::vec![::ethers::core::abi::ethabi::Event {
                         name: ::std::borrow::ToOwned::to_owned("FeesUpdated"),
@@ -1947,74 +1906,6 @@ pub mod paradapp_convert {
                     },],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("HeaderAppended"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("HeaderAppended"),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("txId"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: true,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("height"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("hashLE"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("prevHashLE"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("merkleRootLE"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
-                                indexed: false,
-                            },
-                        ],
-                        anonymous: false,
-                    },],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("HeaderChainStarted"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("HeaderChainStarted"),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("txId"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: true,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("height"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("hashLE"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("prevHashLE"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("merkleRootLE"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
-                                indexed: false,
-                            },
-                        ],
-                        anonymous: false,
-                    },],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("LiquidityUpdated"),
                     ::std::vec![::ethers::core::abi::ethabi::Event {
                         name: ::std::borrow::ToOwned::to_owned("LiquidityUpdated"),
@@ -2035,141 +1926,6 @@ pub mod paradapp_convert {
                             kind: ::ethers::core::abi::ethabi::ParamType::Address,
                             indexed: false,
                         },],
-                        anonymous: false,
-                    },],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("ProofCheckFailed"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("ProofCheckFailed"),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("txId"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: true,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("txidLE"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("blockHashLE"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("reason"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::String,
-                                indexed: false,
-                            },
-                        ],
-                        anonymous: false,
-                    },],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("ProofReplaced"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("ProofReplaced"),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("txId"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: true,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("attempts"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                indexed: false,
-                            },
-                        ],
-                        anonymous: false,
-                    },],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("ProofStored"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("ProofStored"),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("txId"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: true,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("txidLE"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("blockHashLE"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("blockHeight"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: false,
-                            },
-                        ],
-                        anonymous: false,
-                    },],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("ProofTxStored"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("ProofTxStored"),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("txId"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: true,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("txidLE"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("voutIndex"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("valueSats"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("program"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                indexed: false,
-                            },
-                        ],
-                        anonymous: false,
-                    },],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("ProofVerified"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("ProofVerified"),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("txId"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: true,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("txidLE"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("blockHashLE"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
-                                indexed: false,
-                            },
-                        ],
                         anonymous: false,
                     },],
                 ),
@@ -3009,13 +2765,14 @@ pub mod paradapp_convert {
                 .method_hash([117, 147, 167, 58], tx_id)
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `getTxIdsByFilter` (0x34c3af1c) function
+        ///Calls the contract's `getTxIdsByFilter` (0xab7ff8b0) function
         pub fn get_tx_ids_by_filter(
             &self,
             type_filter: u8,
             phase_filter: u8,
             user_filter: ::ethers::core::types::Address,
-            user_program_filter: ::ethers::core::types::Bytes,
+            bitcoin_program_filter: ::ethers::core::types::Bytes,
+            search_user_program: bool,
             network_id_filter: ::ethers::core::types::U256,
             use_network_id_filter: bool,
             from_tx_id: ::ethers::core::types::U256,
@@ -3027,12 +2784,13 @@ pub mod paradapp_convert {
         > {
             self.0
                 .method_hash(
-                    [52, 195, 175, 28],
+                    [171, 127, 248, 176],
                     (
                         type_filter,
                         phase_filter,
                         user_filter,
-                        user_program_filter,
+                        bitcoin_program_filter,
+                        search_user_program,
                         network_id_filter,
                         use_network_id_filter,
                         from_tx_id,
@@ -3305,13 +3063,6 @@ pub mod paradapp_convert {
                 .method_hash([79, 224, 32, 11], tx_id)
                 .expect("method not found (this should never happen)")
         }
-        ///Gets the contract's `AnchorPinnedAsTip` event
-        pub fn anchor_pinned_as_tip_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, AnchorPinnedAsTipFilter>
-        {
-            self.0.event()
-        }
         ///Gets the contract's `ConversionApproved` event
         pub fn conversion_approved_filter(
             &self,
@@ -3347,13 +3098,6 @@ pub mod paradapp_convert {
         {
             self.0.event()
         }
-        ///Gets the contract's `EpochFirstIndexed` event
-        pub fn epoch_first_indexed_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, EpochFirstIndexedFilter>
-        {
-            self.0.event()
-        }
         ///Gets the contract's `FeesUpdated` event
         pub fn fees_updated_filter(
             &self,
@@ -3368,20 +3112,6 @@ pub mod paradapp_convert {
         {
             self.0.event()
         }
-        ///Gets the contract's `HeaderAppended` event
-        pub fn header_appended_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, HeaderAppendedFilter>
-        {
-            self.0.event()
-        }
-        ///Gets the contract's `HeaderChainStarted` event
-        pub fn header_chain_started_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, HeaderChainStartedFilter>
-        {
-            self.0.event()
-        }
         ///Gets the contract's `LiquidityUpdated` event
         pub fn liquidity_updated_filter(
             &self,
@@ -3393,41 +3123,6 @@ pub mod paradapp_convert {
         pub fn operator_changed_filter(
             &self,
         ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, OperatorChangedFilter>
-        {
-            self.0.event()
-        }
-        ///Gets the contract's `ProofCheckFailed` event
-        pub fn proof_check_failed_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ProofCheckFailedFilter>
-        {
-            self.0.event()
-        }
-        ///Gets the contract's `ProofReplaced` event
-        pub fn proof_replaced_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ProofReplacedFilter>
-        {
-            self.0.event()
-        }
-        ///Gets the contract's `ProofStored` event
-        pub fn proof_stored_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ProofStoredFilter>
-        {
-            self.0.event()
-        }
-        ///Gets the contract's `ProofTxStored` event
-        pub fn proof_tx_stored_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ProofTxStoredFilter>
-        {
-            self.0.event()
-        }
-        ///Gets the contract's `ProofVerified` event
-        pub fn proof_verified_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ProofVerifiedFilter>
         {
             self.0.event()
         }
@@ -5378,26 +5073,6 @@ pub mod paradapp_convert {
         Hash,
     )]
     #[ethevent(
-        name = "AnchorPinnedAsTip",
-        abi = "AnchorPinnedAsTip(uint256,uint256,bytes32)"
-    )]
-    pub struct AnchorPinnedAsTipFilter {
-        #[ethevent(indexed)]
-        pub tx_id: ::ethers::core::types::U256,
-        pub height: ::ethers::core::types::U256,
-        pub hash_le: [u8; 32],
-    }
-    #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethevent(
         name = "ConversionApproved",
         abi = "ConversionApproved(uint256,uint256,uint256,bytes32)"
     )]
@@ -5493,26 +5168,6 @@ pub mod paradapp_convert {
         Eq,
         Hash,
     )]
-    #[ethevent(
-        name = "EpochFirstIndexed",
-        abi = "EpochFirstIndexed(uint256,uint256,bytes32)"
-    )]
-    pub struct EpochFirstIndexedFilter {
-        #[ethevent(indexed)]
-        pub tx_id: ::ethers::core::types::U256,
-        pub height: ::ethers::core::types::U256,
-        pub hash_le: [u8; 32],
-    }
-    #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
     #[ethevent(name = "FeesUpdated", abi = "FeesUpdated(uint256,uint16)")]
     pub struct FeesUpdatedFilter {
         pub new_commit_fee: ::ethers::core::types::U256,
@@ -5550,50 +5205,6 @@ pub mod paradapp_convert {
         Eq,
         Hash,
     )]
-    #[ethevent(
-        name = "HeaderAppended",
-        abi = "HeaderAppended(uint256,uint256,bytes32,bytes32,bytes32)"
-    )]
-    pub struct HeaderAppendedFilter {
-        #[ethevent(indexed)]
-        pub tx_id: ::ethers::core::types::U256,
-        pub height: ::ethers::core::types::U256,
-        pub hash_le: [u8; 32],
-        pub prev_hash_le: [u8; 32],
-        pub merkle_root_le: [u8; 32],
-    }
-    #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethevent(
-        name = "HeaderChainStarted",
-        abi = "HeaderChainStarted(uint256,uint256,bytes32,bytes32,bytes32)"
-    )]
-    pub struct HeaderChainStartedFilter {
-        #[ethevent(indexed)]
-        pub tx_id: ::ethers::core::types::U256,
-        pub height: ::ethers::core::types::U256,
-        pub hash_le: [u8; 32],
-        pub prev_hash_le: [u8; 32],
-        pub merkle_root_le: [u8; 32],
-    }
-    #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
     #[ethevent(name = "LiquidityUpdated", abi = "LiquidityUpdated(uint256)")]
     pub struct LiquidityUpdatedFilter {
         pub native_liquidity: ::ethers::core::types::U256,
@@ -5612,132 +5223,23 @@ pub mod paradapp_convert {
     pub struct OperatorChangedFilter {
         pub new_operator: ::ethers::core::types::Address,
     }
-    #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethevent(
-        name = "ProofCheckFailed",
-        abi = "ProofCheckFailed(uint256,bytes32,bytes32,string)"
-    )]
-    pub struct ProofCheckFailedFilter {
-        #[ethevent(indexed)]
-        pub tx_id: ::ethers::core::types::U256,
-        pub txid_le: [u8; 32],
-        pub block_hash_le: [u8; 32],
-        pub reason: ::std::string::String,
-    }
-    #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethevent(name = "ProofReplaced", abi = "ProofReplaced(uint256,uint8)")]
-    pub struct ProofReplacedFilter {
-        #[ethevent(indexed)]
-        pub tx_id: ::ethers::core::types::U256,
-        pub attempts: u8,
-    }
-    #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethevent(
-        name = "ProofStored",
-        abi = "ProofStored(uint256,bytes32,bytes32,uint256)"
-    )]
-    pub struct ProofStoredFilter {
-        #[ethevent(indexed)]
-        pub tx_id: ::ethers::core::types::U256,
-        pub txid_le: [u8; 32],
-        pub block_hash_le: [u8; 32],
-        pub block_height: ::ethers::core::types::U256,
-    }
-    #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethevent(
-        name = "ProofTxStored",
-        abi = "ProofTxStored(uint256,bytes32,uint256,uint64,bytes)"
-    )]
-    pub struct ProofTxStoredFilter {
-        #[ethevent(indexed)]
-        pub tx_id: ::ethers::core::types::U256,
-        pub txid_le: [u8; 32],
-        pub vout_index: ::ethers::core::types::U256,
-        pub value_sats: u64,
-        pub program: ::ethers::core::types::Bytes,
-    }
-    #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethevent(name = "ProofVerified", abi = "ProofVerified(uint256,bytes32,bytes32)")]
-    pub struct ProofVerifiedFilter {
-        #[ethevent(indexed)]
-        pub tx_id: ::ethers::core::types::U256,
-        pub txid_le: [u8; 32],
-        pub block_hash_le: [u8; 32],
-    }
     ///Container type for all of the contract's events
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum ParadappConvertEvents {
-        AnchorPinnedAsTipFilter(AnchorPinnedAsTipFilter),
         ConversionApprovedFilter(ConversionApprovedFilter),
         ConversionCommittedFilter(ConversionCommittedFilter),
         ConversionCompletedFilter(ConversionCompletedFilter),
         ConversionDepositedFilter(ConversionDepositedFilter),
         ConversionRefundedFilter(ConversionRefundedFilter),
-        EpochFirstIndexedFilter(EpochFirstIndexedFilter),
         FeesUpdatedFilter(FeesUpdatedFilter),
         GlobalHeaderAppendedFilter(GlobalHeaderAppendedFilter),
-        HeaderAppendedFilter(HeaderAppendedFilter),
-        HeaderChainStartedFilter(HeaderChainStartedFilter),
         LiquidityUpdatedFilter(LiquidityUpdatedFilter),
         OperatorChangedFilter(OperatorChangedFilter),
-        ProofCheckFailedFilter(ProofCheckFailedFilter),
-        ProofReplacedFilter(ProofReplacedFilter),
-        ProofStoredFilter(ProofStoredFilter),
-        ProofTxStoredFilter(ProofTxStoredFilter),
-        ProofVerifiedFilter(ProofVerifiedFilter),
     }
     impl ::ethers::contract::EthLogDecode for ParadappConvertEvents {
         fn decode_log(
             log: &::ethers::core::abi::RawLog,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
-            if let Ok(decoded) = AnchorPinnedAsTipFilter::decode_log(log) {
-                return Ok(ParadappConvertEvents::AnchorPinnedAsTipFilter(decoded));
-            }
             if let Ok(decoded) = ConversionApprovedFilter::decode_log(log) {
                 return Ok(ParadappConvertEvents::ConversionApprovedFilter(decoded));
             }
@@ -5753,20 +5255,11 @@ pub mod paradapp_convert {
             if let Ok(decoded) = ConversionRefundedFilter::decode_log(log) {
                 return Ok(ParadappConvertEvents::ConversionRefundedFilter(decoded));
             }
-            if let Ok(decoded) = EpochFirstIndexedFilter::decode_log(log) {
-                return Ok(ParadappConvertEvents::EpochFirstIndexedFilter(decoded));
-            }
             if let Ok(decoded) = FeesUpdatedFilter::decode_log(log) {
                 return Ok(ParadappConvertEvents::FeesUpdatedFilter(decoded));
             }
             if let Ok(decoded) = GlobalHeaderAppendedFilter::decode_log(log) {
                 return Ok(ParadappConvertEvents::GlobalHeaderAppendedFilter(decoded));
-            }
-            if let Ok(decoded) = HeaderAppendedFilter::decode_log(log) {
-                return Ok(ParadappConvertEvents::HeaderAppendedFilter(decoded));
-            }
-            if let Ok(decoded) = HeaderChainStartedFilter::decode_log(log) {
-                return Ok(ParadappConvertEvents::HeaderChainStartedFilter(decoded));
             }
             if let Ok(decoded) = LiquidityUpdatedFilter::decode_log(log) {
                 return Ok(ParadappConvertEvents::LiquidityUpdatedFilter(decoded));
@@ -5774,51 +5267,22 @@ pub mod paradapp_convert {
             if let Ok(decoded) = OperatorChangedFilter::decode_log(log) {
                 return Ok(ParadappConvertEvents::OperatorChangedFilter(decoded));
             }
-            if let Ok(decoded) = ProofCheckFailedFilter::decode_log(log) {
-                return Ok(ParadappConvertEvents::ProofCheckFailedFilter(decoded));
-            }
-            if let Ok(decoded) = ProofReplacedFilter::decode_log(log) {
-                return Ok(ParadappConvertEvents::ProofReplacedFilter(decoded));
-            }
-            if let Ok(decoded) = ProofStoredFilter::decode_log(log) {
-                return Ok(ParadappConvertEvents::ProofStoredFilter(decoded));
-            }
-            if let Ok(decoded) = ProofTxStoredFilter::decode_log(log) {
-                return Ok(ParadappConvertEvents::ProofTxStoredFilter(decoded));
-            }
-            if let Ok(decoded) = ProofVerifiedFilter::decode_log(log) {
-                return Ok(ParadappConvertEvents::ProofVerifiedFilter(decoded));
-            }
             Err(::ethers::core::abi::Error::InvalidData)
         }
     }
     impl ::core::fmt::Display for ParadappConvertEvents {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::AnchorPinnedAsTipFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ConversionApprovedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ConversionCommittedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ConversionCompletedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ConversionDepositedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ConversionRefundedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::EpochFirstIndexedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::FeesUpdatedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GlobalHeaderAppendedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::HeaderAppendedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::HeaderChainStartedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::LiquidityUpdatedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::OperatorChangedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ProofCheckFailedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ProofReplacedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ProofStoredFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ProofTxStoredFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ProofVerifiedFilter(element) => ::core::fmt::Display::fmt(element, f),
             }
-        }
-    }
-    impl ::core::convert::From<AnchorPinnedAsTipFilter> for ParadappConvertEvents {
-        fn from(value: AnchorPinnedAsTipFilter) -> Self {
-            Self::AnchorPinnedAsTipFilter(value)
         }
     }
     impl ::core::convert::From<ConversionApprovedFilter> for ParadappConvertEvents {
@@ -5846,11 +5310,6 @@ pub mod paradapp_convert {
             Self::ConversionRefundedFilter(value)
         }
     }
-    impl ::core::convert::From<EpochFirstIndexedFilter> for ParadappConvertEvents {
-        fn from(value: EpochFirstIndexedFilter) -> Self {
-            Self::EpochFirstIndexedFilter(value)
-        }
-    }
     impl ::core::convert::From<FeesUpdatedFilter> for ParadappConvertEvents {
         fn from(value: FeesUpdatedFilter) -> Self {
             Self::FeesUpdatedFilter(value)
@@ -5861,16 +5320,6 @@ pub mod paradapp_convert {
             Self::GlobalHeaderAppendedFilter(value)
         }
     }
-    impl ::core::convert::From<HeaderAppendedFilter> for ParadappConvertEvents {
-        fn from(value: HeaderAppendedFilter) -> Self {
-            Self::HeaderAppendedFilter(value)
-        }
-    }
-    impl ::core::convert::From<HeaderChainStartedFilter> for ParadappConvertEvents {
-        fn from(value: HeaderChainStartedFilter) -> Self {
-            Self::HeaderChainStartedFilter(value)
-        }
-    }
     impl ::core::convert::From<LiquidityUpdatedFilter> for ParadappConvertEvents {
         fn from(value: LiquidityUpdatedFilter) -> Self {
             Self::LiquidityUpdatedFilter(value)
@@ -5879,31 +5328,6 @@ pub mod paradapp_convert {
     impl ::core::convert::From<OperatorChangedFilter> for ParadappConvertEvents {
         fn from(value: OperatorChangedFilter) -> Self {
             Self::OperatorChangedFilter(value)
-        }
-    }
-    impl ::core::convert::From<ProofCheckFailedFilter> for ParadappConvertEvents {
-        fn from(value: ProofCheckFailedFilter) -> Self {
-            Self::ProofCheckFailedFilter(value)
-        }
-    }
-    impl ::core::convert::From<ProofReplacedFilter> for ParadappConvertEvents {
-        fn from(value: ProofReplacedFilter) -> Self {
-            Self::ProofReplacedFilter(value)
-        }
-    }
-    impl ::core::convert::From<ProofStoredFilter> for ParadappConvertEvents {
-        fn from(value: ProofStoredFilter) -> Self {
-            Self::ProofStoredFilter(value)
-        }
-    }
-    impl ::core::convert::From<ProofTxStoredFilter> for ParadappConvertEvents {
-        fn from(value: ProofTxStoredFilter) -> Self {
-            Self::ProofTxStoredFilter(value)
-        }
-    }
-    impl ::core::convert::From<ProofVerifiedFilter> for ParadappConvertEvents {
-        fn from(value: ProofVerifiedFilter) -> Self {
-            Self::ProofVerifiedFilter(value)
         }
     }
     ///Container type for all input parameters for the `APPROVAL_WINDOW_SEC` function with signature `APPROVAL_WINDOW_SEC()` and selector `0xdcd5d309`
@@ -6398,7 +5822,7 @@ pub mod paradapp_convert {
     pub struct GetConversionWithPhaseCall {
         pub tx_id: ::ethers::core::types::U256,
     }
-    ///Container type for all input parameters for the `getTxIdsByFilter` function with signature `getTxIdsByFilter(uint8,uint8,address,bytes,uint256,bool,uint256,uint256,uint256)` and selector `0x34c3af1c`
+    ///Container type for all input parameters for the `getTxIdsByFilter` function with signature `getTxIdsByFilter(uint8,uint8,address,bytes,bool,uint256,bool,uint256,uint256,uint256)` and selector `0xab7ff8b0`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -6411,13 +5835,14 @@ pub mod paradapp_convert {
     )]
     #[ethcall(
         name = "getTxIdsByFilter",
-        abi = "getTxIdsByFilter(uint8,uint8,address,bytes,uint256,bool,uint256,uint256,uint256)"
+        abi = "getTxIdsByFilter(uint8,uint8,address,bytes,bool,uint256,bool,uint256,uint256,uint256)"
     )]
     pub struct GetTxIdsByFilterCall {
         pub type_filter: u8,
         pub phase_filter: u8,
         pub user_filter: ::ethers::core::types::Address,
-        pub user_program_filter: ::ethers::core::types::Bytes,
+        pub bitcoin_program_filter: ::ethers::core::types::Bytes,
+        pub search_user_program: bool,
         pub network_id_filter: ::ethers::core::types::U256,
         pub use_network_id_filter: bool,
         pub from_tx_id: ::ethers::core::types::U256,
@@ -7929,7 +7354,7 @@ pub mod paradapp_convert {
         pub c: Conversion,
         pub phase: u8,
     }
-    ///Container type for all return fields from the `getTxIdsByFilter` function with signature `getTxIdsByFilter(uint8,uint8,address,bytes,uint256,bool,uint256,uint256,uint256)` and selector `0x34c3af1c`
+    ///Container type for all return fields from the `getTxIdsByFilter` function with signature `getTxIdsByFilter(uint8,uint8,address,bytes,bool,uint256,bool,uint256,uint256,uint256)` and selector `0xab7ff8b0`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,

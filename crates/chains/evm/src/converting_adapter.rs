@@ -13,7 +13,10 @@ use paradapp_core::{
     },
     context::CoreContext,
     models::conversion::Conversion,
-    traits::{chain_provider_adapter::ChainProviderAdapter, converting_adapter::ConvertingAdapter},
+    traits::{
+        chain_provider_adapter::{ChainProviderAdapter, TxIdFilter},
+        converting_adapter::ConvertingAdapter,
+    },
 };
 use sqlx::{Row, SqlitePool};
 use tracing::{error, info, warn};
@@ -108,6 +111,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
                     TransactionPhase::ACTIVE_WAITING_PROOF,
                     user_filter,
                     Bytes::new(),
+                    false,
                     dest_network_u256,
                     use_network_filter,
                     U256::one(),
@@ -174,32 +178,24 @@ impl ConvertingAdapter for EvmConvertingAdapter {
     ) -> Result<Vec<(U256, Conversion)>> {
         let mut completed = Vec::new();
 
-        let (dest_network_u256, use_network_filter): (U256, bool) = match dest_network {
-            Some(net) => (U256::from(net as u8), true),
-            None => (U256::zero(), false), // ignored when use_network_filter == false
-        };
-
         for tx_type in [
             TransactionType::BITCOIN_TO_NATIVE,
             TransactionType::NATIVE_TO_NATIVE_IN,
         ] {
             let mut ids: Vec<U256> = self
-                .ctx
-                .contract
-                .get_tx_ids_by_filter(
-                    tx_type,
-                    TransactionPhase::COMPLETED,
-                    Address::zero(),
-                    Bytes::new(),
-                    dest_network_u256,
-                    use_network_filter,
-                    U256::one(),
+                .chain_provider
+                .get_tx_ids_by_filter(TxIdFilter {
+                    type_filter: tx_type,
+                    phase_filter: TransactionPhase::COMPLETED,
+                    user_filter: Some(Address::zero()),
+                    bitcoin_program_filter: None,
+                    bitcoin_program_type: None,
+                    dest_network,
+                    from_tx_id: U256::one(),
                     to_tx_id,
-                    U256::from(500),
-                )
-                .call()
-                .await
-                .map_err(anyhow::Error::from)?;
+                    max_results: U256::from(500),
+                })
+                .await?;
 
             completed.append(&mut ids);
         }

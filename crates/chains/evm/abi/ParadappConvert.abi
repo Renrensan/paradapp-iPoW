@@ -377,31 +377,6 @@
 			{
 				"indexed": false,
 				"internalType": "uint256",
-				"name": "height",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "bytes32",
-				"name": "hashLE",
-				"type": "bytes32"
-			}
-		],
-		"name": "AnchorPinnedAsTip",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "txId",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
 				"name": "dutyWindowSeconds",
 				"type": "uint256"
 			},
@@ -507,31 +482,6 @@
 		"anonymous": false,
 		"inputs": [
 			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "txId",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "height",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "bytes32",
-				"name": "hashLE",
-				"type": "bytes32"
-			}
-		],
-		"name": "EpochFirstIndexed",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
 				"indexed": false,
 				"internalType": "uint256",
 				"name": "newCommitFee",
@@ -594,80 +544,6 @@
 		"anonymous": false,
 		"inputs": [
 			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "txId",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "height",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "bytes32",
-				"name": "hashLE",
-				"type": "bytes32"
-			},
-			{
-				"indexed": false,
-				"internalType": "bytes32",
-				"name": "prevHashLE",
-				"type": "bytes32"
-			},
-			{
-				"indexed": false,
-				"internalType": "bytes32",
-				"name": "merkleRootLE",
-				"type": "bytes32"
-			}
-		],
-		"name": "HeaderAppended",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "txId",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "height",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "bytes32",
-				"name": "hashLE",
-				"type": "bytes32"
-			},
-			{
-				"indexed": false,
-				"internalType": "bytes32",
-				"name": "prevHashLE",
-				"type": "bytes32"
-			},
-			{
-				"indexed": false,
-				"internalType": "bytes32",
-				"name": "merkleRootLE",
-				"type": "bytes32"
-			}
-		],
-		"name": "HeaderChainStarted",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
 				"indexed": false,
 				"internalType": "uint256",
 				"name": "nativeLiquidity",
@@ -688,149 +564,6 @@
 			}
 		],
 		"name": "OperatorChanged",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "txId",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "bytes32",
-				"name": "txidLE",
-				"type": "bytes32"
-			},
-			{
-				"indexed": false,
-				"internalType": "bytes32",
-				"name": "blockHashLE",
-				"type": "bytes32"
-			},
-			{
-				"indexed": false,
-				"internalType": "string",
-				"name": "reason",
-				"type": "string"
-			}
-		],
-		"name": "ProofCheckFailed",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "txId",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint8",
-				"name": "attempts",
-				"type": "uint8"
-			}
-		],
-		"name": "ProofReplaced",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "txId",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "bytes32",
-				"name": "txidLE",
-				"type": "bytes32"
-			},
-			{
-				"indexed": false,
-				"internalType": "bytes32",
-				"name": "blockHashLE",
-				"type": "bytes32"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "blockHeight",
-				"type": "uint256"
-			}
-		],
-		"name": "ProofStored",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "txId",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "bytes32",
-				"name": "txidLE",
-				"type": "bytes32"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "voutIndex",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint64",
-				"name": "valueSats",
-				"type": "uint64"
-			},
-			{
-				"indexed": false,
-				"internalType": "bytes",
-				"name": "program",
-				"type": "bytes"
-			}
-		],
-		"name": "ProofTxStored",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "txId",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "bytes32",
-				"name": "txidLE",
-				"type": "bytes32"
-			},
-			{
-				"indexed": false,
-				"internalType": "bytes32",
-				"name": "blockHashLE",
-				"type": "bytes32"
-			}
-		],
-		"name": "ProofVerified",
 		"type": "event"
 	},
 	{
@@ -1621,8 +1354,13 @@
 			},
 			{
 				"internalType": "bytes",
-				"name": "userProgramFilter",
+				"name": "bitcoinProgramFilter",
 				"type": "bytes"
+			},
+			{
+				"internalType": "bool",
+				"name": "searchUserProgram",
+				"type": "bool"
 			},
 			{
 				"internalType": "uint256",

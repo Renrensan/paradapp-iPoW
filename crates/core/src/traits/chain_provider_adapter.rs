@@ -5,15 +5,37 @@ use ethers::types::{Address, Bytes, H160, U256};
 use crate::{consts::supported_network_enum::SupportedNetwork, conversion_type::ConversionResult};
 
 /// Parameters for filtering transaction IDs.
+#[derive(Default)]
+pub enum BitcoinProgramType {
+    #[default]
+    User,
+    Paradapp,
+}
 pub struct TxIdFilter {
     pub type_filter: u8,
     pub phase_filter: u8,
     pub user_filter: Option<H160>,
-    pub user_program_filter: Option<Bytes>,
+    pub bitcoin_program_filter: Option<Bytes>,
+    pub bitcoin_program_type: Option<BitcoinProgramType>,
     pub dest_network: Option<SupportedNetwork>,
     pub from_tx_id: U256,
     pub to_tx_id: U256,
     pub max_results: U256,
+}
+impl Default for TxIdFilter {
+    fn default() -> Self {
+        Self {
+            type_filter: 0,
+            phase_filter: 0,
+            user_filter: None,
+            bitcoin_program_filter: None,
+            bitcoin_program_type: None,
+            dest_network: None,
+            from_tx_id: U256::one(),
+            to_tx_id: U256::max_value(),
+            max_results: U256::from(500),
+        }
+    }
 }
 
 /// Parameters for committing a Bitcoin -> Native conversion.

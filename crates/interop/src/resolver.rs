@@ -6,7 +6,9 @@ use ethers::types::{Address, Bytes, U256};
 use paradapp_core::consts::supported_network_enum::SupportedNetwork;
 use paradapp_core::consts::transaction_phase::TransactionPhase;
 use paradapp_core::consts::transaction_type::TransactionType;
-use paradapp_core::traits::chain_provider_adapter::{BitcoinToNativeCommitArgs, TxIdFilter};
+use paradapp_core::traits::chain_provider_adapter::{
+    BitcoinProgramType, BitcoinToNativeCommitArgs, TxIdFilter,
+};
 use paradapp_core::traits::chain_stack::ChainStack;
 use paradapp_core::traits::interop_resolver::InteropResolver as InteropResolverTrait;
 use tracing::{debug, info, warn};
@@ -74,7 +76,8 @@ impl InteropResolverTrait for InteropResolver {
                 type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
                 phase_filter: phase,
                 user_filter: None,
-                user_program_filter: None,
+                bitcoin_program_filter: None,
+                bitcoin_program_type: None,
                 dest_network: None,
                 from_tx_id: U256::from(1u64),
                 to_tx_id,
@@ -90,7 +93,7 @@ impl InteropResolverTrait for InteropResolver {
             .get_conversion_info(tx_id)
             .await?;
 
-        // CHECK DESTINATION: Does this user_program already exist on the destination chain?
+        // CHECK DESTINATION: Does this paradapp program already exist on the destination chain?
         let user_program_filter = conv.user_program.clone();
         let dest_next_id = self.dest.chain_provider().next_tx_id().await?;
         let existing_on_dest = self
@@ -100,7 +103,8 @@ impl InteropResolverTrait for InteropResolver {
                 type_filter: TransactionType::NATIVE_TO_NATIVE_IN,
                 phase_filter: TransactionPhase::WAITING_USER_ACTION,
                 user_filter: None,
-                user_program_filter: Some(user_program_filter),
+                bitcoin_program_filter: Some(user_program_filter),
+                bitcoin_program_type: Some(BitcoinProgramType::Paradapp),
                 dest_network: None,
                 from_tx_id: U256::from(1u64),
                 to_tx_id: dest_next_id.saturating_sub(U256::one()),
