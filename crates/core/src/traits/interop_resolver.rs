@@ -6,11 +6,7 @@ use ethers::types::U256;
 pub trait InteropResolver: Send + Sync {
     async fn run_once(&self, duty_seconds: u64) -> Result<()>;
 
-    async fn attempt_approve_one_tx_and_open_tunnel(
-        &self,
-        tx_id: U256,
-        duty_seconds: u64,
-    ) -> Result<()>;
+    async fn attempt_approve_one_tx(&self, tx_id: U256, duty_seconds: u64) -> Result<()>;
 
-    async fn attempt_open_tunnel_only(&self, tx_id: U256) -> Result<()>;
+    async fn attempt_open_tunnel(&self, tx_id: U256) -> Result<()>;
 }

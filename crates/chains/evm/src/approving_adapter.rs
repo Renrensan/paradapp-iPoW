@@ -490,7 +490,7 @@ impl ApprovingAdapter for EvmApprovingAdapter {
 
         let xpub_str: &str = &self.ctx.cfg.btc_root_xpub;
 
-        if !is_native_to_bitcoin {
+        if !is_native_to_bitcoin || (is_native_to_bitcoin && network_id != U256::zero()) {
             match self
                 .get_or_create_receive_program_for_tx(tx_id, xpub_str)
                 .await
@@ -501,21 +501,20 @@ impl ApprovingAdapter for EvmApprovingAdapter {
                         tx_id = %tx_id,
                         address = %address,
                         index = index,
-                        "BTC→Native assigned BTC addr via XPUB"
+                        is_n2n = (network_id != U256::zero()),
+                        "Assigned BTC addr via XPUB for conversion"
                     );
                 }
                 Err(err) => {
                     warn!(
                         tx_id = %tx_id,
                         error = %err,
-                        "Cannot approve BTC→Native – failed deriving address from XPUB"
+                        "Failed deriving address from XPUB"
                     );
                     return Ok(());
                 }
             }
-        }
-        // If is native to bitcoin and there are network id params it must be native to native out requests
-        if is_native_to_bitcoin && network_id != U256::zero() {
+        } else if is_native_to_bitcoin {
             if let Some(static_program) = &self.core_ctx.cfg.paradapp_receive_program {
                 script_arg =
                     hex::decode(static_program.trim_start_matches("0x")).unwrap_or_default();
@@ -533,7 +532,6 @@ impl ApprovingAdapter for EvmApprovingAdapter {
                 return Err(anyhow!("missing receive program for Native→BTC"));
             }
         }
-
         info!(
             tx_id = %tx_id,
             is_native_to_bitcoin = %is_native_to_bitcoin,
@@ -579,6 +577,7 @@ impl ApprovingAdapter for EvmApprovingAdapter {
                 );
             }
         }
+
         Ok(())
     }
 }

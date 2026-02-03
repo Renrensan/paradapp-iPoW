@@ -54,10 +54,7 @@ impl InteropResolverTrait for InteropResolver {
             })
             .await?;
         for tx_id in pending_approval {
-            if let Err(e) = self
-                .attempt_approve_one_tx_and_open_tunnel(tx_id, duty_seconds)
-                .await
-            {
+            if let Err(e) = self.attempt_approve_one_tx(tx_id, duty_seconds).await {
                 warn!(tx_id = %tx_id, error = %e, "Approval flow failed");
             }
         }
@@ -74,7 +71,7 @@ impl InteropResolverTrait for InteropResolver {
             })
             .await?;
         for tx_id in pending_user {
-            if let Err(e) = self.attempt_open_tunnel_only(tx_id).await {
+            if let Err(e) = self.attempt_open_tunnel(tx_id).await {
                 warn!(tx_id = %tx_id, error = %e, "Tunnel-only flow failed");
             }
         }
@@ -82,7 +79,7 @@ impl InteropResolverTrait for InteropResolver {
         Ok(())
     }
 
-    async fn attempt_open_tunnel_only(&self, tx_id: U256) -> Result<()> {
+    async fn attempt_open_tunnel(&self, tx_id: U256) -> Result<()> {
         let conv = self
             .source
             .chain_provider()
@@ -111,58 +108,34 @@ impl InteropResolverTrait for InteropResolver {
             return Ok(());
         }
 
+        let source_anchor = self.source.chain_provider().anchor_info(tx_id).await?;
+        let source_anchor_height_u64: u64 = source_anchor
+            .anchor_height
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("source anchor height conversion error"))?;
         let min_anchor_dest = self.dest.chain_provider().min_anchor_height().await?;
-        let global_tip_src = self.source.chain_provider().global_tip_height().await?;
+        // let global_tip_src = self.source.chain_provider().global_tip_height().await?;
 
-        if min_anchor_dest <= global_tip_src {
+        if min_anchor_dest <= source_anchor.anchor_height {
             // Check destination chain stream state (Sync logic)
             let dest_chain_state = self.dest.chain_provider().get_global_chain_state().await?;
-            let dest_stream_gap = dest_chain_state
-                .safe_anchor
-                .saturating_sub(dest_chain_state.global_tip);
+            let dest_stream_gap =
+                source_anchor_height_u64.saturating_sub(dest_chain_state.global_tip);
 
             if dest_stream_gap > 0 {
-                let next_tx_id = self.dest.chain_provider().next_tx_id().await?;
-                let to_tx_id = next_tx_id.saturating_sub(U256::one());
-
-                let active_ids = self
-                    .dest
-                    .chain_provider()
-                    .get_tx_ids_by_filter(TxIdFilter {
-                        type_filter: TransactionType::ANY,
-                        phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
-                        dest_network: Some(self.dest_network),
-                        to_tx_id,
-                        max_results: U256::from(1000u64),
-                        ..Default::default()
-                    })
-                    .await?;
-
-                if !active_ids.is_empty() {
-                    debug!(tx_id = %tx_id, "dest active_ids not empty, skipping tick");
-                    return Ok(());
-                }
-
+                // If no active opens, jump directly to anchor
                 if dest_chain_state.active_open == 0 {
                     info!(source_tx_id = %tx_id, "calling jump_to_anchor_from_zero_active on dest");
                     self.dest
                         .chain_provider()
                         .jump_to_anchor_from_zero_active(
                             dest_chain_state.global_tip,
-                            dest_chain_state.safe_anchor,
+                            source_anchor_height_u64,
                         )
                         .await?;
                 } else {
-                    // Discovery/Stream logic
-                    info!(source_tx_id = %tx_id, "calling stream_headers_to_height on dest");
-                    self.dest
-                        .streaming()
-                        .stream_headers_to_height(
-                            dest_chain_state.global_tip,
-                            dest_chain_state.safe_anchor,
-                            200,
-                        )
-                        .await?;
+                    debug!(source_tx_id = %tx_id, "Skipping tick, active opens present, should already be streaming");
+                    return Ok(());
                 }
             }
 
@@ -178,6 +151,8 @@ impl InteropResolverTrait for InteropResolver {
                 .await?;
             let network_id = U256::from(self.source.chain_provider().network() as u8);
 
+            // Recall dest to re log
+            let dest_chain_state = self.dest.chain_provider().get_global_chain_state().await?;
             info!(
                 tx_id = %tx_id,
                 bitcoin_amount = ?estimated_bitcoin_amount,
@@ -185,6 +160,8 @@ impl InteropResolverTrait for InteropResolver {
                 network_id = %network_id,
                 dest_address = ?dest_address,
                 locked_anchor_height = %anchor.anchor_height,
+                dest_global_tip = dest_chain_state.global_tip,
+                dest_active_open = dest_chain_state.active_open,
                 "calling commit_bitcoin_to_native on dest"
             );
             self.dest
@@ -208,11 +185,7 @@ impl InteropResolverTrait for InteropResolver {
         Ok(())
     }
 
-    async fn attempt_approve_one_tx_and_open_tunnel(
-        &self,
-        tx_id: U256,
-        duty_seconds: u64,
-    ) -> Result<()> {
+    async fn attempt_approve_one_tx(&self, tx_id: U256, duty_seconds: u64) -> Result<()> {
         let source_chain_sync_result: Result<()> = (async {
             let source_chain_state = self.source.chain_provider().get_global_chain_state().await?;
             info!(
@@ -340,155 +313,12 @@ impl InteropResolverTrait for InteropResolver {
                 .approving()
                 .approve_one_tx(tx_id, duty_seconds)
                 .await?;
-            info!(tx_id = %tx_id, "Source chain TX approved");
         } else {
             warn!(
                 %tx_id,
                 %min_anchor_dest,
                 %global_tip_src,
                 "Skipping approval, anchor condition not met"
-            );
-        }
-
-        // === Destination chain logic (open tunnel if anchor ready) ===
-        let min_anchor_dest = self.dest.chain_provider().min_anchor_height().await?;
-        let global_tip_src = self.source.chain_provider().global_tip_height().await?;
-
-        if min_anchor_dest <= global_tip_src {
-            // Resolve destination state
-            let dest_chain_state = self.dest.chain_provider().get_global_chain_state().await?;
-            info!(
-                btc_tip = dest_chain_state.btc_tip,
-                global_tip = dest_chain_state.global_tip,
-                active_open = dest_chain_state.active_open,
-                "Destination chain state"
-            );
-
-            let dest_stream_gap = dest_chain_state
-                .safe_anchor
-                .saturating_sub(dest_chain_state.global_tip);
-            if dest_stream_gap > 0 {
-                let next_tx_id = self.dest.chain_provider().next_tx_id().await?;
-                let to_tx_id = next_tx_id.saturating_sub(U256::one());
-
-                let active_ids = self
-                    .dest
-                    .chain_provider()
-                    .get_tx_ids_by_filter(TxIdFilter {
-                        type_filter: TransactionType::ANY,
-                        phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
-                        dest_network: Some(self.dest_network),
-                        to_tx_id,
-                        max_results: U256::from(1000u64),
-                        ..Default::default()
-                    })
-                    .await?;
-
-                if !active_ids.is_empty() {
-                    info!(
-                        active_count = active_ids.len(),
-                        "Active destination conversions present → skipping this tick"
-                    );
-                    return Ok(());
-                }
-
-                if dest_chain_state.active_open == 0 {
-                    self.dest
-                        .chain_provider()
-                        .jump_to_anchor_from_zero_active(
-                            dest_chain_state.global_tip,
-                            dest_chain_state.safe_anchor,
-                        )
-                        .await?;
-                } else {
-                    let user_close_candidates = self
-                        .dest
-                        .approving()
-                        .discover_user_close_candidates(
-                            dest_chain_state.next_tx_id - U256::one(),
-                            dest_chain_state.confirmations_required,
-                        )
-                        .await
-                        .unwrap_or_default();
-
-                    let user_close_cost = user_close_candidates.len();
-                    if user_close_cost > 0 && (dest_stream_gap as usize) > user_close_cost {
-                        let candidates: Vec<(U256, &'static str)> = user_close_candidates
-                            .into_iter()
-                            .map(|(tx_id, kind)| {
-                                if kind.contains("refundAfterNoProof") {
-                                    (tx_id, "refundAfterNoProof_NativeTokentoBTC")
-                                } else {
-                                    (tx_id, "claimNative_AfterOperatorExpired")
-                                }
-                            })
-                            .collect();
-                        self.dest
-                            .approving()
-                            .execute_user_closes(candidates)
-                            .await?;
-                    } else {
-                        self.dest
-                            .streaming()
-                            .stream_headers_to_height(
-                                dest_chain_state.global_tip,
-                                dest_chain_state.safe_anchor,
-                                200,
-                            )
-                            .await?;
-                    }
-                }
-            }
-
-            // Open tunnel
-            let conv = self
-                .source
-                .chain_provider()
-                .get_conversion_info(tx_id)
-                .await?;
-            let anchor = self.source.chain_provider().anchor_info(tx_id).await?;
-
-            let dest_address = Address::from_slice(&conv.network_address.as_ref()[..20]);
-            let network_address = Bytes::from(conv.user.as_bytes().to_vec());
-            let native_amount = conv.native_amount;
-            let estimated_bitcoin_amount = self
-                .source
-                .chain_provider()
-                .estimate_bitcoin_from_native(native_amount)
-                .await?;
-            let network_id = U256::from(self.source.chain_provider().network() as u8);
-
-            info!(
-                tx_id = %tx_id,
-                bitcoin_amount = ?estimated_bitcoin_amount,
-                native_amount = ?native_amount,
-                network_id = %network_id,
-                dest_address = ?dest_address,
-                locked_anchor_height = %anchor.anchor_height,
-                "calling commit_bitcoin_to_native on dest"
-            );
-            self.dest
-                .chain_provider()
-                .commit_bitcoin_to_native(BitcoinToNativeCommitArgs {
-                    bitcoin_amount: estimated_bitcoin_amount,
-                    network_id,
-                    user_program: Bytes::new(),
-                    dest_address,
-                    network_address,
-                    duty_window_seconds: conv.operator_duty_expires_at,
-                    paradapp_receive_program: conv.user_program.clone(),
-                    locked_anchor_height: anchor.anchor_height,
-                    slippage: conv.slippage,
-                })
-                .await?;
-
-            info!(tx_id = %tx_id, "Tunnel opened on destination chain");
-        } else {
-            warn!(
-                %tx_id,
-                %min_anchor_dest,
-                %global_tip_src,
-                "Skipping open tunnel, anchor condition not met"
             );
         }
 
