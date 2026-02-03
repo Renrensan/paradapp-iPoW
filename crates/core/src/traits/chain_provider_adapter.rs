@@ -83,18 +83,6 @@ pub trait ChainProviderAdapter: Send + Sync {
 
     async fn get_tx_ids_by_filter(&self, filter: TxIdFilter) -> Result<Vec<U256>>;
 
-    async fn get_active_tx_ids(
-        &self,
-        max_results: u64,
-        dest_network: Option<SupportedNetwork>,
-    ) -> Result<Vec<U256>>;
-
-    async fn get_pending_txids(
-        &self,
-        max_results: u32,
-        dest_network: Option<SupportedNetwork>,
-    ) -> Result<Vec<U256>>;
-
     async fn next_tx_id(&self) -> Result<U256>;
 
     async fn commit_bitcoin_to_native(&self, args: BitcoinToNativeCommitArgs) -> Result<()>;

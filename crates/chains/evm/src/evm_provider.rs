@@ -1,8 +1,8 @@
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use ethers::{abi::Address, types::U256};
+use ethers::types::U256;
 use tracing::{error, info, warn};
 
 use crate::{
@@ -17,10 +17,7 @@ use crate::{
 use anyhow::anyhow;
 use paradapp_core::{
     btc::btc_service::{btc_tip_height, decode_header80, epoch_start, header80_by_height},
-    consts::{
-        supported_network_enum::SupportedNetwork, transaction_phase::TransactionPhase,
-        transaction_type::TransactionType,
-    },
+    consts::supported_network_enum::SupportedNetwork,
     context::CoreContext,
     conversion_type::ConversionResult,
     traits::chain_provider_adapter::{
@@ -382,49 +379,6 @@ impl ChainProviderAdapter for EvmChainProvider {
         }
     }
 
-    async fn get_tx_ids_by_filter(&self, filter: TxIdFilter) -> Result<Vec<U256>> {
-        let contract = self.ctx.contract.clone();
-
-        // Filter params
-        let user_filter = filter.user_filter.unwrap_or_default();
-        let bitcoin_program_filter = filter.bitcoin_program_filter.clone().unwrap_or_default();
-        let search_user_program = !matches!(
-            filter.bitcoin_program_type,
-            Some(BitcoinProgramType::Paradapp)
-        );
-        let (dest_network_u256, use_network_filter): (U256, bool) = match filter.dest_network {
-            Some(net) => (U256::from(net as u8), true),
-            None => (U256::zero(), false),
-        };
-
-        // Contract call
-        match contract
-            .get_tx_ids_by_filter(
-                filter.type_filter,
-                filter.phase_filter,
-                user_filter,
-                bitcoin_program_filter,
-                search_user_program,
-                dest_network_u256,
-                use_network_filter,
-                filter.from_tx_id,
-                filter.to_tx_id,
-                filter.max_results,
-            )
-            .call()
-            .await
-        {
-            Ok(tx_ids) => {
-                info!(count = tx_ids.len(), "Fetched tx_ids");
-                Ok(tx_ids)
-            }
-            Err(e) => {
-                error!(error = %e, "Failed to fetch tx_ids by filter");
-                Err(anyhow::anyhow!(e))
-            }
-        }
-    }
-
     async fn commit_bitcoin_to_native(&self, args: BitcoinToNativeCommitArgs) -> Result<()> {
         let c_op = self.ctx.c_op.clone();
 
@@ -545,111 +499,47 @@ impl ChainProviderAdapter for EvmChainProvider {
         })
     }
 
-    async fn get_active_tx_ids(
-        &self,
-        max_results: u64,
-        dest_network: Option<SupportedNetwork>,
-    ) -> Result<Vec<U256>> {
-        let contract = &self.ctx.contract;
-
-        let next_tx_id: U256 = contract.next_tx_id().call().await?;
-        if next_tx_id <= U256::one() {
-            return Ok(vec![]);
-        }
-        let to_tx_id = next_tx_id - U256::one();
-        let user_filter = Address::zero();
-        let from = U256::one();
-        let max_results_u256 = U256::from(max_results);
-
-        // ---- WAITING USER ACTION ----
-        let tx_ids_waiting_user_action: Vec<U256> = self
-            .get_tx_ids_by_filter(TxIdFilter {
-                type_filter: TransactionType::ANY,
-                phase_filter: TransactionPhase::WAITING_USER_ACTION,
-                user_filter: Some(user_filter),
-                bitcoin_program_filter: None,
-                bitcoin_program_type: None,
-                dest_network,
-                from_tx_id: from,
-                to_tx_id,
-                max_results: max_results_u256,
-            })
-            .await?;
-
-        // ---- ACTIVE_WAITING_PROOF ----
-        let tx_ids_active_waiting_proof: Vec<U256> = self
-            .get_tx_ids_by_filter(TxIdFilter {
-                type_filter: TransactionType::ANY,
-                phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
-                user_filter: Some(user_filter),
-                bitcoin_program_filter: None,
-                bitcoin_program_type: None,
-                dest_network,
-                from_tx_id: from,
-                to_tx_id,
-                max_results: max_results_u256,
-            })
-            .await?;
-
-        // ---- MERGE & DEDUP ----
-        let mut set: HashSet<U256> = tx_ids_waiting_user_action.into_iter().collect();
-        set.extend(tx_ids_active_waiting_proof);
-
-        let tx_ids: Vec<U256> = set.into_iter().collect();
-
-        if !tx_ids.is_empty() {
-            info!("streaming for tx ids: {:?}", tx_ids);
-        }
-        Ok(tx_ids)
-    }
-
-    async fn get_pending_txids(
-        &self,
-        max_results: u32,
-        dest_network: Option<SupportedNetwork>,
-    ) -> Result<Vec<U256>> {
+    async fn get_tx_ids_by_filter(&self, filter: TxIdFilter) -> Result<Vec<U256>> {
         let contract = self.ctx.contract.clone();
 
-        let next_tx_id: U256 = contract.next_tx_id().call().await?;
-        if next_tx_id <= U256::from(1u64) {
-            return Ok(vec![]);
+        // Filter params
+        let user_filter = filter.user_filter.unwrap_or_default();
+        let bitcoin_program_filter = filter.bitcoin_program_filter.clone().unwrap_or_default();
+        let search_user_program = !matches!(
+            filter.bitcoin_program_type,
+            Some(BitcoinProgramType::Paradapp)
+        );
+        let (dest_network_u256, use_network_filter): (U256, bool) = match filter.dest_network {
+            Some(net) => (U256::from(net as u8), true),
+            None => (U256::zero(), false),
+        };
+
+        // Contract call
+        match contract
+            .get_tx_ids_by_filter(
+                filter.type_filter,
+                filter.phase_filter,
+                user_filter,
+                bitcoin_program_filter,
+                search_user_program,
+                dest_network_u256,
+                use_network_filter,
+                filter.from_tx_id,
+                filter.to_tx_id,
+                filter.max_results,
+            )
+            .call()
+            .await
+        {
+            Ok(tx_ids) => {
+                info!(count = tx_ids.len(), "Fetched tx_ids");
+                Ok(tx_ids)
+            }
+            Err(e) => {
+                error!(error = %e, "Failed to fetch tx_ids by filter");
+                Err(anyhow::anyhow!(e))
+            }
         }
-        let to_tx_id = next_tx_id - U256::from(1u64);
-        let user_filter = Address::zero();
-        let from_tx_id = U256::from(1u64);
-        let max_results = U256::from(max_results);
-
-        let mut tx_ids: Vec<U256> = self
-            .get_tx_ids_by_filter(TxIdFilter {
-                type_filter: TransactionType::NATIVE_TO_BITCOIN,
-                phase_filter: TransactionPhase::WAITING_OPERATOR_APPROVAL,
-                user_filter: Some(user_filter),
-                bitcoin_program_filter: None,
-                bitcoin_program_type: None,
-                dest_network,
-                from_tx_id,
-                to_tx_id,
-                max_results,
-            })
-            .await?;
-
-        let mut btc_to_native_tx_ids: Vec<U256> = self
-            .get_tx_ids_by_filter(TxIdFilter {
-                type_filter: TransactionType::BITCOIN_TO_NATIVE,
-                phase_filter: TransactionPhase::WAITING_OPERATOR_APPROVAL,
-                user_filter: Some(user_filter),
-                bitcoin_program_filter: None,
-                bitcoin_program_type: None,
-                dest_network,
-                from_tx_id,
-                to_tx_id,
-                max_results,
-            })
-            .await?;
-
-        tx_ids.append(&mut btc_to_native_tx_ids);
-
-        Ok(tx_ids)
     }
 
     async fn estimate_bitcoin_from_native(&self, native_amount: U256) -> Result<U256> {

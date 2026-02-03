@@ -8,6 +8,7 @@ use paradapp_core::{
     },
 };
 use std::sync::Arc;
+use tokio::try_join;
 use tracing::{error, info, warn};
 
 pub struct LocalOperator;
@@ -75,11 +76,31 @@ impl LocalOperator {
         let duty_seconds = 24 * 60 * 60;
 
         // 1. Fetch pending approvals
-        let pending_txids = match stack.chain_provider().get_pending_txids(500, None).await {
-            Ok(txids) if !txids.is_empty() => txids,
-            Ok(_) => {
-                info!("No pending conversions to approve this cycle.");
-                return Ok(());
+        let provider = stack.chain_provider();
+        let next_tx_id = provider.next_tx_id().await?;
+        let to_tx_id = next_tx_id.saturating_sub(U256::one());
+
+        let pending_txids = match try_join!(
+            provider.get_tx_ids_by_filter(TxIdFilter {
+                type_filter: TransactionType::NATIVE_TO_BITCOIN,
+                phase_filter: TransactionPhase::WAITING_OPERATOR_APPROVAL,
+                to_tx_id,
+                ..Default::default()
+            }),
+            provider.get_tx_ids_by_filter(TxIdFilter {
+                type_filter: TransactionType::BITCOIN_TO_NATIVE,
+                phase_filter: TransactionPhase::WAITING_OPERATOR_APPROVAL,
+                to_tx_id,
+                ..Default::default()
+            })
+        ) {
+            Ok((mut n2b, b2n)) => {
+                n2b.extend(b2n);
+                if n2b.is_empty() {
+                    info!("No pending conversions to approve this cycle.");
+                    return Ok(());
+                }
+                n2b
             }
             Err(e) => {
                 warn!("Failed to fetch pending txids: {e}");
@@ -93,18 +114,17 @@ impl LocalOperator {
         );
 
         // 2. Check RPC Health
-        if let Err(e) = stack.chain_provider().check_rpc_health().await {
+        if let Err(e) = provider.check_rpc_health().await {
             warn!(error = %e, "Skipping cycle — RPC health check failed");
             return Ok(());
         }
 
         // 3. Operator timeout closes
-        let mut state = stack.chain_provider().get_global_chain_state().await?;
+        let mut state = provider.get_global_chain_state().await?;
         if state.next_tx_id > U256::one() {
             let to_tx_id = state.next_tx_id - U256::one();
 
-            let active = stack
-                .chain_provider()
+            let active = provider
                 .get_tx_ids_by_filter(TxIdFilter {
                     type_filter: TransactionType::ANY,
                     phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
@@ -119,8 +139,7 @@ impl LocalOperator {
                 .await
                 .unwrap_or_default();
 
-            let waiting_user = stack
-                .chain_provider()
+            let waiting_user = provider
                 .get_tx_ids_by_filter(TxIdFilter {
                     type_filter: TransactionType::BITCOIN_TO_NATIVE,
                     phase_filter: TransactionPhase::WAITING_USER_ACTION,
@@ -152,8 +171,9 @@ impl LocalOperator {
             stack: Arc<dyn ChainStack>,
             state: GlobalChainState,
         ) -> anyhow::Result<()> {
-            let stream_gap = state.safe_anchor.saturating_sub(state.global_tip);
+            let provider = stack.chain_provider();
 
+            let stream_gap = state.safe_anchor.saturating_sub(state.global_tip);
             if stream_gap == 0 {
                 info!("Global tip already at or beyond safe anchor");
                 return Ok(());
@@ -161,8 +181,7 @@ impl LocalOperator {
 
             if state.active_open == 0 {
                 info!("No active conversions → jumping to safe anchor");
-                stack
-                    .chain_provider()
+                provider
                     .jump_to_anchor_from_zero_active(state.global_tip, state.safe_anchor)
                     .await?;
             } else {
@@ -198,10 +217,9 @@ impl LocalOperator {
                         .await?;
 
                     // Check if we can jump now
-                    let refreshed = stack.chain_provider().get_global_chain_state().await?;
+                    let refreshed = provider.get_global_chain_state().await?;
                     if refreshed.active_open == 0 {
-                        stack
-                            .chain_provider()
+                        provider
                             .jump_to_anchor_from_zero_active(
                                 refreshed.global_tip,
                                 refreshed.safe_anchor,
@@ -222,7 +240,7 @@ impl LocalOperator {
             Ok(())
         }
 
-        state = stack.chain_provider().get_global_chain_state().await?;
+        state = provider.get_global_chain_state().await?;
         if let Err(e) = handle_sync_logic(stack.clone(), state).await {
             warn!(error = %e, "Sync / jump logic failed — skipping approvals");
             return Ok(());
@@ -246,7 +264,21 @@ impl LocalOperator {
     )]
     async fn tick_streaming(stack: Arc<dyn ChainStack>) -> anyhow::Result<()> {
         // 1. Get all currently active transaction IDs on this chain
-        let active_ids = stack.chain_provider().get_active_tx_ids(1000, None).await?;
+        let next_tx_id = stack.chain_provider().next_tx_id().await?;
+        let to_tx_id = next_tx_id.saturating_sub(U256::one());
+
+        let active_ids = stack
+            .chain_provider()
+            .get_tx_ids_by_filter(TxIdFilter {
+                type_filter: TransactionType::ANY,
+                phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
+                dest_network: None,
+                to_tx_id,
+                max_results: U256::from(1000u64),
+                ..Default::default()
+            })
+            .await?;
+
         if active_ids.is_empty() {
             info!("No active conversions found – nothing to stream this pass.");
             return Ok(());

@@ -128,11 +128,22 @@ impl InteropResolverTrait for InteropResolver {
                 .saturating_sub(dest_chain_state.global_tip);
 
             if dest_stream_gap > 0 {
+                let next_tx_id = self.dest.chain_provider().next_tx_id().await?;
+                let to_tx_id = next_tx_id.saturating_sub(U256::one());
+
                 let active_ids = self
                     .dest
                     .chain_provider()
-                    .get_active_tx_ids(1000, Some(self.dest_network))
+                    .get_tx_ids_by_filter(TxIdFilter {
+                        type_filter: TransactionType::ANY,
+                        phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
+                        dest_network: Some(self.dest_network),
+                        to_tx_id,
+                        max_results: U256::from(1000u64),
+                        ..Default::default()
+                    })
                     .await?;
+
                 if !active_ids.is_empty() {
                     debug!(tx_id = %tx_id, "dest active_ids not empty, skipping tick");
                     return Ok(());
@@ -222,10 +233,22 @@ impl InteropResolverTrait for InteropResolver {
                 .saturating_sub(source_chain_state.global_tip);
 
             if source_stream_gap > 0 {
+                let next_tx_id = self.source.chain_provider().next_tx_id().await?;
+                let to_tx_id = next_tx_id.saturating_sub(U256::one());
+
                 let active_ids = self
-                    .source.chain_provider()
-                    .get_active_tx_ids(1000, Some(self.dest_network))
+                    .source
+                    .chain_provider()
+                    .get_tx_ids_by_filter(TxIdFilter {
+                        type_filter: TransactionType::ANY,
+                        phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
+                        dest_network: Some(self.dest_network),
+                        to_tx_id,
+                        max_results: U256::from(1000u64),
+                        ..Default::default()
+                    })
                     .await?;
+
                 if !active_ids.is_empty() {
                     info!(
                         active_count = active_ids.len(),
@@ -300,7 +323,7 @@ impl InteropResolverTrait for InteropResolver {
                             .await?;
                     }
                 }
-            } else {
+            }else {
                 info!("Source chain global tip already at or beyond safe anchor");
             }
             Ok(())
@@ -352,11 +375,22 @@ impl InteropResolverTrait for InteropResolver {
                 .safe_anchor
                 .saturating_sub(dest_chain_state.global_tip);
             if dest_stream_gap > 0 {
+                let next_tx_id = self.dest.chain_provider().next_tx_id().await?;
+                let to_tx_id = next_tx_id.saturating_sub(U256::one());
+
                 let active_ids = self
                     .dest
                     .chain_provider()
-                    .get_active_tx_ids(1000, Some(self.dest_network))
+                    .get_tx_ids_by_filter(TxIdFilter {
+                        type_filter: TransactionType::ANY,
+                        phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
+                        dest_network: Some(self.dest_network),
+                        to_tx_id,
+                        max_results: U256::from(1000u64),
+                        ..Default::default()
+                    })
                     .await?;
+
                 if !active_ids.is_empty() {
                     info!(
                         active_count = active_ids.len(),
