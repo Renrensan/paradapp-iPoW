@@ -11,7 +11,7 @@ use paradapp_core::traits::chain_provider_adapter::{
 };
 use paradapp_core::traits::chain_stack::ChainStack;
 use paradapp_core::traits::interop_resolver::InteropResolver as InteropResolverTrait;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 pub struct InteropResolver {
     pub source: Arc<dyn ChainStack>,
@@ -114,7 +114,6 @@ impl InteropResolverTrait for InteropResolver {
             .try_into()
             .map_err(|_| anyhow::anyhow!("source anchor height conversion error"))?;
         let min_anchor_dest = self.dest.chain_provider().min_anchor_height().await?;
-        // let global_tip_src = self.source.chain_provider().global_tip_height().await?;
 
         if min_anchor_dest <= source_anchor.anchor_height {
             // Check destination chain stream state (Sync logic)
@@ -123,9 +122,8 @@ impl InteropResolverTrait for InteropResolver {
                 source_anchor_height_u64.saturating_sub(dest_chain_state.global_tip);
 
             if dest_stream_gap > 0 {
-                // If no active opens, jump directly to anchor
                 if dest_chain_state.active_open == 0 {
-                    info!(source_tx_id = %tx_id, "calling jump_to_anchor_from_zero_active on dest");
+                    info!(source_tx_id = %tx_id, "No active conversions → jumping to anchor");
                     self.dest
                         .chain_provider()
                         .jump_to_anchor_from_zero_active(
@@ -133,9 +131,72 @@ impl InteropResolverTrait for InteropResolver {
                             source_anchor_height_u64,
                         )
                         .await?;
-                } else {
-                    debug!(source_tx_id = %tx_id, "Skipping tick, active opens present, should already be streaming");
-                    return Ok(());
+                } 
+                else {
+                    // 1. Identify if we can clear the blockers (User-Close Candidates)
+                    let candidates = self
+                        .dest
+                        .approving()
+                        .discover_user_close_candidates(
+                            dest_chain_state.next_tx_id - U256::one(),
+                            dest_chain_state.confirmations_required,
+                        )
+                        .await
+                        .unwrap_or_default();
+
+                    let user_close_cost = candidates.len();
+
+                    // 2. Optimization check: Is clearing blockers cheaper than streaming the gap?
+                    if user_close_cost > 0 && (dest_stream_gap as usize) > user_close_cost {
+                        info!(
+                            cost = user_close_cost,
+                            "Cheaper to user-close blockers than stream headers"
+                        );
+
+                        let mapped_candidates: Vec<(U256, &'static str)> = candidates
+                            .into_iter()
+                            .map(|(id, kind)| {
+                                if kind.contains("refundAfterNoProof") {
+                                    (id, "refundAfterNoProof_NativeTokentoBTC")
+                                } else {
+                                    (id, "claimNative_AfterOperatorExpired")
+                                }
+                            })
+                            .collect();
+
+                        // 3. Clear the blockers
+                        self.dest
+                            .approving()
+                            .execute_user_closes(mapped_candidates)
+                            .await?;
+
+                        // 4. Check if clearing them actually brought active_open to zero
+                        let refreshed = self.dest.chain_provider().get_global_chain_state().await?;
+                        if refreshed.active_open == 0 {
+                            info!("Blockers cleared! Executing jump now.");
+                            self.dest
+                                .chain_provider()
+                                .jump_to_anchor_from_zero_active(
+                                    refreshed.global_tip,
+                                    source_anchor_height_u64,
+                                )
+                                .await?;
+                        }
+                    } else {
+                        // 5. Fallback: If blockers are too many, or cost is too high, just stream.
+                        info!(
+                            gap = dest_stream_gap,
+                            "Streaming headers is cheaper or only option (active_open > 0)"
+                        );
+                        self.dest
+                            .streaming()
+                            .stream_headers_to_height(
+                                dest_chain_state.global_tip,
+                                source_anchor_height_u64,
+                                200,
+                            )
+                            .await?;
+                    }
                 }
             }
 
