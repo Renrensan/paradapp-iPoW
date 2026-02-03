@@ -42,7 +42,7 @@ impl InteropResolverTrait for InteropResolver {
         }
         let to_tx_id = next_tx_id - U256::from(1u64);
 
-        // 1. Process WAITING_OPERATOR_APPROVAL (Standard Flow)
+        // 1. Process WAITING_OPERATOR_APPROVAL
         let pending_approval = self
             .source
             .chain_provider()
@@ -109,139 +109,65 @@ impl InteropResolverTrait for InteropResolver {
         }
 
         let source_anchor = self.source.chain_provider().anchor_info(tx_id).await?;
-        let source_anchor_height_u64: u64 = source_anchor
-            .anchor_height
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("source anchor height conversion error"))?;
-        let min_anchor_dest = self.dest.chain_provider().min_anchor_height().await?;
 
-        if min_anchor_dest <= source_anchor.anchor_height {
-            // Check destination chain stream state (Sync logic)
-            let dest_chain_state = self.dest.chain_provider().get_global_chain_state().await?;
-            let dest_stream_gap =
-                source_anchor_height_u64.saturating_sub(dest_chain_state.global_tip);
+        // --- SYNC DESTINATION TO SOURCE TIP VIA STREAMING ---
+        let source_chain_state = self
+            .source
+            .chain_provider()
+            .get_global_chain_state()
+            .await?;
+        let dest_chain_state = self.dest.chain_provider().get_global_chain_state().await?;
 
-            if dest_stream_gap > 0 {
-                if dest_chain_state.active_open == 0 {
-                    info!(source_tx_id = %tx_id, "No active conversions → jumping to anchor");
-                    self.dest
-                        .chain_provider()
-                        .jump_to_anchor_from_zero_active(
-                            dest_chain_state.global_tip,
-                            source_anchor_height_u64,
-                        )
-                        .await?;
-                } 
-                else {
-                    // 1. Identify if we can clear the blockers (User-Close Candidates)
-                    let candidates = self
-                        .dest
-                        .approving()
-                        .discover_user_close_candidates(
-                            dest_chain_state.next_tx_id - U256::one(),
-                            dest_chain_state.confirmations_required,
-                        )
-                        .await
-                        .unwrap_or_default();
+        let source_tip_u64 = source_chain_state.global_tip;
+        let dest_tip_u64 = dest_chain_state.global_tip;
+        let dest_stream_gap = source_tip_u64.saturating_sub(dest_tip_u64);
 
-                    let user_close_cost = candidates.len();
-
-                    // 2. Optimization check: Is clearing blockers cheaper than streaming the gap?
-                    if user_close_cost > 0 && (dest_stream_gap as usize) > user_close_cost {
-                        info!(
-                            cost = user_close_cost,
-                            "Cheaper to user-close blockers than stream headers"
-                        );
-
-                        let mapped_candidates: Vec<(U256, &'static str)> = candidates
-                            .into_iter()
-                            .map(|(id, kind)| {
-                                if kind.contains("refundAfterNoProof") {
-                                    (id, "refundAfterNoProof_NativeTokentoBTC")
-                                } else {
-                                    (id, "claimNative_AfterOperatorExpired")
-                                }
-                            })
-                            .collect();
-
-                        // 3. Clear the blockers
-                        self.dest
-                            .approving()
-                            .execute_user_closes(mapped_candidates)
-                            .await?;
-
-                        // 4. Check if clearing them actually brought active_open to zero
-                        let refreshed = self.dest.chain_provider().get_global_chain_state().await?;
-                        if refreshed.active_open == 0 {
-                            info!("Blockers cleared! Executing jump now.");
-                            self.dest
-                                .chain_provider()
-                                .jump_to_anchor_from_zero_active(
-                                    refreshed.global_tip,
-                                    source_anchor_height_u64,
-                                )
-                                .await?;
-                        }
-                    } else {
-                        // 5. Fallback: If blockers are too many, or cost is too high, just stream.
-                        info!(
-                            gap = dest_stream_gap,
-                            "Streaming headers is cheaper or only option (active_open > 0)"
-                        );
-                        self.dest
-                            .streaming()
-                            .stream_headers_to_height(
-                                dest_chain_state.global_tip,
-                                source_anchor_height_u64,
-                                200,
-                            )
-                            .await?;
-                    }
-                }
-            }
-
-            // Execute Open Tunnel
-            let anchor = self.source.chain_provider().anchor_info(tx_id).await?;
-            let dest_address = Address::from_slice(&conv.network_address.as_ref()[..20]);
-            let network_address = Bytes::from(conv.user.as_bytes().to_vec());
-            let native_amount = conv.native_amount;
-            let estimated_bitcoin_amount = self
-                .source
-                .chain_provider()
-                .estimate_bitcoin_from_native(native_amount)
-                .await?;
-            let network_id = U256::from(self.source.chain_provider().network() as u8);
-
-            // Recall dest to re log
-            let dest_chain_state = self.dest.chain_provider().get_global_chain_state().await?;
+        // Stream dest to source global tip if needed
+        if dest_stream_gap > 0 {
             info!(
                 tx_id = %tx_id,
-                bitcoin_amount = ?estimated_bitcoin_amount,
-                native_amount = ?native_amount,
-                network_id = %network_id,
-                dest_address = ?dest_address,
-                locked_anchor_height = %anchor.anchor_height,
-                dest_global_tip = dest_chain_state.global_tip,
-                dest_active_open = dest_chain_state.active_open,
-                "calling commit_bitcoin_to_native on dest"
+                gap = dest_stream_gap,
+                "Streaming headers to dest to catch source global tip"
             );
             self.dest
-                .chain_provider()
-                .commit_bitcoin_to_native(BitcoinToNativeCommitArgs {
-                    bitcoin_amount: estimated_bitcoin_amount,
-                    network_id,
-                    user_program: Bytes::new(),
-                    dest_address,
-                    network_address,
-                    duty_window_seconds: conv.operator_duty_expires_at,
-                    paradapp_receive_program: conv.user_program.clone(),
-                    locked_anchor_height: anchor.anchor_height,
-                    slippage: conv.slippage,
-                })
+                .streaming()
+                .stream_headers_to_height(dest_tip_u64, source_tip_u64, 200)
                 .await?;
-
-            info!(source_tx_id = %tx_id, "Tunnel opened for WAITING_USER_ACTION tx");
         }
+
+        // Execute Open Tunnel
+        let dest_address = Address::from_slice(&conv.network_address.as_ref()[..20]);
+        let network_address = Bytes::from(conv.user.as_bytes().to_vec());
+        let native_amount = conv.native_amount;
+        let estimated_bitcoin_amount = self
+            .source
+            .chain_provider()
+            .estimate_bitcoin_from_native(native_amount)
+            .await?;
+        let network_id = U256::from(self.source.chain_provider().network() as u8);
+
+        info!(
+            tx_id = %tx_id,
+            bitcoin_amount = ?estimated_bitcoin_amount,
+            "calling commit_bitcoin_to_native on dest"
+        );
+
+        self.dest
+            .chain_provider()
+            .commit_bitcoin_to_native(BitcoinToNativeCommitArgs {
+                bitcoin_amount: estimated_bitcoin_amount,
+                network_id,
+                user_program: Bytes::new(),
+                dest_address,
+                network_address,
+                duty_window_seconds: conv.operator_duty_expires_at,
+                paradapp_receive_program: conv.user_program.clone(),
+                locked_anchor_height: source_anchor.anchor_height,
+                slippage: conv.slippage,
+            })
+            .await?;
+
+        info!(source_tx_id = %tx_id, "Tunnel opened successfully");
 
         Ok(())
     }
@@ -363,6 +289,82 @@ impl InteropResolverTrait for InteropResolver {
                 "Source chain fresh block / jump logic failed — skipping approval this cycle"
             );
             return Ok(());
+        }
+
+        // Ensure destination chain is synced to source global tip so anchor check passes
+        let global_tip_src = self.source.chain_provider().global_tip_height().await?;
+        let global_tip_src_u64 = global_tip_src.as_u64();
+        let dest_chain_state = self.dest.chain_provider().get_global_chain_state().await?;
+        let dest_stream_gap = global_tip_src_u64.saturating_sub(dest_chain_state.global_tip);
+
+        if dest_stream_gap > 0 {
+            if dest_chain_state.active_open == 0 {
+                info!(source_tx_id = %tx_id, "Dest lagging behind source → jumping dest to source tip");
+                self.dest
+                    .chain_provider()
+                    .jump_to_anchor_from_zero_active(
+                        dest_chain_state.global_tip,
+                        global_tip_src_u64,
+                    )
+                    .await?;
+            } else {
+                let candidates = self
+                    .dest
+                    .approving()
+                    .discover_user_close_candidates(
+                        dest_chain_state.next_tx_id - U256::one(),
+                        dest_chain_state.confirmations_required,
+                    )
+                    .await
+                    .unwrap_or_default();
+
+                let user_close_cost = candidates.len();
+
+                if user_close_cost > 0 && (dest_stream_gap as usize) > user_close_cost {
+                    info!(
+                        cost = user_close_cost,
+                        "Cheaper to user-close dest blockers than stream"
+                    );
+                    let mapped_candidates: Vec<(U256, &'static str)> = candidates
+                        .into_iter()
+                        .map(|(id, kind)| {
+                            if kind.contains("refundAfterNoProof") {
+                                (id, "refundAfterNoProof_NativeTokentoBTC")
+                            } else {
+                                (id, "claimNative_AfterOperatorExpired")
+                            }
+                        })
+                        .collect();
+
+                    self.dest
+                        .approving()
+                        .execute_user_closes(mapped_candidates)
+                        .await?;
+                    let refreshed = self.dest.chain_provider().get_global_chain_state().await?;
+                    if refreshed.active_open == 0 {
+                        self.dest
+                            .chain_provider()
+                            .jump_to_anchor_from_zero_active(
+                                refreshed.global_tip,
+                                global_tip_src_u64,
+                            )
+                            .await?;
+                    }
+                } else {
+                    info!(
+                        gap = dest_stream_gap,
+                        "Streaming headers to dest to catch source tip"
+                    );
+                    self.dest
+                        .streaming()
+                        .stream_headers_to_height(
+                            dest_chain_state.global_tip,
+                            global_tip_src_u64,
+                            200,
+                        )
+                        .await?;
+                }
+            }
         }
 
         // === Only approve if min_anchor_dest <= global_tip_src ===
