@@ -1,9 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use ethers::types::U256;
-
-use crate::consts::supported_network_enum::SupportedNetwork;
-
 pub struct GlobalChainState {
     pub next_tx_id: U256,
     pub confirmations_required: u64,
@@ -29,7 +26,6 @@ pub trait ApprovingAdapter: Send + Sync {
         &self,
         to_tx_id: U256,
         conf_req: u64,
-        dest_network: Option<SupportedNetwork>,
     ) -> Result<Vec<(U256, String)>>;
 
     async fn execute_user_closes(

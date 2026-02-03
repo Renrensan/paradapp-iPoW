@@ -44,7 +44,14 @@ impl InteropResolverTrait for InteropResolver {
 
         // 1. Process WAITING_OPERATOR_APPROVAL (Standard Flow)
         let pending_approval = self
-            .get_txs_by_phase(to_tx_id, TransactionPhase::WAITING_OPERATOR_APPROVAL, 500)
+            .source
+            .chain_provider()
+            .get_tx_ids_by_filter(TxIdFilter {
+                type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
+                phase_filter: TransactionPhase::WAITING_OPERATOR_APPROVAL,
+                to_tx_id,
+                ..Default::default()
+            })
             .await?;
         for tx_id in pending_approval {
             if let Err(e) = self
@@ -57,7 +64,14 @@ impl InteropResolverTrait for InteropResolver {
 
         // 2. Process WAITING_USER_ACTION (Tunnel Only Flow)
         let pending_user = self
-            .get_txs_by_phase(to_tx_id, TransactionPhase::WAITING_USER_ACTION, 500)
+            .source
+            .chain_provider()
+            .get_tx_ids_by_filter(TxIdFilter {
+                type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
+                phase_filter: TransactionPhase::WAITING_USER_ACTION,
+                to_tx_id,
+                ..Default::default()
+            })
             .await?;
         for tx_id in pending_user {
             if let Err(e) = self.attempt_open_tunnel_only(tx_id).await {
@@ -66,24 +80,6 @@ impl InteropResolverTrait for InteropResolver {
         }
 
         Ok(())
-    }
-
-    // Helper to fetch IDs based on phase
-    async fn get_txs_by_phase(&self, to_tx_id: U256, phase: u8, max: u64) -> Result<Vec<U256>> {
-        self.source
-            .chain_provider()
-            .get_tx_ids_by_filter(TxIdFilter {
-                type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
-                phase_filter: phase,
-                user_filter: None,
-                bitcoin_program_filter: None,
-                bitcoin_program_type: None,
-                dest_network: None,
-                from_tx_id: U256::from(1u64),
-                to_tx_id,
-                max_results: U256::from(max),
-            })
-            .await
     }
 
     async fn attempt_open_tunnel_only(&self, tx_id: U256) -> Result<()> {
@@ -102,13 +98,11 @@ impl InteropResolverTrait for InteropResolver {
             .get_tx_ids_by_filter(TxIdFilter {
                 type_filter: TransactionType::NATIVE_TO_NATIVE_IN,
                 phase_filter: TransactionPhase::WAITING_USER_ACTION,
-                user_filter: None,
                 bitcoin_program_filter: Some(user_program_filter),
                 bitcoin_program_type: Some(BitcoinProgramType::Paradapp),
-                dest_network: None,
-                from_tx_id: U256::from(1u64),
                 to_tx_id: dest_next_id.saturating_sub(U256::one()),
                 max_results: U256::one(),
+                ..Default::default()
             })
             .await?;
 
@@ -273,7 +267,6 @@ impl InteropResolverTrait for InteropResolver {
                         .discover_user_close_candidates(
                             source_chain_state.next_tx_id - U256::one(),
                             source_chain_state.confirmations_required,
-                            Some(self.dest_network),
                         )
                         .await
                         .unwrap_or_default();
@@ -414,7 +407,6 @@ impl InteropResolverTrait for InteropResolver {
                         .discover_user_close_candidates(
                             dest_chain_state.next_tx_id - U256::one(),
                             dest_chain_state.confirmations_required,
-                            Some(self.dest_network),
                         )
                         .await
                         .unwrap_or_default();

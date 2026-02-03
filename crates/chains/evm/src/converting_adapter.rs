@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
-use ethers::types::{Address, Bytes, U256};
+use ethers::types::U256;
 use paradapp_core::{
     btc::btc_service::{
         BitcoinMerkleProofPayload, check_confirmation_and_build_proof,
@@ -89,14 +89,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
         to_tx_id: U256,
         dest_network: Option<SupportedNetwork>,
     ) -> Result<Vec<(U256, Conversion)>> {
-        let user_filter = Address::zero();
         let mut ready = Vec::new();
-
-        let (dest_network_u256, use_network_filter): (U256, bool) = match dest_network {
-            Some(net) => (U256::from(net as u8), true),
-            None => (U256::zero(), false),
-        };
-
         let tx_types = [
             TransactionType::NATIVE_TO_BITCOIN,
             TransactionType::NATIVE_TO_NATIVE_OUT,
@@ -104,23 +97,15 @@ impl ConvertingAdapter for EvmConvertingAdapter {
 
         for tx_type in tx_types {
             let active_ids: Vec<U256> = self
-                .ctx
-                .contract
-                .get_tx_ids_by_filter(
-                    tx_type,
-                    TransactionPhase::ACTIVE_WAITING_PROOF,
-                    user_filter,
-                    Bytes::new(),
-                    false,
-                    dest_network_u256,
-                    use_network_filter,
-                    U256::one(),
+                .chain_provider
+                .get_tx_ids_by_filter(TxIdFilter {
+                    type_filter: tx_type,
+                    phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
+                    dest_network,
                     to_tx_id,
-                    U256::from(500),
-                )
-                .call()
-                .await
-                .map_err(anyhow::Error::from)?;
+                    ..Default::default()
+                })
+                .await?;
 
             if active_ids.is_empty() {
                 continue;
@@ -187,13 +172,9 @@ impl ConvertingAdapter for EvmConvertingAdapter {
                 .get_tx_ids_by_filter(TxIdFilter {
                     type_filter: tx_type,
                     phase_filter: TransactionPhase::COMPLETED,
-                    user_filter: Some(Address::zero()),
-                    bitcoin_program_filter: None,
-                    bitcoin_program_type: None,
                     dest_network,
-                    from_tx_id: U256::one(),
                     to_tx_id,
-                    max_results: U256::from(500),
+                    ..Default::default()
                 })
                 .await?;
 

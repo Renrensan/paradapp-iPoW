@@ -7,10 +7,7 @@ use ethers::{
 };
 use paradapp_core::{
     btc::btc_service::derive_p2wpkh_address,
-    consts::{
-        supported_network_enum::SupportedNetwork, transaction_phase::TransactionPhase,
-        transaction_type::TransactionType,
-    },
+    consts::{transaction_phase::TransactionPhase, transaction_type::TransactionType},
     context::CoreContext,
     traits::{
         approving_adapter::ApprovingAdapter,
@@ -207,12 +204,8 @@ impl ApprovingAdapter for EvmApprovingAdapter {
         &self,
         to_tx_id: U256,
         conf_req: u64,
-        dest_network: Option<SupportedNetwork>,
     ) -> Result<Vec<(U256, String)>> {
         let conf_req_bn = U256::from(conf_req);
-
-        let max_results = U256::from(500u64);
-        let from_tx_id = U256::from(1u64);
 
         use futures::try_join;
 
@@ -222,49 +215,29 @@ impl ApprovingAdapter for EvmApprovingAdapter {
             self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
                 type_filter: TransactionType::NATIVE_TO_BITCOIN,
                 phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
-                user_filter: None,
-                bitcoin_program_filter: None,
-                bitcoin_program_type: None,
-                dest_network: None,
-                from_tx_id,
                 to_tx_id,
-                max_results,
+                ..Default::default()
             }),
             // 2. BTC -> Native
             self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
                 type_filter: TransactionType::BITCOIN_TO_NATIVE,
                 phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
-                user_filter: None,
-                bitcoin_program_filter: None,
-                bitcoin_program_type: None,
-                dest_network,
-                from_tx_id,
                 to_tx_id,
-                max_results,
+                ..Default::default()
             }),
             // 3. Native -> Native IN
             self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
                 type_filter: TransactionType::NATIVE_TO_NATIVE_IN,
                 phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
-                user_filter: None,
-                bitcoin_program_filter: None,
-                bitcoin_program_type: None,
-                dest_network,
-                from_tx_id,
                 to_tx_id,
-                max_results,
+                ..Default::default()
             }),
             // 4. Native -> Native OUT
             self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
                 type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
                 phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
-                user_filter: None,
-                bitcoin_program_filter: None,
-                bitcoin_program_type: None,
-                dest_network,
-                from_tx_id,
                 to_tx_id,
-                max_results,
+                ..Default::default()
             }),
         )?;
 
@@ -279,46 +252,26 @@ impl ApprovingAdapter for EvmApprovingAdapter {
             self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
                 type_filter: TransactionType::NATIVE_TO_BITCOIN,
                 phase_filter: TransactionPhase::OPERATOR_DUTY_EXPIRED,
-                user_filter: None,
-                bitcoin_program_filter: None,
-                bitcoin_program_type: None,
-                dest_network: None,
-                from_tx_id,
                 to_tx_id,
-                max_results,
+                ..Default::default()
             }),
             self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
                 type_filter: TransactionType::BITCOIN_TO_NATIVE,
                 phase_filter: TransactionPhase::OPERATOR_DUTY_EXPIRED,
-                user_filter: None,
-                bitcoin_program_filter: None,
-                bitcoin_program_type: None,
-                dest_network,
-                from_tx_id,
                 to_tx_id,
-                max_results,
+                ..Default::default()
             }),
             self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
                 type_filter: TransactionType::NATIVE_TO_NATIVE_IN,
                 phase_filter: TransactionPhase::OPERATOR_DUTY_EXPIRED,
-                user_filter: None,
-                bitcoin_program_filter: None,
-                bitcoin_program_type: None,
-                dest_network,
-                from_tx_id,
                 to_tx_id,
-                max_results,
+                ..Default::default()
             }),
             self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
                 type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
                 phase_filter: TransactionPhase::OPERATOR_DUTY_EXPIRED,
-                user_filter: None,
-                bitcoin_program_filter: None,
-                bitcoin_program_type: None,
-                dest_network,
-                from_tx_id,
                 to_tx_id,
-                max_results,
+                ..Default::default()
             }),
         )?;
 

@@ -128,13 +128,8 @@ impl LocalOperator {
                 .get_tx_ids_by_filter(TxIdFilter {
                     type_filter: TransactionType::ANY,
                     phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
-                    user_filter: None,
-                    bitcoin_program_filter: None,
-                    bitcoin_program_type: None,
-                    dest_network: None,
-                    from_tx_id: U256::one(),
                     to_tx_id,
-                    max_results: U256::from(500u64),
+                    ..Default::default()
                 })
                 .await
                 .unwrap_or_default();
@@ -143,13 +138,8 @@ impl LocalOperator {
                 .get_tx_ids_by_filter(TxIdFilter {
                     type_filter: TransactionType::BITCOIN_TO_NATIVE,
                     phase_filter: TransactionPhase::WAITING_USER_ACTION,
-                    user_filter: None,
-                    bitcoin_program_filter: None,
-                    bitcoin_program_type: None,
-                    dest_network: None,
-                    from_tx_id: U256::one(),
                     to_tx_id,
-                    max_results: U256::from(500u64),
+                    ..Default::default()
                 })
                 .await
                 .unwrap_or_default();
@@ -190,7 +180,6 @@ impl LocalOperator {
                     .discover_user_close_candidates(
                         state.next_tx_id - U256::one(),
                         state.confirmations_required,
-                        None,
                     )
                     .await
                     .unwrap_or_default();
@@ -272,7 +261,6 @@ impl LocalOperator {
             .get_tx_ids_by_filter(TxIdFilter {
                 type_filter: TransactionType::ANY,
                 phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
-                dest_network: None,
                 to_tx_id,
                 max_results: U256::from(1000u64),
                 ..Default::default()
