@@ -10,7 +10,7 @@ The system is built on a **Trait-Based Adapter Architecture**, separating the co
 - **Chains**: Concrete implementations for EVM (Ethereum, Hedera, etc.), Solana, or other supported chains.
 - **Operator**: The orchestration layer that manages transaction lifecycles.
 
-For a deep dive into the design, see [ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+For a deep dive into the design, see [ARCHITECTURE.md](./docs/architecture.md).
 
 ## Quick Start
 
