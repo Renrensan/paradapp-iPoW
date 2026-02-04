@@ -16,17 +16,38 @@ run = "cargo build"
 description = "Run monolith operator"
 run = "cargo run -- --mode all"
 
-[tasks.run-bridge-hedera-eth]
-description = "Run bridge between Hedera and Ethereum"
-run = "cargo run -- --mode bridge --src Hedera --dst Ethereum"
-
 [tasks.run-hedera]
-description = "Run operator for Hedera network"
-run = "cargo run -- --mode operator --src Hedera"
+description = "Run Hedera operator. Supports optional watch sources."
+run = '''
+if [ "$#" -gt 0 ]; then
+  cargo run -- --mode operator --src hedera --watch-sources "$@"
+else
+  cargo run -- --mode operator --src hedera
+fi
+'''
 
 [tasks.run-ethereum]
-description = "Run operator for Ethereum network"
-run = "cargo run -- --mode operator --src Ethereum"
+description = "Run Ethereum operator. Supports optional watch sources."
+run = '''
+if [ "$#" -gt 0 ]; then
+  cargo run -- --mode operator --src eth --watch-sources "$@"
+else
+  cargo run -- --mode operator --src eth
+fi
+'''
+
+[tasks.run-custom]
+description = "Run any operator with custom settings. Usage: mise run run-custom <src> <watch...>"
+run = '''
+SRC="$1"
+shift || true
+
+if [ "$#" -gt 0 ]; then
+  cargo run -- --mode operator --src "$SRC" --watch-sources "$@"
+else
+  cargo run -- --mode operator --src "$SRC"
+fi
+'''
 
 [tasks.docker-build]
 description = "Build Docker image for paradapp operator"

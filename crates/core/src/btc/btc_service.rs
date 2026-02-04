@@ -55,7 +55,14 @@ pub fn to_0x(s: &str) -> String {
 }
 
 pub async fn header80_by_height(ctx: &CoreContext, height: u64) -> Result<(String, String)> {
-    // 1. GET block hash by height (BE)
+    // 1. Acquire the permit from the global rate limiter
+    let _permit = ctx
+        .rpc_limiter
+        .acquire()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to acquire RPC permit for header fetch: {}", e))?;
+
+    // 2. GET block hash by height (BE)
     let url_hash = format!("{}/block-height/{}", ctx.cfg.esplora_base, height);
     let block_hash_be = ctx
         .http
@@ -67,7 +74,7 @@ pub async fn header80_by_height(ctx: &CoreContext, height: u64) -> Result<(Strin
         .trim()
         .to_string();
 
-    // 2. GET block header hex
+    // 3. GET block header hex
     let url_header = format!("{}/block/{}/header", ctx.cfg.esplora_base, block_hash_be);
     let header_hex = ctx
         .http
@@ -79,21 +86,25 @@ pub async fn header80_by_height(ctx: &CoreContext, height: u64) -> Result<(Strin
         .trim()
         .to_string();
 
-    // 3. Validate length (80 bytes → 160 hex chars)
+    // 4. Validate length (80 bytes → 160 hex chars)
     if header_hex.len() != 160 {
         bail!("header80 hex has {} chars, expected 160", header_hex.len());
     }
 
-    // 4. Ensure "0x" prefix (same as your TS code)
+    // 5. Ensure "0x" prefix
     let header80_prefixed = if header_hex.starts_with("0x") {
         header_hex
     } else {
         format!("0x{}", header_hex)
     };
 
+    // 6. Mandatory 250ms gap enforcement before releasing the permit.
+    // This protects the Esplora API from rapid-fire sequential calls
+    // from different worker tasks.
+    tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
+
     Ok((block_hash_be, header80_prefixed))
 }
-
 pub async fn btc_tip_height(ctx: &CoreContext) -> Result<u64> {
     let url = format!("{}/blocks/tip/height", ctx.cfg.esplora_base);
 
@@ -255,14 +266,36 @@ pub fn hex_le_from_be32(hex: &str) -> Result<String> {
 }
 
 pub async fn tx_merkle_proof(ctx: &CoreContext, txid_be: &str) -> Result<Value> {
+    // 1. Acquire permit from the global rate limiter
+    let _permit = ctx
+        .rpc_limiter
+        .acquire()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to acquire RPC permit for merkle proof: {}", e))?;
+
     let url = format!("{}/tx/{}/merkle-proof", ctx.cfg.esplora_base, txid_be);
     let json = ctx.http.get(url).send().await?.json::<Value>().await?;
+
+    // 2. Mandatory 250ms gap before releasing the permit
+    tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
+
     Ok(json)
 }
 
 pub async fn tx_hex(ctx: &CoreContext, txid_be: &str) -> Result<String> {
+    // 1. Acquire permit from the global rate limiter
+    let _permit = ctx
+        .rpc_limiter
+        .acquire()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to acquire RPC permit for tx hex: {}", e))?;
+
     let url = format!("{}/tx/{}/hex", ctx.cfg.esplora_base, txid_be);
     let hex = ctx.http.get(url).send().await?.text().await?;
+
+    // 2. Mandatory 250ms gap before releasing the permit
+    tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
+
     Ok(format!("0x{}", hex.trim()))
 }
 
@@ -421,6 +454,13 @@ pub async fn get_confirmed_receive_by_txid(
     let mut last_seen_txid: Option<String> = None;
 
     loop {
+        // Acquire permit and enforce gap per pagination request
+        let _permit = ctx
+            .rpc_limiter
+            .acquire()
+            .await
+            .map_err(|e| anyhow!("Failed to acquire RPC permit: {}", e))?;
+
         let url = if let Some(ref last) = last_seen_txid {
             format!(
                 "{}/address/{}/txs/chain/{}",
@@ -481,9 +521,11 @@ pub async fn get_confirmed_receive_by_txid(
             .ok_or(anyhow!("missing txid in pagination"))?;
 
         last_seen_txid = Some(last.to_string());
+
+        // Hold permit for 250ms before looping for the next page
+        tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
     }
 }
-
 #[derive(Debug)]
 pub struct ProofBundle {
     pub legacy_0x: String,
@@ -603,15 +645,21 @@ pub async fn check_confirmation_and_build_proof(
     btc_txid: &str,
 ) -> Result<Option<BitcoinMerkleProofPayload>> {
     // ---- 1) Check BTC confirmation ----
-    let status_url = format!("{}/tx/{}/status", ctx.cfg.esplora_base, btc_txid);
-    let res = ctx.http.get(&status_url).send().await?;
+    // We do a manual limit here since it's a raw HTTP call
+    let status = {
+        let _permit = ctx.rpc_limiter.acquire().await?;
+        let status_url = format!("{}/tx/{}/status", ctx.cfg.esplora_base, btc_txid);
+        let res = ctx.http.get(&status_url).send().await?;
 
-    if !res.status().is_success() {
-        info!("Mempool API error for txid {}, will retry later", btc_txid);
-        return Ok(None);
-    }
-
-    let status: TxStatus = res.json().await?;
+        if !res.status().is_success() {
+            info!("Mempool API error for txid {}, will retry later", btc_txid);
+            tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
+            return Ok(None);
+        }
+        let s: TxStatus = res.json().await?;
+        tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
+        s
+    };
 
     if !status.confirmed {
         info!("BTC tx {} not confirmed yet", btc_txid);
@@ -624,23 +672,21 @@ pub async fn check_confirmation_and_build_proof(
     let block_height = status
         .block_height
         .ok_or_else(|| anyhow!("missing block_height"))?;
-
     let block_hash_be = status
         .block_hash
         .as_ref()
         .ok_or_else(|| anyhow!("missing block_hash"))?;
 
     // ---- 3) Build proof bundle ----
-    // vout_index is fixed to 0 in your tx structure
+    // This calls tx_merkle_proof, header80, and tx_hex.
+    // They EACH have their own permit/sleep, so the 250ms gap is enforced 3 times here.
     let vout_index_usize: usize = 0;
-
     let proof =
         build_proof_bundle(ctx, btc_txid, vout_index_usize, block_hash_be, block_height).await?;
 
     // ---- 4) Convert fields to contract-ready types ----
     let legacy_tx =
         ethers::types::Bytes::from(hex::decode(proof.legacy_0x.trim_start_matches("0x"))?);
-
     let mut block_hash_le = [0u8; 32];
     block_hash_le.copy_from_slice(&hex::decode(proof.block_hash_le.trim_start_matches("0x"))?);
 
@@ -655,7 +701,6 @@ pub async fn check_confirmation_and_build_proof(
         })
         .collect::<Result<Vec<_>>>()?;
 
-    // ---- 5) Return payload (no side effects) ----
     Ok(Some(BitcoinMerkleProofPayload {
         tx_id,
         legacy_tx,
@@ -666,7 +711,6 @@ pub async fn check_confirmation_and_build_proof(
         index: U256::from(proof.index),
     }))
 }
-
 pub fn derive_address_from_script_bytes(
     ctx: &CoreContext,
     script_bytes: &[u8],
@@ -825,6 +869,12 @@ pub async fn send_to_user_program(
     user_program: &[u8],
     amount_sats: u64,
 ) -> Result<String> {
+    let _permit = ctx
+        .rpc_limiter
+        .acquire()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to acquire RPC permit for broadcast: {}", e))?;
+
     let mempool_api = &ctx.cfg.mempool_api;
     let dev_address = &ctx.cfg.operator_btc_wallet_address;
     let network = ctx.btc_network;
@@ -957,6 +1007,8 @@ pub async fn send_to_user_program(
         .await?
         .text()
         .await?;
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
 
     Ok(response)
 }

@@ -37,7 +37,10 @@ impl EvmStack {
         let ctx = Arc::new(EvmContext::init(cfg).await?);
 
         // 2. Initialize SQLITE Pool
-        let sqlite = SqliteStorage::init(network.string_identifier()).await?;
+        // // For different db pe chain (need different pub per chain too)
+        // let sqlite = SqliteStorage::init(network.string_identifier()).await?;
+        // For shared db per chain
+        let sqlite = SqliteStorage::init(network.shared_sqlite_db()).await?;
         let sqlite_pool = sqlite.pool();
 
         // 3. Initialize Provider

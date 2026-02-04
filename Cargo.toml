@@ -3,6 +3,5 @@ members = [
   "crates/core",
   "crates/chains/evm",
   "crates/operator",
-  "crates/interop"
 ]
 resolver = "3"

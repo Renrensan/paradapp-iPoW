@@ -12,11 +12,14 @@ pub async fn preflight_commit_global(
     header80_bytes: Bytes,
     height: u64,
 ) -> PreflightResult {
+    // Rate limit RPC calls
+    // let _permit = ctx.rpc_limiter.acquire().await.ok();
+
     let call = ctx
         .c_op
         .commit_global_bitcoin_header_80(header80_bytes, U256::from(height), vec![]);
 
-    match call.call().await {
+    let res = match call.call().await {
         Ok(_) => {
             info!(height, "preflight OK");
             PreflightResult {
@@ -32,5 +35,9 @@ pub async fn preflight_commit_global(
                 static_err: Some(msg),
             }
         }
-    }
+    };
+
+    // Give Thirdweb a 250ms breather
+    tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
+    res
 }

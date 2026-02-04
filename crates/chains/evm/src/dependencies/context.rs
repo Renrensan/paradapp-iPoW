@@ -5,6 +5,7 @@ use ethers::{
     signers::{LocalWallet, Signer},
     types::Address,
 };
+use tokio::sync::Semaphore;
 use std::sync::Arc;
 
 /// Unified runtime context for EVM
@@ -14,6 +15,7 @@ pub struct EvmContext {
     pub contract: Arc<ParadappConvert<Provider<Http>>>,
     pub c_op: Arc<ParadappConvert<SignerMiddleware<Provider<Http>, LocalWallet>>>,
     pub cfg: Arc<EvmConfig>,
+    pub rpc_limiter: Arc<Semaphore>,
 }
 
 impl EvmContext {
@@ -51,6 +53,7 @@ impl EvmContext {
             contract,
             c_op,
             cfg,
+            rpc_limiter: Arc::new(Semaphore::new(1)),
         })
     }
 }

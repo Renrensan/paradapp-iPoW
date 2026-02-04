@@ -5,12 +5,13 @@ use ethers::types::{Address, Bytes, H160, U256};
 use crate::{consts::supported_network_enum::SupportedNetwork, conversion_type::ConversionResult};
 
 /// Parameters for filtering transaction IDs.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub enum BitcoinProgramType {
     #[default]
     User,
     Paradapp,
 }
+#[derive(Clone)]
 pub struct TxIdFilter {
     pub type_filter: u8,
     pub phase_filter: u8,

@@ -53,6 +53,15 @@ impl EvmNetwork {
         }
     }
 
+    // Temporary
+    pub fn shared_sqlite_db(&self) -> &'static str {
+        // Returning a unified name ensures that different variants
+        // resolve to the same SQLite file path/identifier.
+        match self {
+            Self::EthereumSepolia | Self::Hedera => "shared_chain_db",
+        }
+    }
+
     pub fn btc_root_xpub_env(&self) -> &'static str {
         match self {
             Self::EthereumSepolia => "ETH_SEPOLIA_BTC_ROOT_XPUB",

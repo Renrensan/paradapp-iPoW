@@ -3,6 +3,7 @@ use bitcoin::Network;
 use reqwest::Client;
 use std::env;
 use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 #[derive(Clone)]
 pub struct CoreConfig {
@@ -81,6 +82,7 @@ pub struct CoreContext {
     pub http: Arc<Client>,
     pub cfg: Arc<CoreConfig>,
     pub btc_network: Network,
+    pub rpc_limiter: Arc<Semaphore>,
 }
 
 impl CoreContext {
@@ -102,6 +104,7 @@ impl CoreContext {
             http,
             cfg,
             btc_network,
+            rpc_limiter: Arc::new(Semaphore::new(1)),
         })
     }
 }
