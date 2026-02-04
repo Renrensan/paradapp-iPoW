@@ -1,33 +1,32 @@
 # Ignore build artifacts
-
 target
 debug
 release
 
-# Git metadata
+# Documentation
+docs/
+*.md
 
+# Git metadata
 .git
 .gitignore
 
 # IDE/editor configs
-
 .vscode
 .idea
 
 # Local env and configs
-
 .env
 _.log
 _.tmp
 
 # OS-specific
-
 .DS_Store
 Thumbs.db
 
 # Dockerfile itself (optional, if you don’t want it copied)
-
 Dockerfile
 docker-compose.yml
 
+# Local Database State
 data/\*.db
