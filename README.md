@@ -54,16 +54,6 @@ mise run run-hedera eth
 ENGINE=streamer mise run run-ethereum
 ```
 
-### Running Tests
-
-```sh
-# Run all workspace tests
-cargo test
-
-# Run specific crate tests
-cargo test -p paradapp-core
-```
-
 ## Deployment
 
 ### Docker Build
@@ -94,8 +84,8 @@ Production environments should leverage the `ENGINE` environment variable to sca
 
 ## Documentation
 
-- [Getting Started Guide](./docs/GETTING_STARTED.md) - Detailed setup and usage.
-- [Architecture & Design](./docs/ARCHITECTURE.md) - In-depth system design and data flow.
+- [Getting Started Guide](./docs/getting_started.md) - Detailed setup and usage.
+- [Architecture & Design](./docs/architecture.md) - In-depth system design and data flow.
 
 ---
 
