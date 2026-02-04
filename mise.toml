@@ -8,73 +8,72 @@ _.file = ".env"
 description = "Build all operator binaries"
 run = "cargo build --release"
 
-[tasks.build-debug]
-description = "Build all operator binaries in debug mode"
-run = "cargo build"
-
 [tasks.run-all]
-description = "Run monolith operator"
-run = "cargo run -- --mode all"
+description = "Run monolith operator (All networks, all engines)"
+run = "cargo run -- --mode monolith"
+
+
+# --- Network Specific Helpers ---
 
 [tasks.run-hedera]
-description = "Run Hedera operator. Supports optional watch sources."
+description = "Usage: [ENGINE=...] mise run run-hedera [watch...]. Engines: all, approver, streamer, converter."
 run = '''
+bash -c '
+E_FLAG=${ENGINE:-all}
 if [ "$#" -gt 0 ]; then
-  cargo run -- --mode operator --src hedera --watch-sources "$@"
+    cargo run -- --mode operator --src hedera --engine "$E_FLAG" --watch-sources "$@"
 else
-  cargo run -- --mode operator --src hedera
+    cargo run -- --mode operator --src hedera --engine "$E_FLAG"
 fi
+' -- "$@"
 '''
 
 [tasks.run-ethereum]
-description = "Run Ethereum operator. Supports optional watch sources."
+description = "Usage: [ENGINE=...] mise run run-ethereum [watch...]. Engines: all, approver, streamer, converter."
 run = '''
+bash -c '
+E_FLAG=${ENGINE:-all}
 if [ "$#" -gt 0 ]; then
-  cargo run -- --mode operator --src eth --watch-sources "$@"
+    cargo run -- --mode operator --src eth --engine "$E_FLAG" --watch-sources "$@"
 else
-  cargo run -- --mode operator --src eth
+    cargo run -- --mode operator --src eth --engine "$E_FLAG"
 fi
+' -- "$@"
 '''
 
 [tasks.run-custom]
-description = "Run any operator with custom settings. Usage: mise run run-custom <src> <watch...>"
+description = "Usage: [ENGINE=...] mise run run-custom <src> [watch...]. Engines: all, approver, streamer, converter."
 run = '''
+bash -c '
+E_FLAG=${ENGINE:-all}
 SRC="$1"
 shift || true
-
 if [ "$#" -gt 0 ]; then
-  cargo run -- --mode operator --src "$SRC" --watch-sources "$@"
+    cargo run -- --mode operator --src "$SRC" --engine "$E_FLAG" --watch-sources "$@"
 else
-  cargo run -- --mode operator --src "$SRC"
+    cargo run -- --mode operator --src "$SRC" --engine "$E_FLAG"
 fi
+' -- "$@"
 '''
 
+# --- Docker & CI/CD ---
+
 [tasks.docker-build]
-description = "Build Docker image for paradapp operator"
+description = "Build Docker image"
 run = "docker build -t renrensan/paradapp-interoperability-service ."
-
-[tasks.docker-compose-up]
-description = "Start services with Docker Compose"
-run = "docker compose up -d"
-
-[tasks.docker-compose-down]
-description = "Stop services and remove containers"
-run = "docker compose down"
-
-[tasks.docker-compose-logs]
-description = "Follow logs for all services"
-run = "docker compose logs -f"
 
 [tasks.docker-push]
 description = "Push to dockerhub repository"
 run = "docker push renrensan/paradapp-interoperability-service"
+
+# --- Quality Control ---
 
 [tasks.fmt]
 description = "Check Rust code formatting"
 run = "cargo fmt"
 
 [tasks.clippy]
-description = "Run Rust linter (clippy)"
+description = "Run Rust linter"
 run = "cargo clippy --all-targets --all-features -- -D warnings"
 
 [tasks.lint]

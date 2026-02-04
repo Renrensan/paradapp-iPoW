@@ -5,8 +5,8 @@ use ethers::{
     signers::{LocalWallet, Signer},
     types::Address,
 };
-use tokio::sync::Semaphore;
 use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 /// Unified runtime context for EVM
 #[derive(Clone)]

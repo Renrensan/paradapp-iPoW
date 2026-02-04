@@ -5,7 +5,7 @@ use paradapp_core::context::CoreContext;
 use paradapp_core::traits::chain_stack::ChainStack;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock; 
+use tokio::sync::RwLock;
 
 static STACK_CACHE: Lazy<RwLock<HashMap<String, Arc<dyn ChainStack>>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
@@ -37,7 +37,9 @@ impl Registry {
 
         let stack: Arc<dyn ChainStack> = match name.as_str() {
             "hedera" => Arc::new(EvmStack::init(EvmNetwork::Hedera, core_ctx).await?),
-            "eth" | "ethereum" => Arc::new(EvmStack::init(EvmNetwork::EthereumSepolia, core_ctx).await?),
+            "eth" | "ethereum" => {
+                Arc::new(EvmStack::init(EvmNetwork::EthereumSepolia, core_ctx).await?)
+            }
             _ => anyhow::bail!("Unsupported network: {}", name),
         };
 

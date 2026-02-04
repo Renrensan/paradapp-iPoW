@@ -1,10 +1,22 @@
 services:
-  # --- Local Operators ---
+  # --- HEDERA OPERATOR ---
+  # Runs all engines: Approver, Streamer, and Converter for Hedera
   hedera-operator:
     container_name: hedera-operator
     image: renrensan/paradapp-interoperability-service
     build: .
-    command: ["--mode", "operator", "--src", "Hedera"]
+    command:
+      [
+        "--mode",
+        "operator",
+        "--src",
+        "hedera",
+        "--engine",
+        "all",
+        "--watch-sources",
+        "eth",
+        "base",
+      ]
     env_file: .env
     environment:
       SQLITE_DB_DIR: "/app/data"
@@ -12,35 +24,28 @@ services:
       - hedera_data:/app/data
     restart: unless-stopped
 
+  # --- ETHEREUM OPERATOR ---
+  # Runs all engines: Approver, Streamer, and Converter for Ethereum
   ethereum-operator:
     container_name: ethereum-operator
     image: renrensan/paradapp-interoperability-service
-    command: ["--mode", "operator", "--src", "Ethereum"]
+    command:
+      [
+        "--mode",
+        "operator",
+        "--src",
+        "eth",
+        "--engine",
+        "all",
+        "--watch-sources",
+        "hedera",
+      ]
     env_file: .env
     environment:
       SQLITE_DB_DIR: "/app/data"
     volumes:
       - ethereum_data:/app/data
     restart: unless-stopped
-
-  bridge-hedera-eth:
-    container_name: bridge-hedera-eth
-    image: renrensan/paradapp-interoperability-service
-    command: ["--mode", "bridge", "--src", "Hedera", "--dst", "Ethereum"]
-    env_file: .env
-    environment:
-      SQLITE_DB_DIR: "/app/data"
-    restart: unless-stopped
-
-  # --- Future Network (Example) ---
-  # bridge-hedera-base:
-  #   container_name: bridge-hedera-base
-  #   image: renrensan/paradapp-interoperability-service
-  #   command: ["--mode", "bridge", "--src", "Hedera", "--dst", "Base"]
-  #   env_file: .env
-  #   environment:
-  #     SQLITE_DB_DIR: "/app/data"
-  #   restart: unless-stopped
 
 volumes:
   hedera_data:

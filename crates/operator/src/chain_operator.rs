@@ -12,109 +12,113 @@ use paradapp_core::{
     },
 };
 use std::sync::Arc;
-use tokio::{task::JoinHandle, try_join};
+use tokio::try_join;
 use tracing::{error, info, warn};
 
-pub struct LocalOperator;
+use crate::Engine;
 
-impl LocalOperator {
-    pub async fn run(stack: Arc<dyn ChainStack>, watch_sources: Vec<String>) -> anyhow::Result<()> {
+pub struct ChainOperator;
+
+impl ChainOperator {
+    pub async fn run(
+        stack: Arc<dyn ChainStack>,
+        watch_sources: Vec<String>,
+        engine: Engine,
+    ) -> anyhow::Result<()> {
         let network_id = stack.network_id().to_string();
         info!(
             network = %network_id,
             watching = ?watch_sources,
-            "Launching Operator with staggered prime-interval tasks"
+            engine = ?engine,
+            "Launching Operator Task(s)"
         );
 
+        let has_watch_targets = !watch_sources.is_empty();
         let watch_sources = Arc::new(watch_sources);
 
-        // 1. Approving Loop (Interval: 13s)
-        // Checks for new transactions requiring operator signatures
-        let approving_stack = stack.clone();
-        let approving_sources = watch_sources.clone();
-        let approving_handle: JoinHandle<()> = tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(13));
-            // Stagger start by 500ms
-            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-            loop {
-                interval.tick().await;
-                if let Err(e) =
-                    Self::tick_approving(approving_stack.clone(), &approving_sources).await
-                {
-                    warn!(network = %approving_stack.network_id(), error = %e, "Approving task failed");
-                }
-            }
-        });
+        // We use a Vec to track handles so we can monitor whichever ones we actually start
+        let mut handles = Vec::new();
 
-        // 2. Converting Loop (Interval: 17s)
-        // Handles the logic of swapping/converting assets once approved
-        let converting_stack = stack.clone();
-        let converting_handle: JoinHandle<()> = tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(17));
-            // Stagger start by 1.5s
-            tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
-            loop {
-                interval.tick().await;
-                if let Err(e) = Self::tick_converting(converting_stack.clone()).await {
-                    warn!(network = %converting_stack.network_id(), error = %e, "Converting task failed");
+        // 1. Approving Loop
+        if engine == Engine::Approver || engine == Engine::All {
+            let s = stack.clone();
+            let ws = watch_sources.clone();
+            handles.push(tokio::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(13));
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                loop {
+                    interval.tick().await;
+                    if let Err(e) = Self::tick_approving(s.clone(), &ws).await {
+                        warn!(network = %s.network_id(), error = %e, "Approving task failed");
+                    }
                 }
-            }
-        });
+            }));
+        }
 
-        // 3. Tunneling Loop (Interval: 23s)
-        // Forwards cross-chain intents to the destination chain registry
-        let tunneling_stack = stack.clone();
-        let tunneling_handle: JoinHandle<()> = tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(23));
-            // Stagger start by 2.5s
-            tokio::time::sleep(std::time::Duration::from_millis(2500)).await;
-            loop {
-                interval.tick().await;
-                if let Err(e) = Self::tick_tunneling(tunneling_stack.clone()).await {
-                    warn!(network = %tunneling_stack.network_id(), error = %e, "Tunneling task failed");
+        // 2. Converting Loop
+        if engine == Engine::Converter || engine == Engine::All {
+            let s = stack.clone();
+            handles.push(tokio::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(17));
+                tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+                loop {
+                    interval.tick().await;
+                    if let Err(e) = Self::tick_converting(s.clone()).await {
+                        warn!(network = %s.network_id(), error = %e, "Converting task failed");
+                    }
                 }
-            }
-        });
+            }));
+        }
 
-        // 4. Streaming Loop (Interval: 31s)
-        // Watches for incoming events or state changes on the source chain
-        let streaming_stack = stack.clone();
-        let streaming_sources = watch_sources.clone();
-        let streaming_handle: JoinHandle<()> = tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(31));
-            // Stagger start by 3.5s
-            tokio::time::sleep(std::time::Duration::from_millis(3500)).await;
-            loop {
-                interval.tick().await;
-                if let Err(e) =
-                    Self::tick_streaming(streaming_stack.clone(), &streaming_sources).await
-                {
-                    warn!(network = %streaming_stack.network_id(), error = %e, "Streaming task failed");
+        // 3. Tunneling Loop (only runs if one or more watch target is specified)
+        if (engine == Engine::Approver || engine == Engine::All) && has_watch_targets {
+            let s = stack.clone();
+            handles.push(tokio::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(23));
+                tokio::time::sleep(std::time::Duration::from_millis(2500)).await;
+                loop {
+                    interval.tick().await;
+                    if let Err(e) = Self::tick_tunneling(s.clone()).await {
+                        warn!(network = %s.network_id(), error = %e, "Tunneling task failed");
+                    }
                 }
-            }
-        });
+            }));
+        }
 
-        // Monitor all tasks. If any task crashes or a shutdown signal is received, exit.
+        // 4. Streaming Loop
+        if engine == Engine::Streamer || engine == Engine::All {
+            let s = stack.clone();
+            let ws = watch_sources.clone();
+            handles.push(tokio::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(31));
+                tokio::time::sleep(std::time::Duration::from_millis(3500)).await;
+                loop {
+                    interval.tick().await;
+                    if let Err(e) = Self::tick_streaming(s.clone(), &ws).await {
+                        warn!(network = %s.network_id(), error = %e, "Streaming task failed");
+                    }
+                }
+            }));
+        }
+
+        // Monitor whichever handles were created
+        if handles.is_empty() {
+            return Err(anyhow::anyhow!("No engines selected to run"));
+        }
+
+        // Wait for a crash or a shutdown
         tokio::select! {
-            res = approving_handle => {
-                error!(result = ?res, "Approving task exited unexpectedly");
-            }
-            res = converting_handle => {
-                error!(result = ?res, "Converting task exited unexpectedly");
-            }
-            res = tunneling_handle => {
-                error!(result = ?res, "Tunneling task exited unexpectedly");
-            }
-            res = streaming_handle => {
-                error!(result = ?res, "Streaming task exited unexpectedly");
+            res = futures::future::select_all(handles) => {
+                error!(result = ?res.0, "One of the operator tasks exited unexpectedly");
             }
             _ = tokio::signal::ctrl_c() => {
-                info!("Shutdown signal (Ctrl+C) received, stopping operator...");
+                info!("Shutdown signal received, stopping operator...");
             }
         }
 
         Ok(())
     }
+
     #[tracing::instrument(
         name = "operator_approving",
         skip(stack),
@@ -214,7 +218,11 @@ impl LocalOperator {
         Ok(())
     }
 
-    #[tracing::instrument(name = "operator_streaming", skip(stack), fields(network = %stack.network_id()))]
+    #[tracing::instrument(
+        name = "operator_streaming", 
+        skip(stack),
+        fields(network = %stack.network_id())
+    )]
     async fn tick_streaming(
         stack: Arc<dyn ChainStack>,
         watch_sources: &[String],
@@ -488,7 +496,7 @@ impl LocalOperator {
 }
 
 // Helper
-impl LocalOperator {
+impl ChainOperator {
     async fn handle_operator_timeouts(stack: &Arc<dyn ChainStack>, state: &GlobalChainState) {
         if state.next_tx_id <= U256::one() {
             return;
