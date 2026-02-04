@@ -22,7 +22,7 @@ pub enum Engine {
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum Mode {
     Operator,
-    Monolith, // Renamed from "All" to avoid confusion with Engine::All
+    Monolith,
 }
 
 #[derive(Parser, Debug)]
