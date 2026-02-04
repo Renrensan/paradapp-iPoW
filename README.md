@@ -86,9 +86,3 @@ Production environments should leverage the `ENGINE` environment variable to sca
 
 - [Getting Started Guide](./docs/getting_started.md) - Detailed setup and usage.
 - [Architecture & Design](./docs/architecture.md) - In-depth system design and data flow.
-
----
-
-### Next Step
-
-Would you like me to generate a **`CONTRIBUTING.md`** file that outlines the process for adding support for a new blockchain network?
