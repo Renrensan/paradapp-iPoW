@@ -1,10 +1,5 @@
 use std::sync::Arc;
 
-use anyhow::{Context, Result};
-use async_trait::async_trait;
-use ethers::types::U256;
-use tracing::{error, info, warn};
-
 use crate::{
     common::{
         consts::liquidity::Liquidity,
@@ -15,16 +10,20 @@ use crate::{
     dependencies::context::EvmContext,
 };
 use anyhow::anyhow;
+use anyhow::{Context, Result};
+use async_trait::async_trait;
+use ethers::types::U256;
 use paradapp_core::{
     btc::btc_service::{btc_tip_height, decode_header80, epoch_start, header80_by_height},
     consts::supported_network_enum::SupportedNetwork,
     context::CoreContext,
-    conversion_type::ConversionResult,
+    models::conversion::Conversion,
     traits::chain_provider_adapter::{
         AnchorInfo, BitcoinProgramType, BitcoinToNativeCommitArgs, ChainProviderAdapter,
         GlobalChainState, TxIdFilter,
     },
 };
+use tracing::{error, info, warn};
 
 /// EVM-specific chain provider that wraps contract binding calls.
 pub struct EvmChainProvider {
@@ -111,6 +110,7 @@ impl ChainProviderAdapter for EvmChainProvider {
 
         Ok(())
     }
+
     async fn read_liquidity(&self) -> Result<U256> {
         let contract = self.ctx.contract.clone();
 
@@ -633,7 +633,7 @@ impl ChainProviderAdapter for EvmChainProvider {
         }
     }
 
-    async fn get_conversion_info(&self, tx_id: U256) -> Result<ConversionResult> {
+    async fn get_conversion_info(&self, tx_id: U256) -> Result<Conversion> {
         let c = &self.ctx.contract;
 
         let conv = c.conversions(tx_id).call().await?;
@@ -660,7 +660,7 @@ impl ChainProviderAdapter for EvmChainProvider {
             operator_duty_expires_at,
         ) = conv;
 
-        Ok(ConversionResult {
+        Ok(Conversion {
             user,
             is_native_to_bitcoin,
             slippage,

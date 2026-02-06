@@ -1,3 +1,4 @@
+use crate::Engine;
 use ethers_core::types::U256;
 use paradapp_core::{
     btc::btc_service::maybe_rebalance_btc_wallets,
@@ -13,9 +14,7 @@ use paradapp_core::{
 };
 use std::sync::Arc;
 use tokio::try_join;
-use tracing::{error, info, warn};
-
-use crate::Engine;
+use tracing::{debug, error, info, warn};
 
 pub struct ChainOperator;
 
@@ -136,6 +135,7 @@ impl ChainOperator {
         let next_tx_id = provider.next_tx_id().await?;
         let to_tx_id = next_tx_id.saturating_sub(U256::one());
 
+        // Fetch pending tx ids in parallel
         let (n2b, b2n, n2n_out) = try_join!(
             provider.get_tx_ids_by_filter(TxIdFilter {
                 type_filter: TransactionType::NATIVE_TO_BITCOIN,
@@ -157,7 +157,9 @@ impl ChainOperator {
             })
         )?;
 
-        if (n2b.len() + b2n.len() + n2n_out.len()) > 0 {
+        // Log pending tx counts
+        let pending_count = n2b.len() + b2n.len() + n2n_out.len();
+        if pending_count > 0 {
             info!(
                 n2b = n2b.len(),
                 b2n = b2n.len(),
@@ -166,53 +168,86 @@ impl ChainOperator {
             );
         }
 
+        // Check RPC health, skip tick if unhealthy
         if (provider.check_rpc_health().await).is_err() {
             warn!("RPC unhealthy, skipping approval tick");
             return Ok(());
         }
 
+        // Get this network's global chain state
         let state = provider.get_global_chain_state().await?;
+
+        // Handle operator timeouts for this network tx's
         Self::handle_operator_timeouts(&stack, &state).await;
 
+        // Determine if any bridge intents defined by watch_sources from other networks to this network are active
         let bridge_intent_active =
             Self::check_bridge_intent(core_ctx.clone(), watch_sources, current_network).await;
-        if bridge_intent_active {
-            info!("Active bridge intent detected on remote source");
+
+        // Handle sync/jump logic if have local pending txs or active bridge intents
+        if bridge_intent_active || pending_count > 0 {
+            info!(
+                "Active bridge intent or/and pending txs detected to this network, triggering jump/stream logic on this network"
+            );
+            Self::handle_sync_logic(stack.clone(), state, bridge_intent_active).await?;
+        } else {
+            info!("No active intents or pending txs, skipping jump/stream logic on this network");
         }
 
-        Self::handle_sync_logic(stack.clone(), state, bridge_intent_active).await?;
-
+        // Approve local N2B and B2N txs
         for tx_id in n2b.into_iter().chain(b2n) {
             let _ = stack.approving().approve_one_tx(tx_id, duty_seconds).await;
         }
 
+        // Approve N2N_OUT txs if destination anchor height sufficient
         for tx_id in n2n_out {
+            // Get conversion info to determine destination network
             let info = provider.get_conversion_info(tx_id).await?;
             let net_val = info.network_id.as_u32() as u8;
 
+            // Map net_val to SupportedNetwork
             let dest_network = match SupportedNetwork::from_u8(net_val) {
                 Some(net) => net,
                 None => {
                     warn!(
                         val = net_val,
+                        %tx_id,
                         "Received unknown network ID from conversion info"
                     );
                     continue;
                 }
             };
 
+            // If destination is in registry, attempt approval logic
             if let Ok(dest_stack) =
                 crate::registry::Registry::get_stack(dest_network.as_str(), core_ctx.clone()).await
             {
-                let src_tip = provider.global_tip_height().await?.as_u64();
-                Self::sync_remote_chain(dest_stack.clone(), src_tip).await?;
-
+                // Get min anchor height on destination
                 let min_anchor_dest = dest_stack.chain_provider().min_anchor_height().await?;
-                if min_anchor_dest <= provider.global_tip_height().await? {
+                // Get current global tip on this network
+                let current_global_tip = provider.global_tip_height().await?;
+
+                // Only approve if min anchor on dest <= current global tip, else skip
+                if min_anchor_dest <= current_global_tip {
+                    info!(
+                        %tx_id,
+                        %dest_network,
+                        anchor = %min_anchor_dest,
+                        global_tip = %current_global_tip,
+                        "Anchor height sufficient, approving cross-chain tx"
+                    );
                     let _ = stack.approving().approve_one_tx(tx_id, duty_seconds).await;
                 } else {
-                    warn!(%tx_id, %dest_network, "Anchor height not yet sufficient for cross-chain approval");
+                    warn!(
+                        %tx_id,
+                        %dest_network,
+                        anchor = %min_anchor_dest,
+                        global_tip = %current_global_tip,
+                        "Anchor height not yet sufficient for cross-chain approval"
+                    );
                 }
+            } else {
+                warn!(%tx_id, %dest_network, "Could not find stack in registry for destination network");
             }
         }
         Ok(())
@@ -232,7 +267,8 @@ impl ChainOperator {
         let to_tx_id = next_tx_id.saturating_sub(U256::one());
         let current_network = provider.network();
 
-        let mut active_ids = provider
+        // Separate fetches to track phase origin
+        let active_ids = provider
             .get_tx_ids_by_filter(TxIdFilter {
                 type_filter: TransactionType::ANY,
                 phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
@@ -241,6 +277,7 @@ impl ChainOperator {
                 ..Default::default()
             })
             .await?;
+
         let user_action_ids = provider
             .get_tx_ids_by_filter(TxIdFilter {
                 type_filter: TransactionType::ANY,
@@ -251,22 +288,21 @@ impl ChainOperator {
             })
             .await?;
 
-        active_ids.extend(user_action_ids);
-        active_ids.sort();
-        active_ids.dedup();
-
         let mut max_target: u64 = 0;
+        let mut trigger_reason = "none";
         let core_ctx = stack.core_context();
 
+        // 1. Check Watch Sources (Remote Intents)
         for source_name in watch_sources {
             if let Ok(remote_stack) =
                 crate::registry::Registry::get_stack(source_name, core_ctx.clone()).await
             {
+                let remote_phase = TransactionPhase::WAITING_USER_ACTION;
                 let intents = remote_stack
                     .chain_provider()
                     .get_tx_ids_by_filter(TxIdFilter {
                         type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
-                        phase_filter: TransactionPhase::WAITING_USER_ACTION,
+                        phase_filter: remote_phase,
                         dest_network: Some(current_network),
                         max_results: U256::from(100u64),
                         ..Default::default()
@@ -280,37 +316,67 @@ impl ChainOperator {
                         && target.target_height > max_target
                     {
                         max_target = target.target_height;
-                        info!(from = %source_name, target = max_target, "Remote intent requires header sync");
+                        trigger_reason = "remote_intent";
+                        info!(
+                            from_chain = %source_name,
+                            tx_id = %tx_id,
+                            phase = ?remote_phase,
+                            new_target = max_target,
+                            "Streaming triggered: Remote intent requires header sync"
+                        );
                     }
                 }
             }
         }
 
+        // 2. Check Local Transactions
+        // Combine with phase tagging for precise logging
+        let local_checks = [
+            (active_ids, TransactionPhase::ACTIVE_WAITING_PROOF),
+            (user_action_ids, TransactionPhase::WAITING_USER_ACTION),
+        ];
+
         let mut needed_tx_ids = Vec::new();
-        for tx_id in active_ids {
-            let stream_target = stack.streaming().compute_stream_target(tx_id).await?;
-            if !stream_target.needed {
-                continue;
-            }
-            needed_tx_ids.push(tx_id);
-            if stream_target.target_height > max_target {
-                max_target = stream_target.target_height;
+        for (ids, phase) in local_checks {
+            for tx_id in ids {
+                let stream_target = stack.streaming().compute_stream_target(tx_id).await?;
+                if !stream_target.needed {
+                    debug!(tx_id = %tx_id, ?phase, "Streaming not needed for tx");
+                    continue;
+                }
+
+                needed_tx_ids.push(tx_id);
+
+                if stream_target.target_height > max_target {
+                    max_target = stream_target.target_height;
+                    trigger_reason = "local_tx";
+                    info!(
+                        tx_id = %tx_id,
+                        phase = ?phase,
+                        new_target = max_target,
+                        "Streaming triggered: Local transaction requires higher sync"
+                    );
+                }
             }
         }
 
         if max_target > 0 {
             info!(
-                target = max_target,
-                tx_count = needed_tx_ids.len(),
-                "Streaming headers to global state"
+                target_height = max_target,
+                relevant_txs = needed_tx_ids.len(),
+                reason = %trigger_reason,
+                "Executing header push to global state"
             );
+
             stack
                 .streaming()
                 .push_headers_global(max_target, needed_tx_ids)
                 .await?;
         }
+
         Ok(())
     }
+
     #[tracing::instrument(
         name = "operator_converting",
         skip(stack),
@@ -459,9 +525,19 @@ impl ChainOperator {
                     continue;
                 }
 
-                // 2. Sync destination to source tip
+                // 2. Skip tick if destination not synced to source tip
                 let src_tip = provider.global_tip_height().await?.as_u64();
-                Self::sync_remote_chain(dest_stack.clone(), src_tip).await?;
+                let dest_state = dest_provider.get_global_chain_state().await?;
+                if dest_state.global_tip < src_tip {
+                    warn!(
+                        %tx_id,
+                        %dest_network,
+                        dest_tip = dest_state.global_tip,
+                        needed = src_tip,
+                        "Destination not synced to source tip, skipping tunneling tick"
+                    );
+                    continue;
+                }
 
                 // 3. Commit the "IN" side on destination (open tunnel)
                 let source_anchor = provider.anchor_info(tx_id).await?;
@@ -575,27 +651,6 @@ impl ChainOperator {
                     .stream_headers_to_height(state.global_tip, state.safe_anchor, 200)
                     .await?;
             }
-        }
-        Ok(())
-    }
-
-    async fn sync_remote_chain(stack: Arc<dyn ChainStack>, target: u64) -> anyhow::Result<()> {
-        let provider = stack.chain_provider();
-        let state = provider.get_global_chain_state().await?;
-        let gap = target.saturating_sub(state.global_tip);
-        if gap == 0 {
-            return Ok(());
-        }
-
-        if state.active_open == 0 {
-            provider
-                .jump_to_anchor_from_zero_active(state.global_tip, target)
-                .await?;
-        } else {
-            stack
-                .streaming()
-                .stream_headers_to_height(state.global_tip, target, 200)
-                .await?;
         }
         Ok(())
     }

@@ -21,7 +21,7 @@ RUN cargo chef prepare --recipe-path recipe.json
 # ── Builder ──────────────────────────────────────────────────────
 FROM lukemathwalker/cargo-chef:latest-rust-slim-bookworm AS builder
 WORKDIR /app
-
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config libssl-dev libsqlite3-dev \
     && rm -rf /var/lib/apt/lists/* && apt-get clean

@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use ethers::types::{Address, Bytes, H160, U256};
 
-use crate::{consts::supported_network_enum::SupportedNetwork, conversion_type::ConversionResult};
+use crate::{consts::supported_network_enum::SupportedNetwork, models::conversion::Conversion};
 
 /// Parameters for filtering transaction IDs.
 #[derive(Default, Clone)]
@@ -93,7 +93,7 @@ pub trait ChainProviderAdapter: Send + Sync {
 
     async fn anchor_info(&self, tx_id: U256) -> Result<AnchorInfo>;
 
-    async fn get_conversion_info(&self, tx_id: U256) -> Result<ConversionResult>;
+    async fn get_conversion_info(&self, tx_id: U256) -> Result<Conversion>;
 
     async fn get_global_chain_state(&self) -> Result<GlobalChainState>;
 
