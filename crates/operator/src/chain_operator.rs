@@ -475,14 +475,26 @@ impl ChainOperator {
         let to_tx_id = next_tx_id.saturating_sub(U256::one());
 
         // Find outgoing bridge intents waiting for the "IN" side to be opened on the other chain
-        let intents = provider
-            .get_tx_ids_by_filter(TxIdFilter {
-                type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
-                phase_filter: TransactionPhase::WAITING_USER_ACTION,
-                to_tx_id,
-                ..Default::default()
-            })
-            .await?;
+        // 1. Prepare the filters
+        let user_action_filter = TxIdFilter {
+            type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
+            phase_filter: TransactionPhase::WAITING_USER_ACTION,
+            to_tx_id,
+            ..Default::default()
+        };
+
+        let mut waiting_proof_filter = user_action_filter.clone();
+        waiting_proof_filter.phase_filter = TransactionPhase::ACTIVE_WAITING_PROOF;
+
+        // 2. Parallel Execution
+        let (user_action_res, proof_res) = tokio::try_join!(
+            provider.get_tx_ids_by_filter(user_action_filter),
+            provider.get_tx_ids_by_filter(waiting_proof_filter)
+        )?;
+
+        // 3. Combine results
+        let mut intents = user_action_res;
+        intents.extend(proof_res);
 
         for tx_id in intents {
             let info = provider.get_conversion_info(tx_id).await?;
