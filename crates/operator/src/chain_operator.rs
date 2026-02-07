@@ -1,14 +1,17 @@
 use crate::Engine;
 use ethers_core::types::U256;
+use futures::future::join_all;
 use paradapp_core::{
-    btc::btc_service::maybe_rebalance_btc_wallets,
+    btc::btc_service::{btc_tip_height, maybe_rebalance_btc_wallets, rbf_send_to_user_program},
     consts::{
         supported_network_enum::SupportedNetwork, transaction_phase::TransactionPhase,
         transaction_type::TransactionType,
     },
     context::CoreContext,
     traits::{
-        chain_provider_adapter::{GlobalChainState, TxIdFilter},
+        chain_provider_adapter::{
+            BitcoinProgramType, ChainProviderAdapter, GlobalChainState, TxIdFilter,
+        },
         chain_stack::ChainStack,
     },
 };
@@ -17,6 +20,11 @@ use tokio::try_join;
 use tracing::{debug, error, info, warn};
 
 pub struct ChainOperator;
+
+pub struct BridgeIntent {
+    pub stack: Arc<dyn ChainStack>,
+    pub tx_ids: Vec<U256>,
+}
 
 impl ChainOperator {
     pub async fn run(
@@ -87,13 +95,12 @@ impl ChainOperator {
         // 4. Streaming Loop
         if engine == Engine::Streamer || engine == Engine::All {
             let s = stack.clone();
-            let ws = watch_sources.clone();
             handles.push(tokio::spawn(async move {
                 let mut interval = tokio::time::interval(std::time::Duration::from_secs(31));
                 tokio::time::sleep(std::time::Duration::from_millis(3500)).await;
                 loop {
                     interval.tick().await;
-                    if let Err(e) = Self::tick_streaming(s.clone(), &ws).await {
+                    if let Err(e) = Self::tick_streaming(s.clone()).await {
                         warn!(network = %s.network_id(), error = %e, "Streaming task failed");
                     }
                 }
@@ -181,17 +188,29 @@ impl ChainOperator {
         Self::handle_operator_timeouts(&stack, &state).await;
 
         // Determine if any bridge intents defined by watch_sources from other networks to this network are active
-        let bridge_intent_active =
+        // 1. Get the list of active intents
+        let active_intents =
             Self::check_bridge_intent(core_ctx.clone(), watch_sources, current_network).await;
+        let bridge_intent_active = !active_intents.is_empty();
 
-        // Handle sync/jump logic if have local pending txs or active bridge intents
+        // 2. Handle sync/jump logic
         if bridge_intent_active || pending_count > 0 {
+            // Collect network names for better logging
+            let source_names: Vec<String> = active_intents
+                .iter()
+                .map(|i| i.stack.network_id().to_string())
+                .collect();
+
             info!(
-                "Active bridge intent or/and pending txs detected to this network, triggering jump/stream logic on this network"
+                remote_sources = ?source_names,
+                local_pending = pending_count,
+                "Bridge intents or pending txs detected; triggering sync logic"
             );
-            Self::handle_sync_logic(stack.clone(), state, bridge_intent_active).await?;
+
+            // Pass the boolean to the sync logic handler
+            Self::handle_sync_logic(stack.clone(), state, &active_intents).await?;
         } else {
-            info!("No active intents or pending txs, skipping jump/stream logic on this network");
+            info!("No active intents or pending txs; skipping sync logic");
         }
 
         // Approve local N2B and B2N txs
@@ -232,8 +251,8 @@ impl ChainOperator {
                     info!(
                         %tx_id,
                         %dest_network,
-                        anchor = %min_anchor_dest,
-                        global_tip = %current_global_tip,
+                        %min_anchor_dest,
+                        %current_global_tip,
                         "Anchor height sufficient, approving cross-chain tx"
                     );
                     let _ = stack.approving().approve_one_tx(tx_id, duty_seconds).await;
@@ -258,14 +277,10 @@ impl ChainOperator {
         skip(stack),
         fields(network = %stack.network_id())
     )]
-    async fn tick_streaming(
-        stack: Arc<dyn ChainStack>,
-        watch_sources: &[String],
-    ) -> anyhow::Result<()> {
+    async fn tick_streaming(stack: Arc<dyn ChainStack>) -> anyhow::Result<()> {
         let provider = stack.chain_provider();
         let next_tx_id = provider.next_tx_id().await?;
         let to_tx_id = next_tx_id.saturating_sub(U256::one());
-        let current_network = provider.network();
 
         // Separate fetches to track phase origin
         let active_ids = provider
@@ -290,46 +305,8 @@ impl ChainOperator {
 
         let mut max_target: u64 = 0;
         let mut trigger_reason = "none";
-        let core_ctx = stack.core_context();
 
-        // 1. Check Watch Sources (Remote Intents)
-        for source_name in watch_sources {
-            if let Ok(remote_stack) =
-                crate::registry::Registry::get_stack(source_name, core_ctx.clone()).await
-            {
-                let remote_phase = TransactionPhase::WAITING_USER_ACTION;
-                let intents = remote_stack
-                    .chain_provider()
-                    .get_tx_ids_by_filter(TxIdFilter {
-                        type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
-                        phase_filter: remote_phase,
-                        dest_network: Some(current_network),
-                        max_results: U256::from(100u64),
-                        ..Default::default()
-                    })
-                    .await
-                    .unwrap_or_default();
-
-                for tx_id in intents {
-                    if let Ok(target) = remote_stack.streaming().compute_stream_target(tx_id).await
-                        && target.needed
-                        && target.target_height > max_target
-                    {
-                        max_target = target.target_height;
-                        trigger_reason = "remote_intent";
-                        info!(
-                            from_chain = %source_name,
-                            tx_id = %tx_id,
-                            phase = ?remote_phase,
-                            new_target = max_target,
-                            "Streaming triggered: Remote intent requires header sync"
-                        );
-                    }
-                }
-            }
-        }
-
-        // 2. Check Local Transactions
+        // 1. Check Local Transactions
         // Combine with phase tagging for precise logging
         let local_checks = [
             (active_ids, TransactionPhase::ACTIVE_WAITING_PROOF),
@@ -427,7 +404,58 @@ impl ChainOperator {
                             warn!(%tx_id, ?err, "Error submitting merkle proof");
                         }
                     }
-                    None => { /* Not confirmed yet, retry later */ }
+                    None => {
+                        info!(%tx_id, "BTC transaction not yet confirmed, checking RBF criteria...");
+
+                        // 1. Fetch Anchor Info from the contract
+                        let anchor = stack.chain_provider().anchor_info(tx_id).await?;
+
+                        // 2. Fetch current Bitcoin Tip Height
+                        let tip_height = btc_tip_height(&stack.core_context()).await?;
+
+                        // 3. Define thresholds (Configurable)
+                        let anchor_threshold = anchor.anchor_height.as_u64() + 10;
+                        let tip_lag_threshold = 1;
+
+                        // Condition Check:
+                        // Tip must be > (Anchor + 10) AND Tip must be > (some_reference_height + lag)
+                        // For RBF, we usually check if tip_height - anchor_height > 10.
+                        if tip_height > anchor_threshold
+                            && tip_height >= (anchor.anchor_height.as_u64() + tip_lag_threshold)
+                        {
+                            info!(%tx_id, tip=%tip_height, anchor=%anchor.anchor_height, "RBF criteria met. Proceeding with fee bump.");
+
+                            let amount_sats = conv.bitcoin_amount.as_u64();
+                            let user_program = conv.user_program.0.to_vec();
+
+                            match rbf_send_to_user_program(
+                                &stack.core_context(),
+                                btc_txid,
+                                &user_program,
+                                amount_sats,
+                            )
+                            .await
+                            {
+                                Ok(new_btc_txid) => {
+                                    info!(%tx_id, old = %btc_txid, new = %new_btc_txid, "RBF Successful");
+
+                                    // Update storage using your mark_processed (UPSERT) logic
+                                    if let Err(e) = stack
+                                        .converting()
+                                        .mark_processed(tx_id, Some(new_btc_txid))
+                                        .await
+                                    {
+                                        error!(%tx_id, "Failed to update RBF txid in storage: {:?}", e);
+                                    }
+                                }
+                                Err(e) => {
+                                    warn!(%tx_id, "RBF attempt failed or skipped by node: {:?}", e);
+                                }
+                            }
+                        } else {
+                            debug!(%tx_id, tip=%tip_height, anchor=%anchor.anchor_height, "RBF not needed yet.");
+                        }
+                    }
                 }
                 continue;
             }
@@ -516,40 +544,55 @@ impl ChainOperator {
                 crate::registry::Registry::get_stack(dest_network.as_str(), core_ctx.clone()).await
             {
                 // 1. Check if the tunnel is already open on the destination
-                let dest_provider = dest_stack.chain_provider();
-                let already_opened = dest_provider
-                    .get_tx_ids_by_filter(TxIdFilter {
-                        type_filter: TransactionType::NATIVE_TO_NATIVE_IN,
-                        phase_filter: TransactionPhase::WAITING_USER_ACTION,
-                        bitcoin_program_filter: Some(info.user_program.clone()),
-                        to_tx_id: dest_provider
-                            .next_tx_id()
-                            .await?
-                            .saturating_sub(U256::one()),
-                        max_results: U256::one(),
-                        ..Default::default()
-                    })
-                    .await
-                    .map(|v| !v.is_empty())
-                    .unwrap_or(false);
+                let dest_provider: Arc<dyn ChainProviderAdapter> = dest_stack.chain_provider();
+                let filter = TxIdFilter {
+                    type_filter: TransactionType::NATIVE_TO_NATIVE_IN,
+                    bitcoin_program_filter: Some(info.user_program.clone()),
+                    bitcoin_program_type: Some(BitcoinProgramType::Paradapp),
+                    to_tx_id: dest_provider
+                        .next_tx_id()
+                        .await?
+                        .saturating_sub(U256::one()),
+                    max_results: U256::one(),
+                    ..Default::default()
+                };
+
+                // 2. Prepare the specific filters for each phase
+                let mut user_action_filter = filter.clone();
+                user_action_filter.phase_filter = TransactionPhase::WAITING_USER_ACTION;
+
+                let mut waiting_proof_filter = filter;
+                waiting_proof_filter.phase_filter = TransactionPhase::ACTIVE_WAITING_PROOF;
+
+                // 3. Run queries in parallel (Promise.all style)
+                let already_opened = match tokio::try_join!(
+                    dest_provider.get_tx_ids_by_filter(user_action_filter),
+                    dest_provider.get_tx_ids_by_filter(waiting_proof_filter)
+                ) {
+                    Ok((user_list, proof_list)) => !user_list.is_empty() || !proof_list.is_empty(),
+                    Err(e) => {
+                        error!(error = %e, "Failed to check if intent is already opened");
+                        false
+                    }
+                };
 
                 if already_opened {
                     continue;
                 }
 
-                // 2. Skip tick if destination not synced to source tip
-                let src_tip = provider.global_tip_height().await?.as_u64();
-                let dest_state = dest_provider.get_global_chain_state().await?;
-                if dest_state.global_tip < src_tip {
-                    warn!(
-                        %tx_id,
-                        %dest_network,
-                        dest_tip = dest_state.global_tip,
-                        needed = src_tip,
-                        "Destination not synced to source tip, skipping tunneling tick"
-                    );
-                    continue;
-                }
+                // // 2. Skip tick if destination not synced to source tip
+                // let src_tip = provider.global_tip_height().await?.as_u64();
+                // let dest_state = dest_provider.get_global_chain_state().await?;
+                // if dest_state.global_tip < src_tip {
+                //     warn!(
+                //         %tx_id,
+                //         %dest_network,
+                //         dest_tip = dest_state.global_tip,
+                //         needed = src_tip,
+                //         "Destination not synced to source tip, skipping tunneling tick"
+                //     );
+                //     continue;
+                // }
 
                 // 3. Commit the "IN" side on destination (open tunnel)
                 let source_anchor = provider.anchor_info(tx_id).await?;
@@ -621,20 +664,82 @@ impl ChainOperator {
     async fn handle_sync_logic(
         stack: Arc<dyn ChainStack>,
         state: GlobalChainState,
-        bridge_intent_active: bool,
+        active_intents: &[BridgeIntent],
     ) -> anyhow::Result<()> {
         let provider = stack.chain_provider();
-        let gap = state.safe_anchor.saturating_sub(state.global_tip);
+        let network = stack.network_id();
+
+        // 1. Determine the target height
+        let mut target_height = state.safe_anchor;
+        let mut target_reason = "local safe anchor";
+
+        // Collect all anchor_info futures from all intents and all tx_ids
+        let mut anchor_futures = Vec::new();
+        for intent in active_intents {
+            let remote_name = intent.stack.network_id();
+            for &tx_id in &intent.tx_ids {
+                let provider_clone = intent.stack.chain_provider().clone();
+                anchor_futures.push(async move {
+                    provider_clone
+                        .anchor_info(tx_id)
+                        .await
+                        .map(|info| info.anchor_height.as_u64())
+                        .map_err(|e| (tx_id, remote_name, e))
+                });
+            }
+        }
+
+        if !anchor_futures.is_empty() {
+            debug!(%network, count = anchor_futures.len(), "Fetching remote anchor heights in parallel");
+        }
+
+        // Execute all requests in parallel
+        let results = futures::future::join_all(anchor_futures).await;
+
+        // Log errors for failed anchor lookups
+        for res in results.iter() {
+            if let Err((tx_id, r_network, err)) = res {
+                warn!(%network, remote = %r_network, %tx_id, error = %err, "Failed to fetch remote anchor info");
+            }
+        }
+
+        let min_remote_anchor = results.into_iter().filter_map(|r| r.ok()).min();
+
+        // If we found remote intents, our sync target is the minimum anchor height required
+        if let Some(remote_target) = min_remote_anchor {
+            // We only update if the remote requirement is actually different/relevant
+            if remote_target != state.safe_anchor {
+                target_height = remote_target;
+                target_reason = "lowest remote bridge intent anchor";
+            }
+        }
+
+        let gap = target_height.saturating_sub(state.global_tip);
         if gap == 0 {
+            debug!(%network, current = state.global_tip, target = target_height, "No sync gap found; chain is up to date");
             return Ok(());
         }
 
-        if state.active_open == 0 && !bridge_intent_active {
+        info!(
+            %network,
+            current = state.global_tip,
+            target = target_height,
+            gap = gap,
+            reason = %target_reason,
+            active_txs = state.active_open,
+            "Sync gap detected; initiating synchronization"
+        );
+
+        // 2. Sync Execution
+        // Reensure state is fresh before deciding on jump vs stream
+        // let state = provider.get_global_chain_state().await?;
+        if state.active_open == 0 {
+            info!(%network, %target_height, "No active conversions in source chain → jumping to target height");
             provider
-                .jump_to_anchor_from_zero_active(state.global_tip, state.safe_anchor)
+                .jump_to_anchor_from_zero_active(state.global_tip, target_height)
                 .await?;
         } else {
-            let candidates = stack
+            let user_close_candidates = stack
                 .approving()
                 .discover_user_close_candidates(
                     state.next_tx_id - U256::one(),
@@ -642,28 +747,49 @@ impl ChainOperator {
                 )
                 .await
                 .unwrap_or_default();
-            if !candidates.is_empty() && (gap as usize) > candidates.len() {
-                let mapped = candidates
+
+            let user_close_cost = user_close_candidates.len();
+
+            info!(
+                %network,
+                stream_gap = gap,
+                user_close_cost = user_close_cost,
+                "Source chain user-close vs stream decision"
+            );
+
+            if user_close_cost > 0 && (gap as usize) > user_close_cost {
+                info!(%network, "Cheaper to user-close than stream → executing");
+
+                let candidates: Vec<(U256, &'static str)> = user_close_candidates
                     .into_iter()
-                    .map(|(id, kind)| {
-                        (
-                            id,
-                            if kind.contains("refund") {
-                                "refundAfterNoProof_NativeTokentoBTC"
-                            } else {
-                                "claimNative_AfterOperatorExpired"
-                            },
-                        )
+                    .map(|(tx_id, kind)| {
+                        if kind.contains("refundAfterNoProof") {
+                            (tx_id, "refundAfterNoProof_NativeTokentoBTC")
+                        } else {
+                            (tx_id, "claimNative_AfterOperatorExpired")
+                        }
                     })
                     .collect();
-                stack.approving().execute_user_closes(mapped).await?;
+
+                stack.approving().execute_user_closes(candidates).await?;
+
+                // REFRESH STATE: Check if we can jump now
+                let refreshed = provider.get_global_chain_state().await?;
+                if refreshed.active_open == 0 {
+                    info!(%network, "All active closed → jumping to target height");
+                    provider
+                        .jump_to_anchor_from_zero_active(refreshed.global_tip, target_height)
+                        .await?;
+                }
             } else {
+                info!(%network, "Streaming headers is cheaper or no candidates found");
                 stack
                     .streaming()
                     .stream_headers_to_height(state.global_tip, state.safe_anchor, 200)
                     .await?;
             }
         }
+
         Ok(())
     }
 
@@ -671,25 +797,61 @@ impl ChainOperator {
         ctx: Arc<CoreContext>,
         sources: &[String],
         current: SupportedNetwork,
-    ) -> bool {
-        for source in sources {
-            if let Ok(remote) = crate::registry::Registry::get_stack(source, ctx.clone()).await {
-                let pending = remote
-                    .chain_provider()
-                    .get_tx_ids_by_filter(TxIdFilter {
-                        type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
-                        phase_filter: TransactionPhase::WAITING_USER_ACTION,
-                        dest_network: Some(current),
-                        max_results: U256::one(),
-                        ..Default::default()
-                    })
-                    .await
-                    .unwrap_or_default();
-                if !pending.is_empty() {
-                    return true;
+    ) -> Vec<BridgeIntent> {
+        // Create a list of futures to execute in parallel
+        let tasks = sources.iter().map(|source| {
+            let ctx = ctx.clone();
+            let source = source.clone();
+
+            async move {
+                if let Ok(remote_stack) = crate::registry::Registry::get_stack(&source, ctx).await {
+                    let remote_provider = remote_stack.chain_provider();
+
+                    // Run the two filter queries for this specific network
+                    let (approval_res, user_action_res) = tokio::join!(
+                        remote_provider.get_tx_ids_by_filter(TxIdFilter {
+                            type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
+                            phase_filter: TransactionPhase::WAITING_OPERATOR_APPROVAL,
+                            dest_network: Some(current),
+                            max_results: U256::from(100u64),
+                            ..Default::default()
+                        }),
+                        remote_provider.get_tx_ids_by_filter(TxIdFilter {
+                            type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
+                            phase_filter: TransactionPhase::WAITING_USER_ACTION,
+                            dest_network: Some(current),
+                            max_results: U256::from(100u64),
+                            ..Default::default()
+                        })
+                    );
+
+                    let mut all_ids = approval_res.unwrap_or_default();
+                    all_ids.extend(user_action_res.unwrap_or_default());
+
+                    if !all_ids.is_empty() {
+                        all_ids.sort();
+                        all_ids.dedup();
+
+                        info!(
+                            from_network = %source,
+                            count = all_ids.len(),
+                            "Found active bridge intents (Approval + User Action)"
+                        );
+
+                        return Some(BridgeIntent {
+                            stack: remote_stack,
+                            tx_ids: all_ids,
+                        });
+                    }
                 }
+                None
             }
-        }
-        false
+        });
+
+        // Execute all network checks in parallel (Promise.all)
+        let results = join_all(tasks).await;
+
+        // Filter out the Nones (networks with no intents or errors)
+        results.into_iter().flatten().collect()
     }
 }

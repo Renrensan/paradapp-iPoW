@@ -108,11 +108,7 @@ impl StreamingAdapter for EvmStreamingAdapter {
             let c_op = self.ctx.c_op.clone();
             let gas = U256::from(1_200_000u64);
             let call = c_op
-                .commit_global_bitcoin_header_80(
-                    header80_bytes,
-                    U256::from(next_height),
-                    tx_ids_to_check.clone(),
-                )
+                .commit_global_bitcoin_header_80(header80_bytes, U256::from(next_height))
                 .gas(gas);
 
             let pending = call.send().await?;
@@ -286,7 +282,7 @@ impl StreamingAdapter for EvmStreamingAdapter {
 
             // 3. Commit the header
             match c_op
-                .commit_global_bitcoin_header_80(header80_bytes, U256::from(h), Vec::<U256>::new())
+                .commit_global_bitcoin_header_80(header80_bytes, U256::from(h))
                 .send()
                 .await
             {

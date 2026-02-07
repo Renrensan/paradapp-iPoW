@@ -946,11 +946,6 @@
 				"internalType": "uint256",
 				"name": "height",
 				"type": "uint256"
-			},
-			{
-				"internalType": "uint256[]",
-				"name": "txIdsToCheck",
-				"type": "uint256[]"
 			}
 		],
 		"name": "commitGlobalBitcoinHeader80",

@@ -10,6 +10,7 @@ pub struct EvmConfig {
     pub contract_address: String,
     pub enable_onchain_lp_topup: String,
     pub btc_root_xpub: String,
+    pub btc_mnemonic: String,
 }
 
 impl EvmConfig {
@@ -32,6 +33,10 @@ impl EvmConfig {
             .or_else(|_| env::var("BTC_ROOT_XPUB"))
             .expect("Missing BTC root xpub env var");
 
+        let btc_mnemonic = env::var(network.btc_mnemonic_env())
+            .or_else(|_| env::var("BTC_MNEMONIC"))
+            .expect("Missing BTC mnemonic env var");
+
         Self {
             network,
             rpc_url,
@@ -39,6 +44,7 @@ impl EvmConfig {
             contract_address,
             enable_onchain_lp_topup,
             btc_root_xpub,
+            btc_mnemonic,
         }
     }
 }

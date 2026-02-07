@@ -78,9 +78,6 @@ pub trait ChainProviderAdapter: Send + Sync {
 
     async fn jump_to_anchor_from_zero_active(&self, global_tip: u64, anchor_h: u64) -> Result<u64>;
 
-    async fn jump_to_height_from_zero_active(&self, current_tip: u64, target_h: u64)
-    -> Result<u64>;
-
     async fn global_tip_height(&self) -> Result<U256>;
 
     async fn min_anchor_height(&self) -> Result<U256>;

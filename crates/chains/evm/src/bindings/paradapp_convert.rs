@@ -570,17 +570,6 @@ pub mod paradapp_convert {
                                     ::std::borrow::ToOwned::to_owned("uint256"),
                                 ),
                             },
-                            ::ethers::core::abi::ethabi::Param {
-                                name: ::std::borrow::ToOwned::to_owned("txIdsToCheck"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Array(
-                                    ::std::boxed::Box::new(
-                                        ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                                    ),
-                                ),
-                                internal_type: ::core::option::Option::Some(
-                                    ::std::borrow::ToOwned::to_owned("uint256[]"),
-                                ),
-                            },
                         ],
                         outputs: ::std::vec![],
                         constant: ::core::option::Option::None,
@@ -2649,15 +2638,14 @@ pub mod paradapp_convert {
                 .method_hash([84, 33, 51, 16], ())
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `commitGlobalBitcoinHeader80` (0xc8f2f01b) function
+        ///Calls the contract's `commitGlobalBitcoinHeader80` (0x16118bee) function
         pub fn commit_global_bitcoin_header_80(
             &self,
             header_80: ::ethers::core::types::Bytes,
             height: ::ethers::core::types::U256,
-            tx_ids_to_check: ::std::vec::Vec<::ethers::core::types::U256>,
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash([200, 242, 240, 27], (header_80, height, tx_ids_to_check))
+                .method_hash([22, 17, 139, 238], (header_80, height))
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `commitNativeToBitcoin` (0xa4cc4f8e) function
@@ -5666,7 +5654,7 @@ pub mod paradapp_convert {
     )]
     #[ethcall(name = "commitFeeNative", abi = "commitFeeNative()")]
     pub struct CommitFeeNativeCall;
-    ///Container type for all input parameters for the `commitGlobalBitcoinHeader80` function with signature `commitGlobalBitcoinHeader80(bytes,uint256,uint256[])` and selector `0xc8f2f01b`
+    ///Container type for all input parameters for the `commitGlobalBitcoinHeader80` function with signature `commitGlobalBitcoinHeader80(bytes,uint256)` and selector `0x16118bee`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -5679,12 +5667,11 @@ pub mod paradapp_convert {
     )]
     #[ethcall(
         name = "commitGlobalBitcoinHeader80",
-        abi = "commitGlobalBitcoinHeader80(bytes,uint256,uint256[])"
+        abi = "commitGlobalBitcoinHeader80(bytes,uint256)"
     )]
     pub struct CommitGlobalBitcoinHeader80Call {
         pub header_80: ::ethers::core::types::Bytes,
         pub height: ::ethers::core::types::U256,
-        pub tx_ids_to_check: ::std::vec::Vec<::ethers::core::types::U256>,
     }
     ///Container type for all input parameters for the `commitNativeToBitcoin` function with signature `commitNativeToBitcoin(uint256,uint256,bytes,bytes)` and selector `0xa4cc4f8e`
     #[derive(

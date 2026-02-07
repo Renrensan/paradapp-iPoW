@@ -244,7 +244,7 @@ impl ChainProviderAdapter for EvmChainProvider {
                 match self
                     .ctx
                     .c_op
-                    .commit_global_bitcoin_header_80(header80_bytes, U256::from(first_h), vec![])
+                    .commit_global_bitcoin_header_80(header80_bytes, U256::from(first_h))
                     .send()
                     .await
                 {
@@ -317,7 +317,7 @@ impl ChainProviderAdapter for EvmChainProvider {
             match self
                 .ctx
                 .c_op
-                .commit_global_bitcoin_header_80(anchor80_bytes, U256::from(anchor_h), vec![])
+                .commit_global_bitcoin_header_80(anchor80_bytes, U256::from(anchor_h))
                 .send()
                 .await
             {
@@ -364,183 +364,6 @@ impl ChainProviderAdapter for EvmChainProvider {
             original_global_tip = %global_tip,
             target_anchor = %anchor_h,
             "jump_to_anchor_from_zero_active finished"
-        );
-
-        Ok(committed_up_to)
-    }
-
-    async fn jump_to_height_from_zero_active(&self, global_tip: u64, target_h: u64) -> Result<u64> {
-        info!(
-            input_global_tip = %global_tip,
-            input_target_h = %target_h,
-            "jump_to_height_from_zero_active called"
-        );
-
-        // 1. Guard: Check if we are already at or past the target
-        if target_h <= global_tip {
-            info!(
-                target_h = %target_h,
-                global_tip = %global_tip,
-                "No jump needed — target already <= global tip"
-            );
-            return Ok(global_tip);
-        }
-
-        // 2. Calculate epoch start for the target
-        let first_h = epoch_start(target_h);
-        info!(
-            calculated_first_h = %first_h,
-            target_h = %target_h,
-            current_global_tip = %global_tip,
-            "Planning jump: first_h={} → target_h={}",
-            first_h, target_h
-        );
-
-        let mut committed_up_to: u64 = global_tip;
-
-        // === 1. Commit epoch-first header ===
-        if first_h > global_tip && first_h > 0 {
-            info!(height = %first_h, "Attempting to commit epoch-first header");
-
-            let (_, header80) = header80_by_height(&self.core_ctx, first_h)
-                .await
-                .with_context(|| {
-                    format!("Failed to fetch epoch-first header at height {first_h}")
-                })?;
-
-            let header80_bytes = decode_header80(&header80)
-                .map_err(|e| anyhow!("decode failed for first_h={first_h}: {e}"))?;
-
-            let preflight =
-                preflight_commit_global(&self.ctx, header80_bytes.clone(), first_h).await;
-
-            if !preflight.static_ok {
-                let err = preflight.static_err.unwrap_or_default();
-                if err.to_string().to_lowercase().contains("height-rewrite") {
-                    info!(height = %first_h, "Epoch-first already committed (height-rewrite)");
-                    committed_up_to = committed_up_to.max(first_h);
-                } else {
-                    return Err(anyhow!("Preflight failed for epoch-first {first_h}: {err}"));
-                }
-            } else {
-                match self
-                    .ctx
-                    .c_op
-                    .commit_global_bitcoin_header_80(header80_bytes, U256::from(first_h), vec![])
-                    .send()
-                    .await
-                {
-                    Ok(pending) => match pending.await {
-                        Ok(Some(receipt)) => {
-                            info!(
-                                tx_hash = ?receipt.transaction_hash,
-                                height = %first_h,
-                                "Epoch-first header"
-                            );
-                            committed_up_to = committed_up_to.max(first_h);
-                        }
-                        Ok(None) => {
-                            warn!(
-                                height = %first_h,
-                                "Epoch-first header TX dropped from mempool — will retry"
-                            );
-                        }
-                        Err(e) => {
-                            warn!(
-                                height = %first_h,
-                                error = %e,
-                                "Epoch-first header TX failed while awaiting receipt — will retry"
-                            );
-                        }
-                    },
-                    Err(e) => {
-                        warn!(
-                            height = %first_h,
-                            error = %e,
-                            "Failed to broadcast epoch-first — will retry"
-                        );
-                    }
-                }
-            }
-        } else {
-            info!(
-                first_h = %first_h,
-                global_tip = %global_tip,
-                "Skipping epoch-first: already at or beyond"
-            );
-            committed_up_to = committed_up_to.max(first_h);
-        }
-
-        // === 2. Commit actual target header ===
-        info!(height = %target_h, "Now committing target header");
-
-        let (_, target80) = header80_by_height(&self.core_ctx, target_h)
-            .await
-            .with_context(|| format!("Failed to fetch target header {target_h}"))?;
-
-        let target80_bytes = decode_header80(&target80)
-            .map_err(|e| anyhow!("decode failed for target_h={target_h}: {e}"))?;
-
-        let preflight = preflight_commit_global(&self.ctx, target80_bytes.clone(), target_h).await;
-
-        if !preflight.static_ok {
-            let err = preflight.static_err.unwrap_or_default();
-            let err_msg = err.to_string().to_lowercase();
-            if err_msg.contains("height-rewrite") {
-                info!(height = %target_h, "Target already stored (height-rewrite)");
-                committed_up_to = target_h;
-            } else if err_msg.contains("no-jump-while-active") {
-                warn!(height = %target_h, "no-jump-while-active triggered — possible race!");
-                return Ok(committed_up_to);
-            } else {
-                return Err(anyhow!("Preflight failed for target {target_h}: {err}"));
-            }
-        } else {
-            match self
-                .ctx
-                .c_op
-                .commit_global_bitcoin_header_80(target80_bytes, U256::from(target_h), vec![])
-                .send()
-                .await
-            {
-                Ok(pending) => match pending.await {
-                    Ok(Some(receipt)) => {
-                        info!(
-                            tx_hash = ?receipt.transaction_hash,
-                            height = %target_h,
-                            "TARGET HEADER TX MINED — jump successful"
-                        );
-                        committed_up_to = target_h;
-                    }
-                    Ok(None) => {
-                        warn!(
-                            height = %target_h,
-                            "TARGET HEADER TX dropped from mempool — will retry next cycle"
-                        );
-                    }
-                    Err(e) => {
-                        warn!(
-                            height = %target_h,
-                            error = %e,
-                            "TARGET HEADER TX failed while awaiting receipt — will retry next cycle"
-                        );
-                    }
-                },
-                Err(e) => {
-                    warn!(
-                        height = %target_h,
-                        error = %e,
-                        "Failed to broadcast target header — will retry next cycle"
-                    );
-                }
-            }
-        }
-
-        info!(
-            final_committed_up_to = %committed_up_to,
-            original_global_tip = %global_tip,
-            target_destination = %target_h,
-            "jump_to_height_from_zero_active finished"
         );
 
         Ok(committed_up_to)

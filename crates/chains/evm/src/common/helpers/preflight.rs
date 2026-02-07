@@ -17,7 +17,7 @@ pub async fn preflight_commit_global(
 
     let call = ctx
         .c_op
-        .commit_global_bitcoin_header_80(header80_bytes, U256::from(height), vec![]);
+        .commit_global_bitcoin_header_80(header80_bytes, U256::from(height));
 
     let res = match call.call().await {
         Ok(_) => {

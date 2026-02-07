@@ -122,7 +122,7 @@ impl ApprovingAdapter for EvmApprovingAdapter {
                 if deposit_over && duty_active {
                     info!(
                         tx_id = %tx_id,
-                        "[op] Native→BTC txId={} no deposit, timeoutNoDeposit_NativeTokentoBTC",
+                        "[op] Native→BTC txId={} padeposit, timeoutNoDeposit_NativeTokentoBTC",
                         tx_id
                     );
 
@@ -418,7 +418,7 @@ impl ApprovingAdapter for EvmApprovingAdapter {
                 "claimNative_AfterOperatorExpired" => {
                     info!(
                         tx_id = %tx_id,
-                        "⚠️ [jump] User-close claimNative_AfterOperatorExpired"
+                        "[jump] User-close claimNative_AfterOperatorExpired"
                     );
 
                     // 1. static call

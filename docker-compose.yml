@@ -45,7 +45,7 @@ services:
       SQLITE_DB_DIR: "/app/data"
     volumes:
       - ethereum_data:/app/data
-    restart: unless-stopped
+    restart: unless-stoppedc
 
 volumes:
   hedera_data:

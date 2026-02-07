@@ -662,6 +662,7 @@ pub async fn check_confirmation_and_build_proof(
     };
 
     if !status.confirmed {
+        // Check if eligible for RBF
         info!("BTC tx {} not confirmed yet", btc_txid);
         return Ok(None);
     }
@@ -711,6 +712,7 @@ pub async fn check_confirmation_and_build_proof(
         index: U256::from(proof.index),
     }))
 }
+
 pub fn derive_address_from_script_bytes(
     ctx: &CoreContext,
     script_bytes: &[u8],
@@ -856,6 +858,7 @@ pub async fn maybe_rebalance_btc_wallets(ctx: &CoreContext) -> anyhow::Result<()
 #[serde(rename_all = "camelCase")]
 pub struct FeeRecommended {
     pub economy_fee: f64,
+    pub half_hour_fee: f64,
 }
 #[derive(serde::Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -887,15 +890,15 @@ pub async fn send_to_user_program(
     let secp = Secp256k1::new();
 
     // Get fee rate
-    let fee_res: FeeRecommended = ctx
-        .http
-        .get(format!("{}/v1/fees/recommended", mempool_api))
-        .send()
-        .await?
-        .json()
-        .await?;
-    let dynamic_rate = fee_res.economy_fee.ceil() as u64;
-    let fee_rate = 1u64.max(dynamic_rate.min(2));
+    // let fee_res: FeeRecommended = ctx
+    //     .http
+    //     .get(format!("{}/v1/fees/recommended", mempool_api))
+    //     .send()
+    //     .await?
+    //     .json()
+    //     .await?;
+    // let dynamic_rate = fee_res.economy_fee.ceil() as u64;
+    // let fee_rate = dynamic_rate.clamp(1, 500);
 
     // Get operator UTXOs
     let utxos: Vec<Utxo> = ctx
@@ -918,9 +921,9 @@ pub async fn send_to_user_program(
         selected.push(utxo.clone());
         input_sum += utxo.value;
 
-        let est_vbytes = (selected.len() as u64 * 59) + (2 * 31) + 10;
-        final_fee = est_vbytes * fee_rate;
-        final_fee = 300.max(final_fee.min(800));
+        // let est_vbytes = (selected.len() as u64 * 59) + (2 * 31) + 10;
+        // final_fee = est_vbytes * fee_rate;
+        final_fee = 140;
 
         if input_sum >= amount_sats + final_fee {
             break;
@@ -1009,6 +1012,156 @@ pub async fn send_to_user_program(
         .await?;
 
     tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
+
+    Ok(response)
+}
+
+pub async fn rbf_send_to_user_program(
+    ctx: &CoreContext,
+    original_txid: &str,
+    user_program: &[u8],
+    amount_sats: u64,
+) -> Result<String> {
+    let _permit = ctx.rpc_limiter.acquire().await?;
+    let mempool_api = &ctx.cfg.mempool_api;
+    let dev_address = &ctx.cfg.operator_btc_wallet_address;
+    let network = ctx.btc_network;
+
+    let wif = &ctx.cfg.operator_btc_wallet_private_key;
+    let private_key = bitcoin::PrivateKey::from_wif(wif)?;
+    let secret_key = private_key.inner;
+    let secp = Secp256k1::new();
+
+    // 1. Fetch original TX
+    let tx_hex = ctx
+        .http
+        .get(format!("{}/tx/{}/hex", mempool_api, original_txid))
+        .send()
+        .await?
+        .text()
+        .await?;
+    let old_tx: Transaction = bitcoin::consensus::encode::deserialize(&hex::decode(tx_hex)?)?;
+
+    // 2. Fetch UTXO values and calculate old fee
+    let mut selected = vec![];
+    let mut input_sum: u64 = 0;
+    for input in &old_tx.input {
+        let prev_txid = input.previous_output.txid.to_string();
+        let prev_vout = input.previous_output.vout;
+        let res = ctx
+            .http
+            .get(format!("{}/tx/{}", mempool_api, prev_txid))
+            .send()
+            .await?;
+        let tx_val: serde_json::Value = res.json().await?;
+        let value = tx_val["vout"][prev_vout as usize]["value"]
+            .as_u64()
+            .unwrap();
+
+        selected.push(Utxo {
+            txid: prev_txid,
+            vout: prev_vout,
+            value,
+        });
+        input_sum += value;
+    }
+
+    // --- FEE BUMP CALCULATION ---
+    // Calculate what we paid last time
+    let current_output_sum: u64 = old_tx.output.iter().map(|o| o.value.to_sat()).sum();
+    let old_absolute_fee = input_sum.saturating_sub(current_output_sum);
+    let old_vsize = old_tx.vsize() as f64;
+    let old_fee_rate = (old_absolute_fee as f64 / old_vsize as f64).ceil() as u64;
+
+    // Get current market recommendation
+    let fee_res: FeeRecommended = ctx
+        .http
+        .get(format!("{}/v1/fees/recommended", mempool_api))
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    // The +2 Rule: We beat the old rate by 2 OR follow the market, whichever is higher
+    // 1. Prioritize Economy Fee
+    let market_rate = fee_res.economy_fee as f64;
+    let old_rate = old_fee_rate as f64;
+
+    let new_fee_rate = if market_rate > old_rate {
+        // If economy is already higher, jump straight to it
+        market_rate
+    } else {
+        // If economy is too low, perform a minimal 0.1 bump
+        old_rate + 0.1
+    };
+
+    info!(
+        "RBF: Old rate was {} sat/vB. Market (half-hour) is {} sat/vB. New rate chosen: {} sat/vB.",
+        old_fee_rate, market_rate, new_fee_rate
+    );
+
+    let final_fee = old_vsize * new_fee_rate;
+    let final_fee = final_fee.ceil() as u64;
+    let change = input_sum
+        .checked_sub(amount_sats + final_fee)
+        .ok_or_else(|| anyhow!("Insufficient funds: Fee bump would deplete change output"))?;
+
+    // 4. Rebuild
+    let mut tx = Transaction {
+        version: bitcoin::transaction::Version::TWO,
+        lock_time: LockTime::ZERO,
+        input: old_tx.input.clone(),
+        output: vec![],
+    };
+
+    tx.output.push(TxOut {
+        value: Amount::from_sat(amount_sats),
+        script_pubkey: ScriptBuf::from(user_program.to_vec()),
+    });
+
+    if change > 0 {
+        let change_script = BTCAddress::from_str(dev_address)?
+            .require_network(network)?
+            .script_pubkey();
+        tx.output.push(TxOut {
+            value: Amount::from_sat(change),
+            script_pubkey: change_script,
+        });
+    }
+
+    // 5. Sign
+    for (i, utxo) in selected.iter().enumerate() {
+        let mut cache = SighashCache::new(&tx);
+        let script_pubkey = BTCAddress::from_str(dev_address)?
+            .require_network(network)?
+            .script_pubkey();
+        let sighash = cache.p2wpkh_signature_hash(
+            i,
+            &script_pubkey,
+            Amount::from_sat(utxo.value),
+            EcdsaSighashType::All,
+        )?;
+        let msg = Message::from_digest_slice(&sighash[..])?;
+        let sig = secp.sign_ecdsa(&msg, &secret_key);
+        let mut sig_ser = sig.serialize_der().to_vec();
+        sig_ser.push(EcdsaSighashType::All as u8);
+        tx.input[i].witness.clear();
+        tx.input[i].witness.push(sig_ser);
+        tx.input[i]
+            .witness
+            .push(private_key.public_key(&secp).to_bytes());
+    }
+
+    let tx_hex = hex::encode(serialize(&tx));
+    let response = ctx
+        .http
+        .post(format!("{}/tx", mempool_api))
+        .header("Content-Type", "text/plain")
+        .body(tx_hex)
+        .send()
+        .await?
+        .text()
+        .await?;
 
     Ok(response)
 }
