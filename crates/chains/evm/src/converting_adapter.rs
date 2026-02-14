@@ -5,20 +5,19 @@ use ethers::types::U256;
 use paradapp_core::{
     btc::btc_service::{
         BitcoinMerkleProofPayload, check_confirmation_and_build_proof,
-        derive_address_from_mnemonic, send_all_btc_from_account_to_dev, send_to_user_program,
+        send_to_user_program,
     },
     consts::{
-        supported_network_enum::SupportedNetwork, transaction_phase::TransactionPhase,
-        transaction_type::TransactionType,
+        supported_network_enum::SupportedNetwork,
+        transaction_phase::TransactionPhase, transaction_type::TransactionType,
     },
-    context::CoreContext,
+    dependencies::context::CoreContext,
     models::conversion::Conversion,
     traits::{
         chain_provider_adapter::{ChainProviderAdapter, TxIdFilter},
         converting_adapter::ConvertingAdapter,
     },
 };
-use sqlx::{Row, SqlitePool};
 use tracing::{error, info, warn};
 
 use crate::{bindings::paradapp_convert, dependencies::context::EvmContext};
@@ -27,7 +26,6 @@ use anyhow::Result;
 pub struct EvmConvertingAdapter {
     pub ctx: Arc<EvmContext>,
     pub core_ctx: Arc<CoreContext>,
-    pub sqlite_storage: SqlitePool,
     pub chain_provider: Arc<dyn ChainProviderAdapter>,
 }
 
@@ -59,28 +57,28 @@ impl EvmConvertingAdapter {
 
 #[async_trait]
 impl ConvertingAdapter for EvmConvertingAdapter {
-    async fn mark_processed(&self, tx_id: U256, btc_tx_id: Option<String>) -> Result<()> {
-        let id_i64: i64 = tx_id.to_string().parse().unwrap();
+    async fn mark_processed(
+        &self,
+        tx_id: U256,
+        btc_tx_id: Option<String>,
+    ) -> Result<()> {
+        let tx_id_str = tx_id.to_string();
+        let btc_id = btc_tx_id.unwrap_or_else(|| "unknown".to_string());
+        let network = self.ctx.cfg.network.string_identifier();
 
-        info!(tx_id = %tx_id, btc_tx_id = ?btc_tx_id, "Marking transaction as processed");
+        info!(tx_id = %tx_id, btc_tx_id = %btc_id, "Marking transaction as processed in storage");
 
-        let query = r#"
-            INSERT INTO processed_conversions (tx_id, processed, btc_tx_id)
-            VALUES (?1, 1, ?2)
-            ON CONFLICT(tx_id) DO UPDATE SET processed=1, btc_tx_id=excluded.btc_tx_id
-        "#;
-
-        if let Err(e) = sqlx::query(query)
-            .bind(id_i64)
-            .bind(btc_tx_id.clone())
-            .execute(&self.sqlite_storage)
+        if let Err(e) = self
+            .core_ctx
+            .redis_storage
+            .set_conversion_processed(network, &tx_id_str, &btc_id)
             .await
         {
-            error!(tx_id = %tx_id, btc_tx_id = ?btc_tx_id, error = %e, "Failed to mark transaction as processed");
-            return Err(e.into());
+            error!(tx_id = %tx_id, error = %e, "Failed to mark transaction as processed");
+            return Err(e);
         }
 
-        info!(tx_id = %tx_id, btc_tx_id = ?btc_tx_id, "Transaction marked as processed successfully");
+        info!(tx_id = %tx_id, "Transaction marked successfully");
         Ok(())
     }
 
@@ -127,11 +125,14 @@ impl ConvertingAdapter for EvmConvertingAdapter {
                     .await?;
 
                 // 2. Perform business logic checks
-                if tx_type == TransactionType::NATIVE_TO_BITCOIN && !evm_conv.is_native_to_bitcoin {
+                if tx_type == TransactionType::NATIVE_TO_BITCOIN
+                    && !evm_conv.is_native_to_bitcoin
+                {
                     continue;
                 }
 
-                if !evm_conv.approved || evm_conv.completed || evm_conv.refunded {
+                if !evm_conv.approved || evm_conv.completed || evm_conv.refunded
+                {
                     continue;
                 }
 
@@ -162,6 +163,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
         dest_network: Option<SupportedNetwork>,
     ) -> Result<Vec<(U256, Conversion)>> {
         let mut completed = Vec::new();
+        let network = self.ctx.cfg.network.string_identifier();
 
         for tx_type in [
             TransactionType::BITCOIN_TO_NATIVE,
@@ -190,47 +192,26 @@ impl ConvertingAdapter for EvmConvertingAdapter {
 
         let mut ready = Vec::new();
 
-        // Check for processed in sqlite
-        // Convert completed U256 IDs to i64
-        let completed_ids: Vec<i64> = completed
-            .iter()
-            .map(|tx_id| tx_id.low_u64() as i64)
-            .collect();
+        // Check for processed in storage
+        // Convert completed U256 IDs to strings for Redis
+        let completed_id_strs: Vec<String> =
+            completed.iter().map(|tx_id| tx_id.to_string()).collect();
 
-        let placeholders = (0..completed_ids.len())
-            .map(|_| "?")
-            .collect::<Vec<_>>()
-            .join(", ");
-        let sql = format!(
-            "SELECT tx_id FROM processed_conversions WHERE tx_id IN ({}) AND processed = 1",
-            placeholders
-        );
-        let mut query = sqlx::query(&sql);
-        for id in &completed_ids {
-            query = query.bind(id);
-        }
-
-        let processed_ids: Vec<i64> = query
-            .fetch_all(&self.sqlite_storage)
-            .await?
-            .into_iter()
-            .map(|row| row.get::<i64, _>("tx_id"))
-            .collect();
-
-        let processed_set: std::collections::HashSet<i64> = processed_ids.into_iter().collect();
+        // Perform batch check in Redis
+        let processed_flags = self
+            .core_ctx
+            .redis_storage
+            .filter_processed_ids(network, &completed_id_strs)
+            .await?;
 
         for (idx, tx_id) in completed.iter().enumerate() {
-            if processed_set.contains(&completed_ids[idx]) {
+            // Check processed flag from Redis
+            if processed_flags[idx] {
                 continue;
             }
 
-            let evm_conv = self
-                .ctx
-                .c_op
-                .get_conversion_with_phase(*tx_id)
-                .call()
-                .await?
-                .0;
+            let evm_conv =
+                self.ctx.c_op.get_conversion_with_phase(*tx_id).call().await?.0;
 
             if evm_conv.is_native_to_bitcoin {
                 continue;
@@ -255,7 +236,11 @@ impl ConvertingAdapter for EvmConvertingAdapter {
         Ok(ready)
     }
 
-    async fn handle_native_to_btc_conversion(&self, tx_id: U256, conv: Conversion) -> Result<()> {
+    async fn handle_native_to_btc_conversion(
+        &self,
+        tx_id: U256,
+        conv: Conversion,
+    ) -> Result<()> {
         // Convert Bytes -> Vec<u8> for user program
         let user_program: Vec<u8> = if conv.user_program.0.is_empty() {
             vec![]
@@ -263,105 +248,65 @@ impl ConvertingAdapter for EvmConvertingAdapter {
             conv.user_program.0.to_vec()
         };
 
+        // Program status for logging
+        let program_status =
+            if user_program.is_empty() { "empty" } else { "non-empty" };
         info!(
-            "Sending {} sats BTC to user's script program: {}",
-            conv.bitcoin_amount,
-            if user_program.is_empty() {
-                "empty"
-            } else {
-                "non-empty"
-            }
+            amount_sats = %conv.bitcoin_amount,
+            program_status, "Sending BTC to user's script program"
         );
 
         // Safely downcast bitcoin_amount to u64 for sats
-        let amount_sats: u64 = conv
-            .bitcoin_amount
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("btc_amount overflow: {}", conv.bitcoin_amount))?;
+        let amount_sats: u64 =
+            conv.bitcoin_amount.try_into().map_err(|_| {
+                anyhow::anyhow!("btc_amount overflow: {}", conv.bitcoin_amount)
+            })?;
 
-        match send_to_user_program(&self.core_ctx, &user_program, amount_sats).await {
+        // Attempt to send BTC to user program
+        match send_to_user_program(&self.core_ctx, &user_program, amount_sats)
+            .await
+        {
             Ok(result) => {
-                info!("Sent BTC to user for txId={} (btc_txid={})", tx_id, result);
+                info!(
+                    tx_id = %tx_id,
+                    btc_txid = %result,
+                    "BTC sent successfully to user program"
+                );
                 self.mark_processed(tx_id, Some(result)).await?;
-            }
+            },
             Err(e) => {
-                error!(error=%e, "Failed to send BTC to user for txId={}", tx_id);
+                let err_msg = e.to_string();
+
+                if err_msg.contains("Not enough funds") {
+                    warn!(tx_id = %tx_id, "Insufficient BTC. Triggering provider-level emergency sweep.");
+
+                    if let Err(e) =
+                        self.chain_provider.trigger_btc_sweep().await
+                    {
+                        error!(tx_id = %tx_id, error = %e, "Emergency sweep execution failed");
+                    } else {
+                        info!(tx_id = %tx_id, "Emergency sweep completed successfully.");
+                    }
+                }
+                error!(error = %e, tx_id = %tx_id, "Failed to send BTC to user program");
                 return Err(e);
-            }
+            },
         }
 
         Ok(())
     }
 
-    async fn handle_btc_to_native_conversion(&self, tx_id: U256, conv: Conversion) -> Result<()> {
-        let btc_human =
-            ethers::utils::format_units(conv.bitcoin_amount, 8).unwrap_or_else(|_| "0".into());
-        let native_human =
-            ethers::utils::format_units(conv.native_amount, 8).unwrap_or_else(|_| "0".into());
-        let sats_str = conv.bitcoin_amount.to_string();
+    async fn handle_btc_to_native_conversion(&self, tx_id: U256) -> Result<()> {
+        // Log before the action so you know which ID is being targeted
+        info!(%tx_id, "Marking BTC→NATIVE conversion as processed in storage.");
 
-        let user_program = if conv.user_program.0.is_empty() {
-            "0x".to_string()
-        } else {
-            format!("0x{}", hex::encode(&conv.user_program.0))
-        };
+        // Immediate mark as processed since no on-chain action is needed
+        let status_str = "processed_btc_to_native".to_string();
 
-        info!(
-            "\n[BTC→Native] txId={}\n   User received ≈ {} Native from contract.\n   BTC amount committed for this conversion ≈ {} BTC ({} sats).",
-            tx_id, native_human, btc_human, sats_str
-        );
+        self.mark_processed(tx_id, Some(status_str.clone())).await?;
 
-        info!(
-            "SIMULATE: sell {} BTC (received on operator BTC address) -> {} Native on exchange.",
-            btc_human, native_human
-        );
-        info!(
-            "SIMULATE: use resulting Native to keep operator side hedged and/or refill contract liquidity if needed."
-        );
-        info!(
-            "userProgram (unused for BTC→Native but shown for parity): {}",
-            user_program
-        );
-
-        // For DB lookups, downcast safely
-        let tx_id_str = tx_id.to_string();
-
-        let row = sqlx::query(
-            "SELECT idx
-         FROM receive_state
-         WHERE tx_id = ?
-           AND tx_id != '__next_index__'",
-        )
-        .bind(&tx_id_str)
-        .fetch_optional(&self.sqlite_storage)
-        .await?;
-
-        let Some(row) = row else {
-            warn!("No receive_state entry for BTC→Native tx_id={}", tx_id);
-            return Ok(());
-        };
-
-        let idx: u32 = row.get::<i64, _>("idx") as u32;
-
-        let derived = derive_address_from_mnemonic(&self.core_ctx, vec![idx]).await?;
-        let info = &derived[0];
-
-        match send_all_btc_from_account_to_dev(&self.core_ctx, &info.address, &info.wif).await {
-            Ok(sent_txid) => {
-                let txid_opt = if sent_txid.is_empty() {
-                    None
-                } else {
-                    Some(sent_txid)
-                };
-                self.mark_processed(tx_id, txid_opt).await?;
-            }
-            Err(err) => {
-                warn!(
-                    "Failed sending BTC back to main for tx_id={}: {:?}",
-                    tx_id, err
-                );
-            }
-        }
+        // Success confirmation log
+        info!(%tx_id, status = %status_str, "Successfully marked conversion.");
 
         Ok(())
     }
@@ -371,7 +316,8 @@ impl ConvertingAdapter for EvmConvertingAdapter {
         tx_id: U256,
         btc_txid: &str,
     ) -> Result<Option<BitcoinMerkleProofPayload>> {
-        check_confirmation_and_build_proof(&self.core_ctx, tx_id, btc_txid).await
+        check_confirmation_and_build_proof(&self.core_ctx, tx_id, btc_txid)
+            .await
     }
 
     async fn submit_merkle_proof(
@@ -400,49 +346,37 @@ impl ConvertingAdapter for EvmConvertingAdapter {
         Ok(())
     }
 
-    async fn get_processed_native_to_btc(&self, tx_ids: &[U256]) -> Result<HashMap<U256, String>> {
+    async fn get_processed_native_to_btc(
+        &self,
+        tx_ids: &[U256],
+    ) -> Result<HashMap<U256, String>> {
         // Short-circuit: nothing to check
         if tx_ids.is_empty() {
             return Ok(HashMap::new());
         }
 
-        // Convert U256 -> i64 (same as old logic)
-        let tx_ids_i64: Vec<i64> = tx_ids
-            .iter()
-            .map(|id| id.to_string().parse::<i64>())
-            .collect::<Result<_, _>>()?;
+        // Convert U256 -> String
+        let tx_id_strs: Vec<String> =
+            tx_ids.iter().map(|id| id.to_string()).collect();
 
-        // Build dynamic IN (...) placeholders
-        let placeholders = std::iter::repeat_n("?", tx_ids_i64.len())
-            .collect::<Vec<_>>()
-            .join(", ");
+        let network = self.ctx.cfg.network.string_identifier();
 
-        let sql = format!(
-            r#"
-            SELECT tx_id, btc_tx_id
-            FROM processed_conversions
-            WHERE tx_id IN ({})
-              AND processed = 1
-              AND btc_tx_id IS NOT NULL
-            "#,
-            placeholders
-        );
-
-        let mut query = sqlx::query(&sql);
-
-        for id in &tx_ids_i64 {
-            query = query.bind(id);
-        }
-
-        let rows = query.fetch_all(&self.sqlite_storage).await?;
+        // Use the redis_storage from core_ctx
+        let btc_tx_ids = self
+            .core_ctx
+            .redis_storage
+            .get_btc_tx_ids(network, &tx_id_strs)
+            .await?;
 
         let mut result = HashMap::new();
 
-        for row in rows {
-            let tx_id_i64: i64 = row.get("tx_id");
-            let btc_tx_id: String = row.get("btc_tx_id");
-
-            result.insert(U256::from(tx_id_i64), btc_tx_id);
+        for (i, btc_tx_id) in btc_tx_ids.into_iter().enumerate() {
+            if let Some(btc_id) = btc_tx_id {
+                // Mimicking "btc_tx_id IS NOT NULL"
+                if btc_id != "unknown" {
+                    result.insert(tx_ids[i], btc_id);
+                }
+            }
         }
 
         Ok(result)

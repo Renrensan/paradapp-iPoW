@@ -2,7 +2,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 use ethers::types::{Address, Bytes, H160, U256};
 
-use crate::{consts::supported_network_enum::SupportedNetwork, models::conversion::Conversion};
+use crate::{
+    consts::supported_network_enum::SupportedNetwork,
+    models::conversion::Conversion,
+};
 
 /// Parameters for filtering transaction IDs.
 #[derive(Default, Clone)]
@@ -72,21 +75,40 @@ pub trait ChainProviderAdapter: Send + Sync {
 
     fn network(&self) -> SupportedNetwork;
 
+    fn min_transaction_limit(&self) -> u64;
+
+    fn max_transaction_limit(&self) -> u64;
+
+    async fn trigger_btc_sweep(&self) -> Result<()>;
+
     async fn read_liquidity(&self) -> Result<U256>;
 
-    async fn maybe_rebalance_contract_liquidity(&self, native_liq: U256) -> Result<()>;
+    async fn maybe_rebalance_contract_liquidity(
+        &self,
+        native_liq: U256,
+    ) -> Result<()>;
 
-    async fn jump_to_anchor_from_zero_active(&self, global_tip: u64, anchor_h: u64) -> Result<u64>;
+    async fn jump_to_anchor_from_zero_active(
+        &self,
+        global_tip: u64,
+        anchor_h: u64,
+    ) -> Result<u64>;
 
     async fn global_tip_height(&self) -> Result<U256>;
 
     async fn min_anchor_height(&self) -> Result<U256>;
 
-    async fn get_tx_ids_by_filter(&self, filter: TxIdFilter) -> Result<Vec<U256>>;
+    async fn get_tx_ids_by_filter(
+        &self,
+        filter: TxIdFilter,
+    ) -> Result<Vec<U256>>;
 
     async fn next_tx_id(&self) -> Result<U256>;
 
-    async fn commit_bitcoin_to_native(&self, args: BitcoinToNativeCommitArgs) -> Result<()>;
+    async fn commit_bitcoin_to_native(
+        &self,
+        args: BitcoinToNativeCommitArgs,
+    ) -> Result<()>;
 
     async fn anchor_info(&self, tx_id: U256) -> Result<AnchorInfo>;
 
@@ -94,5 +116,13 @@ pub trait ChainProviderAdapter: Send + Sync {
 
     async fn get_global_chain_state(&self) -> Result<GlobalChainState>;
 
-    async fn estimate_bitcoin_from_native(&self, native_amount: U256) -> Result<U256>;
+    async fn estimate_bitcoin_from_native(
+        &self,
+        native_amount: U256,
+    ) -> Result<U256>;
+
+    async fn estimate_native_from_bitcoin(
+        &self,
+        bitcoin_amount: U256,
+    ) -> anyhow::Result<U256>;
 }

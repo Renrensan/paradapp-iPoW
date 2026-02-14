@@ -20,7 +20,7 @@ The "Execution" layer. This contains the concrete implementations of the core tr
 
 - **EVM**: A comprehensive implementation for Ethereum-like chains (Ethereum, Hedera, etc.).
   - **Adapters**: Concrete logic for state-based approving and converting.
-  - **Dependencies**: Per-chain SQLite state and network-specific configurations.
+  - **Dependencies**: Network-specific configurations.
 
 ### 3. Operator (`crates/operator`)
 
@@ -39,10 +39,6 @@ The operator moves transactions through a state machine to ensure security and c
 2.  **Streaming (BTC Specific)**: For BTC-related flows, the `StreamingAdapter` syncs block headers or specific data to the target contract to provide the necessary context for verification.
 3.  **Approving**: The `ApprovingAdapter` runs a series of security and business-logic checks. If the transaction passes, it is signed/authorized.
 4.  **Converting**: The `ConvertingAdapter` picks up the approved intent and executes the final movement of funds or state change on the destination network.
-
-## Local State Management
-
-Each chain implementation manages its own local state via **SQLite** located in the root `/data` directory. This is primarily use to avoid operator sending BTC twice and also to derive btc receive program which must be unique between transactions.
 
 ## Scalability & Extensibility
 

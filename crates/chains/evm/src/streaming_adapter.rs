@@ -1,12 +1,15 @@
 use crate::{
-    common::helpers::preflight::preflight_commit_global, dependencies::context::EvmContext,
+    common::helpers::preflight::preflight_commit_global,
+    dependencies::context::EvmContext,
 };
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use ethers::types::U256;
 use paradapp_core::{
-    btc::btc_service::{btc_tip_height, check_work_le, decode_header80, header80_by_height},
-    context::CoreContext,
+    btc::btc_service::{
+        btc_tip_height, check_work_le, decode_header80, header80_by_height,
+    },
+    dependencies::context::CoreContext,
     traits::{
         chain_provider_adapter::ChainProviderAdapter,
         streaming_adapter::{StreamTarget, StreamingAdapter},
@@ -57,7 +60,8 @@ impl StreamingAdapter for EvmStreamingAdapter {
 
         // 2. Loop streaming headers
         loop {
-            let tip_bn: U256 = self.ctx.contract.global_tip_height().call().await?;
+            let tip_bn: U256 =
+                self.ctx.contract.global_tip_height().call().await?;
 
             let tip = tip_bn.as_u64();
             let next_height = if tip == 0 { 1 } else { tip + 1 };
@@ -72,7 +76,8 @@ impl StreamingAdapter for EvmStreamingAdapter {
             }
 
             // 3. Fetch header80
-            let (_hash, header80) = header80_by_height(&self.core_ctx, next_height).await?;
+            let (_hash, header80) =
+                header80_by_height(&self.core_ctx, next_height).await?;
 
             // 4. Proof-of-work check
             let (ok, bits, _target, _h_val) = check_work_le(&header80)?;
@@ -86,9 +91,16 @@ impl StreamingAdapter for EvmStreamingAdapter {
 
             // 5. Preflight / callStatic check
             let header80_bytes = decode_header80(&header80).map_err(|e| {
-                anyhow::anyhow!("failed to decode header80 at height {next_height}: {e}")
+                anyhow::anyhow!(
+                    "failed to decode header80 at height {next_height}: {e}"
+                )
             })?;
-            let pf = preflight_commit_global(&self.ctx, header80_bytes.clone(), next_height).await;
+            let pf = preflight_commit_global(
+                &self.ctx,
+                header80_bytes.clone(),
+                next_height,
+            )
+            .await;
 
             if !pf.static_ok
                 && let Some(err_str) = pf.static_err
@@ -96,7 +108,10 @@ impl StreamingAdapter for EvmStreamingAdapter {
                 let reason = err_str.to_lowercase();
 
                 if reason.contains("height-rewrite") {
-                    info!(height = next_height, "height already stored, skipping.");
+                    info!(
+                        height = next_height,
+                        "height already stored, skipping."
+                    );
                     continue;
                 }
 
@@ -108,7 +123,10 @@ impl StreamingAdapter for EvmStreamingAdapter {
             let c_op = self.ctx.c_op.clone();
             let gas = U256::from(1_200_000u64);
             let call = c_op
-                .commit_global_bitcoin_header_80(header80_bytes, U256::from(next_height))
+                .commit_global_bitcoin_header_80(
+                    header80_bytes,
+                    U256::from(next_height),
+                )
                 .gas(gas);
 
             let pending = call.send().await?;
@@ -159,8 +177,14 @@ impl StreamingAdapter for EvmStreamingAdapter {
         ) = conv;
 
         // 2. windowsFor(txId)
-        let (headers_started, _start_height, last_height, deposit_end, proof_end, _duty_expires_at) =
-            c.windows_for(tx_id).call().await?;
+        let (
+            headers_started,
+            _start_height,
+            last_height,
+            deposit_end,
+            proof_end,
+            _duty_expires_at,
+        ) = c.windows_for(tx_id).call().await?;
 
         if !headers_started {
             return Ok(StreamTarget {
@@ -241,14 +265,18 @@ impl StreamingAdapter for EvmStreamingAdapter {
 
         for h in start..=end {
             // 1. Fetch header80
-            let (_, header80) = header80_by_height(&self.core_ctx, h)
-                .await
-                .with_context(|| format!("Failed to fetch header80 for height {h}"))?;
+            let (_, header80) =
+                header80_by_height(&self.core_ctx, h).await.with_context(
+                    || format!("Failed to fetch header80 for height {h}"),
+                )?;
 
             // 2. Preflight check
-            let header80_bytes = decode_header80(&header80)
-                .map_err(|e| anyhow!("failed to decode header80 at height {h}: {e}"))?;
-            let preflight = preflight_commit_global(&self.ctx, header80_bytes.clone(), h).await;
+            let header80_bytes = decode_header80(&header80).map_err(|e| {
+                anyhow!("failed to decode header80 at height {h}: {e}")
+            })?;
+            let preflight =
+                preflight_commit_global(&self.ctx, header80_bytes.clone(), h)
+                    .await;
 
             if !preflight.static_ok {
                 let err_msg = preflight
@@ -293,7 +321,7 @@ impl StreamingAdapter for EvmStreamingAdapter {
                     } else {
                         warn!(height = %h, "Tx for height was dropped/not mined");
                     }
-                }
+                },
                 Err(e) => {
                     // Likely nonce/gas issue — log and stop
                     error!(
@@ -302,7 +330,7 @@ impl StreamingAdapter for EvmStreamingAdapter {
                         "Failed to send commit tx for height"
                     );
                     return Ok(new_tip);
-                }
+                },
             }
         }
 

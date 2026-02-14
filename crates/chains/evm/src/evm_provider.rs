@@ -4,7 +4,8 @@ use crate::{
     common::{
         consts::liquidity::Liquidity,
         helpers::{
-            parse_native_token::parse_human_native_token, preflight::preflight_commit_global,
+            parse_native_token::parse_human_native_token,
+            preflight::preflight_commit_global,
         },
     },
     dependencies::context::EvmContext,
@@ -14,13 +15,16 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use ethers::types::U256;
 use paradapp_core::{
-    btc::btc_service::{btc_tip_height, decode_header80, epoch_start, header80_by_height},
+    btc::btc_service::{
+        btc_tip_height, decode_header80, epoch_start, header80_by_height,
+        sweep_btc_to_main,
+    },
     consts::supported_network_enum::SupportedNetwork,
-    context::CoreContext,
+    dependencies::context::CoreContext,
     models::conversion::Conversion,
     traits::chain_provider_adapter::{
-        AnchorInfo, BitcoinProgramType, BitcoinToNativeCommitArgs, ChainProviderAdapter,
-        GlobalChainState, TxIdFilter,
+        AnchorInfo, BitcoinProgramType, BitcoinToNativeCommitArgs,
+        ChainProviderAdapter, GlobalChainState, TxIdFilter,
     },
 };
 use tracing::{error, info, warn};
@@ -43,15 +47,21 @@ impl ChainProviderAdapter for EvmChainProvider {
         self.ctx.cfg.network.into()
     }
 
+    fn min_transaction_limit(&self) -> u64 {
+        self.ctx.cfg.min_transaction_limit
+    }
+
+    fn max_transaction_limit(&self) -> u64 {
+        self.ctx.cfg.max_transaction_limit
+    }
+
     async fn check_rpc_health(&self) -> Result<()> {
         // 1. Acquire a permit from the global limiter.
         // Since rpc_limiter is an Arc<Semaphore>, this is thread-safe across all stacks.
-        let _permit = self
-            .core_ctx
-            .rpc_limiter
-            .acquire()
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to acquire RPC permit: {}", e))?;
+        let _permit =
+            self.core_ctx.rpc_limiter.acquire().await.map_err(|e| {
+                anyhow::anyhow!("Failed to acquire RPC permit: {}", e)
+            })?;
 
         // --- EVM RPC Check ---
         let evm_ok = match self
@@ -63,15 +73,16 @@ impl ChainProviderAdapter for EvmChainProvider {
             Ok(bn) => {
                 info!(block_number = %bn, "EVM RPC alive");
                 true
-            }
+            },
             Err(e) => {
                 error!(error = %e, "EVM RPC health check failed");
                 false
-            }
+            },
         };
 
         // --- Bitcoin Esplora Check ---
-        let url = format!("{}/blocks/tip/height", self.core_ctx.cfg.esplora_base);
+        let url =
+            format!("{}/blocks/tip/height", self.core_ctx.cfg.esplora_base);
         let btc_ok = match self.core_ctx.http.get(url).send().await {
             Ok(resp) => {
                 let status = resp.status();
@@ -81,17 +92,17 @@ impl ChainProviderAdapter for EvmChainProvider {
                         Err(e) => {
                             error!(error = %e, "Failed to read Esplora response text");
                             false
-                        }
+                        },
                     }
                 } else {
                     error!(status = %status.as_u16(), "Bitcoin Esplora returned error status");
                     false
                 }
-            }
+            },
             Err(e) => {
                 error!(error = %e, "Bitcoin Esplora connection failed");
                 false
-            }
+            },
         };
 
         // 2. Mandatory gap enforcement.
@@ -111,6 +122,55 @@ impl ChainProviderAdapter for EvmChainProvider {
         Ok(())
     }
 
+    async fn trigger_btc_sweep(&self) -> Result<()> {
+        let network = self.ctx.cfg.network.string_identifier();
+
+        // 1. Get the starting point from Redis
+        let start =
+            self.core_ctx.redis_storage.get_last_swept_index(network).await?;
+
+        // 2. Get the current bridge index (how many addresses have we derived?)
+        let end = self
+            .core_ctx
+            .redis_storage
+            .get_next_derivation_index(network)
+            .await?;
+
+        if end <= start {
+            info!(start, end, "No new indexes to sweep.");
+            return Ok(());
+        }
+
+        info!(start, end, "Initiating scheduled rebalance sweep");
+
+        // Perform the actual BTC sweep logic
+        match sweep_btc_to_main(
+            &self.core_ctx,
+            &self.ctx.cfg.btc_mnemonic,
+            start,
+            end,
+        )
+        .await
+        {
+            Ok(btc_txid) => {
+                if !btc_txid.is_empty() {
+                    info!(%btc_txid, start, end, "Sweep successful");
+                } else {
+                    info!(start, end, "Sweep completed (no funds found)");
+                }
+
+                // 3. Update the last swept index in Redis so we don't repeat work
+                self.core_ctx
+                    .redis_storage
+                    .set_last_swept_index(network, end)
+                    .await?;
+            },
+            Err(e) => anyhow::bail!("Provider sweep failed: {}", e),
+        }
+
+        Ok(())
+    }
+
     async fn read_liquidity(&self) -> Result<U256> {
         let contract = self.ctx.contract.clone();
 
@@ -120,13 +180,13 @@ impl ChainProviderAdapter for EvmChainProvider {
             match call.call().await {
                 Ok(v) => {
                     native_liq = v;
-                }
+                },
                 Err(e) => {
                     info!(
                         error = %e,
                         "nativeLiquidity() view not found or failed; treating as 0."
                     );
-                }
+                },
             }
         }
 
@@ -142,11 +202,15 @@ impl ChainProviderAdapter for EvmChainProvider {
         Ok(native_liq)
     }
 
-    async fn maybe_rebalance_contract_liquidity(&self, native_liq: U256) -> Result<()> {
+    async fn maybe_rebalance_contract_liquidity(
+        &self,
+        native_liq: U256,
+    ) -> Result<()> {
         let c_op = self.ctx.c_op.clone();
         let low_native = parse_human_native_token(Liquidity::HBAR_LIQ_LOW)?;
         let high_native = parse_human_native_token(Liquidity::HBAR_LIQ_HIGH)?;
-        let enable_topup: bool = self.ctx.cfg.enable_onchain_lp_topup.to_lowercase() == "true";
+        let enable_topup: bool =
+            self.ctx.cfg.enable_onchain_lp_topup.to_lowercase() == "true";
 
         if native_liq < low_native {
             let need_native = low_native - native_liq;
@@ -165,7 +229,7 @@ impl ChainProviderAdapter for EvmChainProvider {
                         info!(
                             tx_hash = ?pending.tx_hash(),
                         "addNativeLiquidity tx broadcasted.")
-                    }
+                    },
                     Err(e) => error!(error=%e,"addNativeLiquidity failed"),
                 }
             } else {
@@ -181,7 +245,9 @@ impl ChainProviderAdapter for EvmChainProvider {
                 excess = %ethers::utils::format_ether(excess),
                 "Native liquidity above high threshold."
             );
-            info!("   TODO: call withdrawNativeLiquidity() → deposit to exchange.");
+            info!(
+                "   TODO: call withdrawNativeLiquidity() → deposit to exchange."
+            );
         } else {
             info!("Native liquidity within range – no rebalance needed.");
         }
@@ -189,7 +255,11 @@ impl ChainProviderAdapter for EvmChainProvider {
         Ok(())
     }
 
-    async fn jump_to_anchor_from_zero_active(&self, global_tip: u64, anchor_h: u64) -> Result<u64> {
+    async fn jump_to_anchor_from_zero_active(
+        &self,
+        global_tip: u64,
+        anchor_h: u64,
+    ) -> Result<u64> {
         info!(
             input_global_tip = %global_tip,
             input_anchor_h = %anchor_h,
@@ -223,14 +293,21 @@ impl ChainProviderAdapter for EvmChainProvider {
             let (_, header80) = header80_by_height(&self.core_ctx, first_h)
                 .await
                 .with_context(|| {
-                    format!("Failed to fetch epoch-first header at height {first_h}")
+                    format!(
+                        "Failed to fetch epoch-first header at height {first_h}"
+                    )
                 })?;
 
-            let header80_bytes = decode_header80(&header80)
-                .map_err(|e| anyhow!("decode failed for first_h={first_h}: {e}"))?;
+            let header80_bytes = decode_header80(&header80).map_err(|e| {
+                anyhow!("decode failed for first_h={first_h}: {e}")
+            })?;
 
-            let preflight =
-                preflight_commit_global(&self.ctx, header80_bytes.clone(), first_h).await;
+            let preflight = preflight_commit_global(
+                &self.ctx,
+                header80_bytes.clone(),
+                first_h,
+            )
+            .await;
 
             if !preflight.static_ok {
                 let err = preflight.static_err.unwrap_or_default();
@@ -238,13 +315,18 @@ impl ChainProviderAdapter for EvmChainProvider {
                     info!(height = %first_h, "Epoch-first already committed (height-rewrite)");
                     committed_up_to = committed_up_to.max(first_h);
                 } else {
-                    return Err(anyhow!("Preflight failed for epoch-first {first_h}: {err}"));
+                    return Err(anyhow!(
+                        "Preflight failed for epoch-first {first_h}: {err}"
+                    ));
                 }
             } else {
                 match self
                     .ctx
                     .c_op
-                    .commit_global_bitcoin_header_80(header80_bytes, U256::from(first_h))
+                    .commit_global_bitcoin_header_80(
+                        header80_bytes,
+                        U256::from(first_h),
+                    )
                     .send()
                     .await
                 {
@@ -256,20 +338,20 @@ impl ChainProviderAdapter for EvmChainProvider {
                                 "Epoch-first header"
                             );
                             committed_up_to = committed_up_to.max(first_h);
-                        }
+                        },
                         Ok(None) => {
                             warn!(
                                 height = %first_h,
                                 "Epoch-first header TX dropped from mempool — will retry"
                             );
-                        }
+                        },
                         Err(e) => {
                             warn!(
                                 height = %first_h,
                                 error = %e,
                                 "Epoch-first header TX failed while awaiting receipt — will retry"
                             );
-                        }
+                        },
                     },
                     Err(e) => {
                         warn!(
@@ -278,7 +360,7 @@ impl ChainProviderAdapter for EvmChainProvider {
                             "Failed to broadcast epoch-first — will retry"
                         );
                         // Do NOT advance tip
-                    }
+                    },
                 }
             }
         } else {
@@ -293,14 +375,21 @@ impl ChainProviderAdapter for EvmChainProvider {
         // === 2. Commit actual anchor header ===
         info!(height = %anchor_h, "Now committing anchor header");
 
-        let (_, anchor80) = header80_by_height(&self.core_ctx, anchor_h)
-            .await
-            .with_context(|| format!("Failed to fetch anchor header {anchor_h}"))?;
+        let (_, anchor80) =
+            header80_by_height(&self.core_ctx, anchor_h).await.with_context(
+                || format!("Failed to fetch anchor header {anchor_h}"),
+            )?;
 
-        let anchor80_bytes = decode_header80(&anchor80)
-            .map_err(|e| anyhow!("decode failed for anchor_h={anchor_h}: {e}"))?;
+        let anchor80_bytes = decode_header80(&anchor80).map_err(|e| {
+            anyhow!("decode failed for anchor_h={anchor_h}: {e}")
+        })?;
 
-        let preflight = preflight_commit_global(&self.ctx, anchor80_bytes.clone(), anchor_h).await;
+        let preflight = preflight_commit_global(
+            &self.ctx,
+            anchor80_bytes.clone(),
+            anchor_h,
+        )
+        .await;
 
         if !preflight.static_ok {
             let err = preflight.static_err.unwrap_or_default();
@@ -311,13 +400,18 @@ impl ChainProviderAdapter for EvmChainProvider {
                 warn!(height = %anchor_h, "no-jump-while-active triggered — possible race!");
                 return Ok(committed_up_to);
             } else {
-                return Err(anyhow!("Preflight failed for anchor {anchor_h}: {err}"));
+                return Err(anyhow!(
+                    "Preflight failed for anchor {anchor_h}: {err}"
+                ));
             }
         } else {
             match self
                 .ctx
                 .c_op
-                .commit_global_bitcoin_header_80(anchor80_bytes, U256::from(anchor_h))
+                .commit_global_bitcoin_header_80(
+                    anchor80_bytes,
+                    U256::from(anchor_h),
+                )
                 .send()
                 .await
             {
@@ -330,14 +424,14 @@ impl ChainProviderAdapter for EvmChainProvider {
                                 "ANCHOR HEADER TX MINED — jump successful"
                             );
                             committed_up_to = anchor_h; // Critical: update to anchor_h, not first_h!
-                        }
+                        },
                         Ok(None) => {
                             warn!(
                                 height = %anchor_h,
                                 "ANCHOR HEADER TX dropped from mempool — will retry next cycle"
                             );
                             // Do not advance
-                        }
+                        },
                         Err(e) => {
                             warn!(
                                 height = %anchor_h,
@@ -345,9 +439,9 @@ impl ChainProviderAdapter for EvmChainProvider {
                                 "ANCHOR HEADER TX failed while awaiting receipt — will retry next cycle"
                             );
                             // Do not advance
-                        }
+                        },
                     }
-                }
+                },
                 Err(e) => {
                     warn!(
                         height = %anchor_h,
@@ -355,7 +449,7 @@ impl ChainProviderAdapter for EvmChainProvider {
                         "Failed to broadcast anchor header — will retry next cycle"
                     );
                     // Do not advance
-                }
+                },
             }
         }
 
@@ -382,11 +476,11 @@ impl ChainProviderAdapter for EvmChainProvider {
             Ok(height) => {
                 info!(%height, "Fetched global tip height from EVM contract");
                 Ok(height)
-            }
+            },
             Err(e) => {
                 error!(error = %e, "Failed to fetch global tip height");
                 Err(anyhow::anyhow!(e))
-            }
+            },
         }
     }
 
@@ -397,15 +491,18 @@ impl ChainProviderAdapter for EvmChainProvider {
             Ok(height) => {
                 info!(%height, "Fetched min anchor height from EVM contract");
                 Ok(height)
-            }
+            },
             Err(e) => {
                 error!(error = %e, "Failed to fetch min anchor height");
                 Err(anyhow::anyhow!(e))
-            }
+            },
         }
     }
 
-    async fn commit_bitcoin_to_native(&self, args: BitcoinToNativeCommitArgs) -> Result<()> {
+    async fn commit_bitcoin_to_native(
+        &self,
+        args: BitcoinToNativeCommitArgs,
+    ) -> Result<()> {
         let c_op = self.ctx.c_op.clone();
 
         match c_op
@@ -429,11 +526,11 @@ impl ChainProviderAdapter for EvmChainProvider {
                     "Sent CommitBitcoinToNative transaction"
                 );
                 Ok(())
-            }
+            },
             Err(e) => {
                 error!(error = %e, "Failed to send CommitBitcoinToNative transaction");
                 Err(anyhow::anyhow!(e))
-            }
+            },
         }
     }
 
@@ -441,10 +538,9 @@ impl ChainProviderAdapter for EvmChainProvider {
         let c_op = self.ctx.c_op.clone();
 
         match c_op.anchor_info(tx_id).call().await {
-            Ok((anchor_height, epoch_first_height)) => Ok(AnchorInfo {
-                anchor_height,
-                epoch_first_height,
-            }),
+            Ok((anchor_height, epoch_first_height)) => {
+                Ok(AnchorInfo { anchor_height, epoch_first_height })
+            },
             Err(e) => {
                 error!(
                     %tx_id,
@@ -452,7 +548,7 @@ impl ChainProviderAdapter for EvmChainProvider {
                     "Failed to fetch anchor info from EVM contract"
                 );
                 Err(anyhow::anyhow!(e))
-            }
+            },
         }
     }
 
@@ -512,7 +608,8 @@ impl ChainProviderAdapter for EvmChainProvider {
         let next_tx_id = contract.next_tx_id().call().await?;
         let conf_req = contract.confirmations_required().call().await?.as_u64();
         let global_tip = contract.global_tip_height().call().await?.as_u64();
-        let active_open = contract.active_open_conversions().call().await?.as_u64();
+        let active_open =
+            contract.active_open_conversions().call().await?.as_u64();
         let btc_tip = btc_tip_height(&self.core_ctx).await?;
 
         Ok(GlobalChainState {
@@ -525,20 +622,25 @@ impl ChainProviderAdapter for EvmChainProvider {
         })
     }
 
-    async fn get_tx_ids_by_filter(&self, filter: TxIdFilter) -> Result<Vec<U256>> {
+    async fn get_tx_ids_by_filter(
+        &self,
+        filter: TxIdFilter,
+    ) -> Result<Vec<U256>> {
         let contract = self.ctx.contract.clone();
 
         // Filter params
         let user_filter = filter.user_filter.unwrap_or_default();
-        let bitcoin_program_filter = filter.bitcoin_program_filter.clone().unwrap_or_default();
+        let bitcoin_program_filter =
+            filter.bitcoin_program_filter.clone().unwrap_or_default();
         let search_user_program = !matches!(
             filter.bitcoin_program_type,
             Some(BitcoinProgramType::Paradapp)
         );
-        let (dest_network_u256, use_network_filter): (U256, bool) = match filter.dest_network {
-            Some(net) => (U256::from(net as u8), true),
-            None => (U256::zero(), false),
-        };
+        let (dest_network_u256, use_network_filter): (U256, bool) =
+            match filter.dest_network {
+                Some(net) => (U256::from(net as u8), true),
+                None => (U256::zero(), false),
+            };
 
         // Contract call
         match contract
@@ -560,22 +662,21 @@ impl ChainProviderAdapter for EvmChainProvider {
             Ok(tx_ids) => {
                 info!(count = tx_ids.len(), "Fetched tx_ids");
                 Ok(tx_ids)
-            }
+            },
             Err(e) => {
                 error!(error = %e, "Failed to fetch tx_ids by filter");
                 Err(anyhow::anyhow!(e))
-            }
+            },
         }
     }
 
-    async fn estimate_bitcoin_from_native(&self, native_amount: U256) -> Result<U256> {
+    async fn estimate_bitcoin_from_native(
+        &self,
+        native_amount: U256,
+    ) -> Result<U256> {
         let c_op = self.ctx.c_op.clone();
 
-        match c_op
-            .estimate_bitcoin_from_native(native_amount)
-            .call()
-            .await
-        {
+        match c_op.estimate_bitcoin_from_native(native_amount).call().await {
             Ok(estimated_btc) => {
                 info!(
                     native_amount = %native_amount,
@@ -583,7 +684,7 @@ impl ChainProviderAdapter for EvmChainProvider {
                     "Estimated Bitcoin from native"
                 );
                 Ok(estimated_btc)
-            }
+            },
             Err(e) => {
                 error!(
                     error = %e,
@@ -591,7 +692,25 @@ impl ChainProviderAdapter for EvmChainProvider {
                     "Failed to estimate Bitcoin from native"
                 );
                 Err(anyhow::anyhow!(e))
-            }
+            },
+        }
+    }
+
+    async fn estimate_native_from_bitcoin(
+        &self,
+        bitcoin_amount: U256,
+    ) -> anyhow::Result<U256> {
+        let c_op = self.ctx.c_op.clone();
+
+        match c_op.estimate_native_from_bitcoin(bitcoin_amount).call().await {
+            Ok(native_amount) => {
+                info!(%bitcoin_amount, %native_amount, "Estimated native from Bitcoin");
+                Ok(native_amount)
+            },
+            Err(e) => {
+                error!(error = %e, %bitcoin_amount, "Failed to estimate native from Bitcoin");
+                Err(anyhow::anyhow!(e))
+            },
         }
     }
 }

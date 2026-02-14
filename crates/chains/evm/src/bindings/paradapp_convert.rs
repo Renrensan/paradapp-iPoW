@@ -2374,8 +2374,9 @@ pub mod paradapp_convert {
         }
     }
     ///The parsed JSON ABI of the contract.
-    pub static PARADAPPCONVERT_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
-        ::ethers::contract::Lazy::new(__abi);
+    pub static PARADAPPCONVERT_ABI: ::ethers::contract::Lazy<
+        ::ethers::core::abi::Abi,
+    > = ::ethers::contract::Lazy::new(__abi);
     pub struct ParadappConvert<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for ParadappConvert<M> {
         fn clone(&self) -> Self {
@@ -2394,7 +2395,10 @@ pub mod paradapp_convert {
         }
     }
     impl<M> ::core::fmt::Debug for ParadappConvert<M> {
-        fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        fn fmt(
+            &self,
+            f: &mut ::core::fmt::Formatter<'_>,
+        ) -> ::core::fmt::Result {
             f.debug_tuple(::core::stringify!(ParadappConvert))
                 .field(&self.address())
                 .finish()
@@ -2416,7 +2420,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `APPROVAL_WINDOW_SEC` (0xdcd5d309) function
         pub fn approval_window_sec(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([220, 213, 211, 9], ())
                 .expect("method not found (this should never happen)")
@@ -2424,7 +2431,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `BPS_DENOM` (0x6637e38c) function
         pub fn bps_denom(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([102, 55, 227, 140], ())
                 .expect("method not found (this should never happen)")
@@ -2432,7 +2442,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `BTC_DECIMALS` (0x8e32388e) function
         pub fn btc_decimals(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([142, 50, 56, 142], ())
                 .expect("method not found (this should never happen)")
@@ -2440,7 +2453,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `CONFIRMATIONS_REQUIRED` (0xede42057) function
         pub fn confirmations_required(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([237, 228, 32, 87], ())
                 .expect("method not found (this should never happen)")
@@ -2448,7 +2464,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `DEPOSIT_BLOCKS_WINDOW` (0x64f367f3) function
         pub fn deposit_blocks_window(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([100, 243, 103, 243], ())
                 .expect("method not found (this should never happen)")
@@ -2456,7 +2475,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `DIFF_PERIOD` (0x969695a9) function
         pub fn diff_period(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([150, 150, 149, 169], ())
                 .expect("method not found (this should never happen)")
@@ -2464,7 +2486,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `MAX_TIMESPAN_SEC` (0x6ebd4a13) function
         pub fn max_timespan_sec(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([110, 189, 74, 19], ())
                 .expect("method not found (this should never happen)")
@@ -2472,7 +2497,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `MIN_TIMESPAN_SEC` (0xd9d96f03) function
         pub fn min_timespan_sec(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([217, 217, 111, 3], ())
                 .expect("method not found (this should never happen)")
@@ -2480,7 +2508,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `NATIVE_DECIMALS` (0xe66bf2d7) function
         pub fn native_decimals(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([230, 107, 242, 215], ())
                 .expect("method not found (this should never happen)")
@@ -2488,7 +2519,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `PROOF_BLOCKS_WINDOW` (0x4f29043b) function
         pub fn proof_blocks_window(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([79, 41, 4, 59], ())
                 .expect("method not found (this should never happen)")
@@ -2496,7 +2530,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `RESERVE_MARGIN_BPS` (0xf842f91e) function
         pub fn reserve_margin_bps(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([248, 66, 249, 30], ())
                 .expect("method not found (this should never happen)")
@@ -2504,7 +2541,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `RETARGET_PERIOD_SEC` (0x6b59dbba) function
         pub fn retarget_period_sec(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([107, 89, 219, 186], ())
                 .expect("method not found (this should never happen)")
@@ -2512,7 +2552,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `SELF_NETWORK_ID` (0xede4754a) function
         pub fn self_network_id(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([237, 228, 117, 74], ())
                 .expect("method not found (this should never happen)")
@@ -2520,13 +2563,18 @@ pub mod paradapp_convert {
         ///Calls the contract's `activeOpenConversions` (0x9aa076a3) function
         pub fn active_open_conversions(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([154, 160, 118, 163], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `addNativeLiquidity` (0xb238b533) function
-        pub fn add_native_liquidity(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
+        pub fn add_native_liquidity(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([178, 56, 181, 51], ())
                 .expect("method not found (this should never happen)")
@@ -2539,7 +2587,10 @@ pub mod paradapp_convert {
             max_addr_len: u16,
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash([30, 22, 158, 183], (network_id, min_addr_len, max_addr_len))
+                .method_hash(
+                    [30, 22, 158, 183],
+                    (network_id, min_addr_len, max_addr_len),
+                )
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `anchorInfo` (0xdcedfea3) function
@@ -2577,7 +2628,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `bitcoinUsdPriceId` (0x4f7c5ae3) function
         pub fn bitcoin_usd_price_id(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([79, 124, 90, 227], ())
                 .expect("method not found (this should never happen)")
@@ -2633,7 +2687,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `commitFeeNative` (0x54213310) function
         pub fn commit_fee_native(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([84, 33, 51, 16], ())
                 .expect("method not found (this should never happen)")
@@ -2699,8 +2756,10 @@ pub mod paradapp_convert {
         pub fn debug_decode_header(
             &self,
             header_80: ::ethers::core::types::Bytes,
-        ) -> ::ethers::contract::builders::ContractCall<M, ([u8; 32], [u8; 32], [u8; 32], u32, u32)>
-        {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ([u8; 32], [u8; 32], [u8; 32], u32, u32),
+        > {
             self.0
                 .method_hash([194, 91, 94, 85], header_80)
                 .expect("method not found (this should never happen)")
@@ -2718,7 +2777,10 @@ pub mod paradapp_convert {
         pub fn estimate_bitcoin_from_native(
             &self,
             native_amount: ::ethers::core::types::U256,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([112, 16, 58, 91], native_amount)
                 .expect("method not found (this should never happen)")
@@ -2727,7 +2789,10 @@ pub mod paradapp_convert {
         pub fn estimate_native_from_bitcoin(
             &self,
             bitcoin_amount: ::ethers::core::types::U256,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([71, 43, 124, 65], bitcoin_amount)
                 .expect("method not found (this should never happen)")
@@ -2748,7 +2813,8 @@ pub mod paradapp_convert {
         pub fn get_conversion_with_phase(
             &self,
             tx_id: ::ethers::core::types::U256,
-        ) -> ::ethers::contract::builders::ContractCall<M, (Conversion, u8)> {
+        ) -> ::ethers::contract::builders::ContractCall<M, (Conversion, u8)>
+        {
             self.0
                 .method_hash([117, 147, 167, 58], tx_id)
                 .expect("method not found (this should never happen)")
@@ -2792,8 +2858,10 @@ pub mod paradapp_convert {
         pub fn global_headers(
             &self,
             p0: [u8; 32],
-        ) -> ::ethers::contract::builders::ContractCall<M, ([u8; 32], [u8; 32], u32, u32, bool, u64)>
-        {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ([u8; 32], [u8; 32], u32, u32, bool, u64),
+        > {
             self.0
                 .method_hash([217, 161, 157, 53], p0)
                 .expect("method not found (this should never happen)")
@@ -2810,7 +2878,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `globalTipHeight` (0xf7b21a16) function
         pub fn global_tip_height(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([247, 178, 26, 22], ())
                 .expect("method not found (this should never happen)")
@@ -2818,7 +2889,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `minAnchorHeight` (0x71c9502c) function
         pub fn min_anchor_height(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([113, 201, 80, 44], ())
                 .expect("method not found (this should never happen)")
@@ -2826,7 +2900,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `nativeLiquidity` (0x06c67372) function
         pub fn native_liquidity(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([6, 198, 115, 114], ())
                 .expect("method not found (this should never happen)")
@@ -2834,7 +2911,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `nativeUsdPriceId` (0xcb1a7d62) function
         pub fn native_usd_price_id(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([203, 26, 125, 98], ())
                 .expect("method not found (this should never happen)")
@@ -2843,7 +2923,8 @@ pub mod paradapp_convert {
         pub fn network_configs(
             &self,
             p0: ::ethers::core::types::U256,
-        ) -> ::ethers::contract::builders::ContractCall<M, (bool, u16, u16)> {
+        ) -> ::ethers::contract::builders::ContractCall<M, (bool, u16, u16)>
+        {
             self.0
                 .method_hash([123, 153, 182, 3], p0)
                 .expect("method not found (this should never happen)")
@@ -2851,7 +2932,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `nextTxId` (0x8aff87b2) function
         pub fn next_tx_id(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([138, 255, 135, 178], ())
                 .expect("method not found (this should never happen)")
@@ -2859,7 +2943,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `operator` (0x570ca735) function
         pub fn operator(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::Address,
+        > {
             self.0
                 .method_hash([87, 12, 167, 53], ())
                 .expect("method not found (this should never happen)")
@@ -2907,7 +2994,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `removableNative` (0x8dd9e124) function
         pub fn removable_native(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([141, 217, 225, 36], ())
                 .expect("method not found (this should never happen)")
@@ -2931,7 +3021,9 @@ pub mod paradapp_convert {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `serviceFeeBps` (0x529c5514) function
-        pub fn service_fee_bps(&self) -> ::ethers::contract::builders::ContractCall<M, u16> {
+        pub fn service_fee_bps(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, u16> {
             self.0
                 .method_hash([82, 156, 85, 20], ())
                 .expect("method not found (this should never happen)")
@@ -2943,7 +3035,10 @@ pub mod paradapp_convert {
             new_service_fee_bps: u16,
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash([38, 247, 51, 81], (new_commit_fee, new_service_fee_bps))
+                .method_hash(
+                    [38, 247, 51, 81],
+                    (new_commit_fee, new_service_fee_bps),
+                )
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `setOperator` (0xb3ab15fb) function
@@ -2993,7 +3088,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `totalHeldCommitFees` (0x1942f33e) function
         pub fn total_held_commit_fees(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([25, 66, 243, 62], ())
                 .expect("method not found (this should never happen)")
@@ -3001,7 +3099,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `totalLockedDeposits` (0xda7abe3d) function
         pub fn total_locked_deposits(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([218, 122, 190, 61], ())
                 .expect("method not found (this should never happen)")
@@ -3009,7 +3110,10 @@ pub mod paradapp_convert {
         ///Calls the contract's `totalReservedNative` (0x7d6f91b6) function
         pub fn total_reserved_native(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::U256,
+        > {
             self.0
                 .method_hash([125, 111, 145, 182], ())
                 .expect("method not found (this should never happen)")
@@ -3054,77 +3158,106 @@ pub mod paradapp_convert {
         ///Gets the contract's `ConversionApproved` event
         pub fn conversion_approved_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ConversionApprovedFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            ConversionApprovedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `ConversionCommitted` event
         pub fn conversion_committed_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ConversionCommittedFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            ConversionCommittedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `ConversionCompleted` event
         pub fn conversion_completed_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ConversionCompletedFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            ConversionCompletedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `ConversionDeposited` event
         pub fn conversion_deposited_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ConversionDepositedFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            ConversionDepositedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `ConversionRefunded` event
         pub fn conversion_refunded_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ConversionRefundedFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            ConversionRefundedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `FeesUpdated` event
         pub fn fees_updated_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, FeesUpdatedFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            FeesUpdatedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `GlobalHeaderAppended` event
         pub fn global_header_appended_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, GlobalHeaderAppendedFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            GlobalHeaderAppendedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `LiquidityUpdated` event
         pub fn liquidity_updated_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, LiquidityUpdatedFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            LiquidityUpdatedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `OperatorChanged` event
         pub fn operator_changed_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, OperatorChangedFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            OperatorChangedFilter,
+        > {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
         pub fn events(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ParadappConvertEvents>
-        {
-            self.0
-                .event_with_filter(::core::default::Default::default())
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            ParadappConvertEvents,
+        > {
+            self.0.event_with_filter(::core::default::Default::default())
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-        for ParadappConvert<M>
+    impl<M: ::ethers::providers::Middleware>
+        From<::ethers::contract::Contract<M>> for ParadappConvert<M>
     {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
@@ -3323,7 +3456,10 @@ pub mod paradapp_convert {
         Eq,
         Hash,
     )]
-    #[etherror(name = "GlobalFirstHeaderMissing", abi = "GlobalFirstHeaderMissing()")]
+    #[etherror(
+        name = "GlobalFirstHeaderMissing",
+        abi = "GlobalFirstHeaderMissing()"
+    )]
     pub struct GlobalFirstHeaderMissing;
     ///Custom Error type `HeaderStarted` with signature `HeaderStarted()` and selector `0x560d420d`
     #[derive(
@@ -3388,7 +3524,10 @@ pub mod paradapp_convert {
         Eq,
         Hash,
     )]
-    #[etherror(name = "IncorrectNetworkAddress", abi = "IncorrectNetworkAddress()")]
+    #[etherror(
+        name = "IncorrectNetworkAddress",
+        abi = "IncorrectNetworkAddress()"
+    )]
     pub struct IncorrectNetworkAddress;
     ///Custom Error type `IncorrectValue` with signature `IncorrectValue()` and selector `0xd2ade556`
     #[derive(
@@ -3583,7 +3722,10 @@ pub mod paradapp_convert {
         Eq,
         Hash,
     )]
-    #[etherror(name = "MetaAnchorHeaderMissing", abi = "MetaAnchorHeaderMissing()")]
+    #[etherror(
+        name = "MetaAnchorHeaderMissing",
+        abi = "MetaAnchorHeaderMissing()"
+    )]
     pub struct MetaAnchorHeaderMissing;
     ///Custom Error type `MetaFirstHeaderMissing` with signature `MetaFirstHeaderMissing()` and selector `0x4020e29b`
     #[derive(
@@ -3596,7 +3738,10 @@ pub mod paradapp_convert {
         Eq,
         Hash,
     )]
-    #[etherror(name = "MetaFirstHeaderMissing", abi = "MetaFirstHeaderMissing()")]
+    #[etherror(
+        name = "MetaFirstHeaderMissing",
+        abi = "MetaFirstHeaderMissing()"
+    )]
     pub struct MetaFirstHeaderMissing;
     ///Custom Error type `NeedBitcoinAmount` with signature `NeedBitcoinAmount()` and selector `0x98ce0dfc`
     #[derive(
@@ -3648,7 +3793,10 @@ pub mod paradapp_convert {
         Eq,
         Hash,
     )]
-    #[etherror(name = "NetworkAddressNotAllowed", abi = "NetworkAddressNotAllowed()")]
+    #[etherror(
+        name = "NetworkAddressNotAllowed",
+        abi = "NetworkAddressNotAllowed()"
+    )]
     pub struct NetworkAddressNotAllowed;
     ///Custom Error type `NetworkChangeLocked` with signature `NetworkChangeLocked()` and selector `0xa93c9b64`
     #[derive(
@@ -3713,7 +3861,10 @@ pub mod paradapp_convert {
         Eq,
         Hash,
     )]
-    #[etherror(name = "OracleDecimalsIncorrect", abi = "OracleDecimalsIncorrect()")]
+    #[etherror(
+        name = "OracleDecimalsIncorrect",
+        abi = "OracleDecimalsIncorrect()"
+    )]
     pub struct OracleDecimalsIncorrect;
     ///Custom Error type `OracleZeroPrice` with signature `OracleZeroPrice()` and selector `0x4b77fd3c`
     #[derive(
@@ -3966,7 +4117,9 @@ pub mod paradapp_convert {
     #[etherror(name = "ZeroValue", abi = "ZeroValue()")]
     pub struct ZeroValue;
     ///Container type for all of the contract's custom errors
-    #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
+    #[derive(
+        Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash,
+    )]
     pub enum ParadappConvertErrors {
         AlreadyVerified(AlreadyVerified),
         AnchorMustBeTip(AnchorMustBeTip),
@@ -4039,61 +4192,99 @@ pub mod paradapp_convert {
     impl ::ethers::core::abi::AbiDecode for ParadappConvertErrors {
         fn decode(
             data: impl AsRef<[u8]>,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError>
+        {
             let data = data.as_ref();
             if let Ok(decoded) =
                 <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded) = <AlreadyVerified as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <AlreadyVerified as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
+            {
                 return Ok(Self::AlreadyVerified(decoded));
             }
-            if let Ok(decoded) = <AnchorMustBeTip as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <AnchorMustBeTip as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
+            {
                 return Ok(Self::AnchorMustBeTip(decoded));
             }
-            if let Ok(decoded) = <ApproveWindowOver as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <ApproveWindowOver as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::ApproveWindowOver(decoded));
             }
-            if let Ok(decoded) = <BadBitcoinProgram as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <BadBitcoinProgram as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::BadBitcoinProgram(decoded));
             }
-            if let Ok(decoded) = <BadSlippage as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <BadSlippage as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::BadSlippage(decoded));
             }
-            if let Ok(decoded) = <BadState as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <BadState as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::BadState(decoded));
             }
-            if let Ok(decoded) = <BadTxId as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <BadTxId as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::BadTxId(decoded));
             }
-            if let Ok(decoded) = <DutyExpired as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <DutyExpired as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::DutyExpired(decoded));
             }
-            if let Ok(decoded) = <DutyNotExpired as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <DutyNotExpired as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::DutyNotExpired(decoded));
             }
             if let Ok(decoded) =
-                <EpochAnchorsMissing as ::ethers::core::abi::AbiDecode>::decode(data)
+                <EpochAnchorsMissing as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::EpochAnchorsMissing(decoded));
             }
-            if let Ok(decoded) = <EpochFirstMissing as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <EpochFirstMissing as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::EpochFirstMissing(decoded));
             }
-            if let Ok(decoded) = <EpochMetaMissing as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <EpochMetaMissing as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::EpochMetaMissing(decoded));
             }
-            if let Ok(decoded) = <ExceedsRemovable as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <ExceedsRemovable as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::ExceedsRemovable(decoded));
             }
             if let Ok(decoded) =
-                <GlobalAnchorMissing as ::ethers::core::abi::AbiDecode>::decode(data)
+                <GlobalAnchorMissing as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::GlobalAnchorMissing(decoded));
             }
@@ -4102,18 +4293,27 @@ pub mod paradapp_convert {
             {
                 return Ok(Self::GlobalFirstHeaderMissing(decoded));
             }
-            if let Ok(decoded) = <HeaderStarted as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <HeaderStarted as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::HeaderStarted(decoded));
             }
-            if let Ok(decoded) = <HeightRewrite as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <HeightRewrite as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::HeightRewrite(decoded));
             }
             if let Ok(decoded) =
-                <IncorrectCommitFee as ::ethers::core::abi::AbiDecode>::decode(data)
+                <IncorrectCommitFee as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::IncorrectCommitFee(decoded));
             }
-            if let Ok(decoded) = <IncorrectNetwork as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <IncorrectNetwork as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::IncorrectNetwork(decoded));
             }
@@ -4122,56 +4322,90 @@ pub mod paradapp_convert {
             {
                 return Ok(Self::IncorrectNetworkAddress(decoded));
             }
-            if let Ok(decoded) = <IncorrectValue as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <IncorrectValue as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::IncorrectValue(decoded));
             }
-            if let Ok(decoded) = <IncorrectWindow as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <IncorrectWindow as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
+            {
                 return Ok(Self::IncorrectWindow(decoded));
             }
             if let Ok(decoded) =
-                <InvalidAnchorHeight as ::ethers::core::abi::AbiDecode>::decode(data)
+                <InvalidAnchorHeight as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::InvalidAnchorHeight(decoded));
             }
             if let Ok(decoded) =
-                <InvalidConstructor as ::ethers::core::abi::AbiDecode>::decode(data)
+                <InvalidConstructor as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::InvalidConstructor(decoded));
             }
-            if let Ok(decoded) = <InvalidFeeConfig as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <InvalidFeeConfig as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::InvalidFeeConfig(decoded));
             }
             if let Ok(decoded) =
-                <InvalidFirstOrAnchor as ::ethers::core::abi::AbiDecode>::decode(data)
+                <InvalidFirstOrAnchor as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::InvalidFirstOrAnchor(decoded));
             }
-            if let Ok(decoded) = <InvalidHeader as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <InvalidHeader as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::InvalidHeader(decoded));
             }
             if let Ok(decoded) =
-                <InvalidNetworkConfig as ::ethers::core::abi::AbiDecode>::decode(data)
+                <InvalidNetworkConfig as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::InvalidNetworkConfig(decoded));
             }
-            if let Ok(decoded) = <InvalidRetarget as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <InvalidRetarget as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
+            {
                 return Ok(Self::InvalidRetarget(decoded));
             }
-            if let Ok(decoded) = <InvalidTypeFilter as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <InvalidTypeFilter as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::InvalidTypeFilter(decoded));
             }
-            if let Ok(decoded) = <LE8OutOfBounds as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <LE8OutOfBounds as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::LE8OutOfBounds(decoded));
             }
-            if let Ok(decoded) = <LowLiquidity as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <LowLiquidity as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::LowLiquidity(decoded));
             }
-            if let Ok(decoded) = <LowReserve as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <LowReserve as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::LowReserve(decoded));
             }
-            if let Ok(decoded) = <LowWork as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <LowWork as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::LowWork(decoded));
             }
             if let Ok(decoded) =
@@ -4184,14 +4418,23 @@ pub mod paradapp_convert {
             {
                 return Ok(Self::MetaFirstHeaderMissing(decoded));
             }
-            if let Ok(decoded) = <NeedBitcoinAmount as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <NeedBitcoinAmount as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::NeedBitcoinAmount(decoded));
             }
-            if let Ok(decoded) = <NeedDestAddress as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <NeedDestAddress as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
+            {
                 return Ok(Self::NeedDestAddress(decoded));
             }
-            if let Ok(decoded) = <NeedDutyWindow as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <NeedDutyWindow as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::NeedDutyWindow(decoded));
             }
             if let Ok(decoded) =
@@ -4200,18 +4443,28 @@ pub mod paradapp_convert {
                 return Ok(Self::NetworkAddressNotAllowed(decoded));
             }
             if let Ok(decoded) =
-                <NetworkChangeLocked as ::ethers::core::abi::AbiDecode>::decode(data)
+                <NetworkChangeLocked as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::NetworkChangeLocked(decoded));
             }
-            if let Ok(decoded) = <NetworkNotAllowed as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <NetworkNotAllowed as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::NetworkNotAllowed(decoded));
             }
-            if let Ok(decoded) = <NoHeadersYet as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <NoHeadersYet as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::NoHeadersYet(decoded));
             }
-            if let Ok(decoded) = <NoJumpWhenActive as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <NoJumpWhenActive as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::NoJumpWhenActive(decoded));
             }
@@ -4220,45 +4473,70 @@ pub mod paradapp_convert {
             {
                 return Ok(Self::OracleDecimalsIncorrect(decoded));
             }
-            if let Ok(decoded) = <OracleZeroPrice as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <OracleZeroPrice as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
+            {
                 return Ok(Self::OracleZeroPrice(decoded));
             }
-            if let Ok(decoded) = <PrevAndTipUnmatch as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <PrevAndTipUnmatch as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::PrevAndTipUnmatch(decoded));
             }
             if let Ok(decoded) =
-                <ProgramAlreadyUsed as ::ethers::core::abi::AbiDecode>::decode(data)
+                <ProgramAlreadyUsed as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::ProgramAlreadyUsed(decoded));
             }
             if let Ok(decoded) =
-                <ProgramOutOfBounds as ::ethers::core::abi::AbiDecode>::decode(data)
+                <ProgramOutOfBounds as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::ProgramOutOfBounds(decoded));
             }
             if let Ok(decoded) =
-                <SlippageNotAllowed as ::ethers::core::abi::AbiDecode>::decode(data)
+                <SlippageNotAllowed as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::SlippageNotAllowed(decoded));
             }
             if let Ok(decoded) =
-                <TransactionOverflow as ::ethers::core::abi::AbiDecode>::decode(data)
+                <TransactionOverflow as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::TransactionOverflow(decoded));
             }
             if let Ok(decoded) =
-                <TransactionTooShort as ::ethers::core::abi::AbiDecode>::decode(data)
+                <TransactionTooShort as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::TransactionTooShort(decoded));
             }
-            if let Ok(decoded) = <TransferFailed as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <TransferFailed as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::TransferFailed(decoded));
             }
-            if let Ok(decoded) = <Unauthorized as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <Unauthorized as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::Unauthorized(decoded));
             }
-            if let Ok(decoded) = <UnexpectedValue as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <UnexpectedValue as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
+            {
                 return Ok(Self::UnexpectedValue(decoded));
             }
             if let Ok(decoded) =
@@ -4266,35 +4544,58 @@ pub mod paradapp_convert {
             {
                 return Ok(Self::UserBitcoinProgramNotAllowed(decoded));
             }
-            if let Ok(decoded) = <ValueOutOfBounds as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <ValueOutOfBounds as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::ValueOutOfBounds(decoded));
             }
-            if let Ok(decoded) = <Var16OutOfBounds as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <Var16OutOfBounds as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::Var16OutOfBounds(decoded));
             }
-            if let Ok(decoded) = <Var32OutOfBounds as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <Var32OutOfBounds as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::Var32OutOfBounds(decoded));
             }
-            if let Ok(decoded) = <Var64OutOfBounds as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <Var64OutOfBounds as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::Var64OutOfBounds(decoded));
             }
-            if let Ok(decoded) = <VarIntOutOfBounds as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <VarIntOutOfBounds as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::VarIntOutOfBounds(decoded));
             }
-            if let Ok(decoded) = <VoutOutOfBounds as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <VoutOutOfBounds as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
+            {
                 return Ok(Self::VoutOutOfBounds(decoded));
             }
             if let Ok(decoded) =
-                <WrongConversionType as ::ethers::core::abi::AbiDecode>::decode(data)
+                <WrongConversionType as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::WrongConversionType(decoded));
             }
-            if let Ok(decoded) = <ZeroValue as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <ZeroValue as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::ZeroValue(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -4303,113 +4604,201 @@ pub mod paradapp_convert {
     impl ::ethers::core::abi::AbiEncode for ParadappConvertErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::AlreadyVerified(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::AnchorMustBeTip(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ApproveWindowOver(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::BadBitcoinProgram(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::BadSlippage(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::BadState(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::BadTxId(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::DutyExpired(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::DutyNotExpired(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::AlreadyVerified(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::AnchorMustBeTip(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::ApproveWindowOver(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::BadBitcoinProgram(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::BadSlippage(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::BadState(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::BadTxId(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::DutyExpired(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::DutyNotExpired(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::EpochAnchorsMissing(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::EpochFirstMissing(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::EpochMetaMissing(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ExceedsRemovable(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::EpochFirstMissing(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::EpochMetaMissing(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::ExceedsRemovable(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::GlobalAnchorMissing(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::GlobalFirstHeaderMissing(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::HeaderStarted(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::HeightRewrite(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::HeaderStarted(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::HeightRewrite(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::IncorrectCommitFee(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::IncorrectNetwork(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::IncorrectNetwork(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::IncorrectNetworkAddress(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::IncorrectValue(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::IncorrectWindow(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::IncorrectValue(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::IncorrectWindow(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::InvalidAnchorHeight(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::InvalidConstructor(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::InvalidFeeConfig(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::InvalidFeeConfig(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::InvalidFirstOrAnchor(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::InvalidHeader(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::InvalidHeader(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::InvalidNetworkConfig(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::InvalidRetarget(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InvalidTypeFilter(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::LE8OutOfBounds(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::LowLiquidity(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::LowReserve(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::LowWork(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::InvalidRetarget(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::InvalidTypeFilter(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::LE8OutOfBounds(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::LowLiquidity(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::LowReserve(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::LowWork(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::MetaAnchorHeaderMissing(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::MetaFirstHeaderMissing(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::NeedBitcoinAmount(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NeedDestAddress(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NeedDutyWindow(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::NeedBitcoinAmount(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::NeedDestAddress(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::NeedDutyWindow(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::NetworkAddressNotAllowed(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::NetworkChangeLocked(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::NetworkNotAllowed(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NoHeadersYet(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NoJumpWhenActive(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::NetworkNotAllowed(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::NoHeadersYet(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::NoJumpWhenActive(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::OracleDecimalsIncorrect(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::OracleZeroPrice(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::PrevAndTipUnmatch(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::OracleZeroPrice(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::PrevAndTipUnmatch(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::ProgramAlreadyUsed(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::ProgramOutOfBounds(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::SlippageNotAllowed(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::TransactionOverflow(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::TransactionTooShort(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::TransferFailed(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::Unauthorized(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::UnexpectedValue(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::TransferFailed(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::Unauthorized(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::UnexpectedValue(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::UserBitcoinProgramNotAllowed(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ValueOutOfBounds(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::Var16OutOfBounds(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::Var32OutOfBounds(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::Var64OutOfBounds(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::VarIntOutOfBounds(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::VoutOutOfBounds(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::ValueOutOfBounds(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::Var16OutOfBounds(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::Var32OutOfBounds(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::Var64OutOfBounds(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::VarIntOutOfBounds(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::VoutOutOfBounds(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::WrongConversionType(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ZeroValue(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
+                },
+                Self::ZeroValue(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::RevertString(s) => {
+                    ::ethers::core::abi::AbiEncode::encode(s)
+                },
             }
         }
     }
@@ -4653,74 +5042,199 @@ pub mod paradapp_convert {
         }
     }
     impl ::core::fmt::Display for ParadappConvertErrors {
-        fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        fn fmt(
+            &self,
+            f: &mut ::core::fmt::Formatter<'_>,
+        ) -> ::core::fmt::Result {
             match self {
-                Self::AlreadyVerified(element) => ::core::fmt::Display::fmt(element, f),
-                Self::AnchorMustBeTip(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ApproveWindowOver(element) => ::core::fmt::Display::fmt(element, f),
-                Self::BadBitcoinProgram(element) => ::core::fmt::Display::fmt(element, f),
-                Self::BadSlippage(element) => ::core::fmt::Display::fmt(element, f),
-                Self::BadState(element) => ::core::fmt::Display::fmt(element, f),
+                Self::AlreadyVerified(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::AnchorMustBeTip(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::ApproveWindowOver(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::BadBitcoinProgram(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::BadSlippage(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::BadState(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
                 Self::BadTxId(element) => ::core::fmt::Display::fmt(element, f),
-                Self::DutyExpired(element) => ::core::fmt::Display::fmt(element, f),
-                Self::DutyNotExpired(element) => ::core::fmt::Display::fmt(element, f),
-                Self::EpochAnchorsMissing(element) => ::core::fmt::Display::fmt(element, f),
-                Self::EpochFirstMissing(element) => ::core::fmt::Display::fmt(element, f),
-                Self::EpochMetaMissing(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ExceedsRemovable(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GlobalAnchorMissing(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GlobalFirstHeaderMissing(element) => ::core::fmt::Display::fmt(element, f),
-                Self::HeaderStarted(element) => ::core::fmt::Display::fmt(element, f),
-                Self::HeightRewrite(element) => ::core::fmt::Display::fmt(element, f),
-                Self::IncorrectCommitFee(element) => ::core::fmt::Display::fmt(element, f),
-                Self::IncorrectNetwork(element) => ::core::fmt::Display::fmt(element, f),
-                Self::IncorrectNetworkAddress(element) => ::core::fmt::Display::fmt(element, f),
-                Self::IncorrectValue(element) => ::core::fmt::Display::fmt(element, f),
-                Self::IncorrectWindow(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidAnchorHeight(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidConstructor(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidFeeConfig(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidFirstOrAnchor(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidHeader(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidNetworkConfig(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidRetarget(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidTypeFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::LE8OutOfBounds(element) => ::core::fmt::Display::fmt(element, f),
-                Self::LowLiquidity(element) => ::core::fmt::Display::fmt(element, f),
-                Self::LowReserve(element) => ::core::fmt::Display::fmt(element, f),
+                Self::DutyExpired(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::DutyNotExpired(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::EpochAnchorsMissing(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::EpochFirstMissing(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::EpochMetaMissing(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::ExceedsRemovable(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::GlobalAnchorMissing(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::GlobalFirstHeaderMissing(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::HeaderStarted(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::HeightRewrite(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::IncorrectCommitFee(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::IncorrectNetwork(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::IncorrectNetworkAddress(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::IncorrectValue(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::IncorrectWindow(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::InvalidAnchorHeight(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::InvalidConstructor(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::InvalidFeeConfig(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::InvalidFirstOrAnchor(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::InvalidHeader(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::InvalidNetworkConfig(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::InvalidRetarget(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::InvalidTypeFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::LE8OutOfBounds(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::LowLiquidity(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::LowReserve(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
                 Self::LowWork(element) => ::core::fmt::Display::fmt(element, f),
-                Self::MetaAnchorHeaderMissing(element) => ::core::fmt::Display::fmt(element, f),
-                Self::MetaFirstHeaderMissing(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NeedBitcoinAmount(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NeedDestAddress(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NeedDutyWindow(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NetworkAddressNotAllowed(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NetworkChangeLocked(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NetworkNotAllowed(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NoHeadersYet(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NoJumpWhenActive(element) => ::core::fmt::Display::fmt(element, f),
-                Self::OracleDecimalsIncorrect(element) => ::core::fmt::Display::fmt(element, f),
-                Self::OracleZeroPrice(element) => ::core::fmt::Display::fmt(element, f),
-                Self::PrevAndTipUnmatch(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ProgramAlreadyUsed(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ProgramOutOfBounds(element) => ::core::fmt::Display::fmt(element, f),
-                Self::SlippageNotAllowed(element) => ::core::fmt::Display::fmt(element, f),
-                Self::TransactionOverflow(element) => ::core::fmt::Display::fmt(element, f),
-                Self::TransactionTooShort(element) => ::core::fmt::Display::fmt(element, f),
-                Self::TransferFailed(element) => ::core::fmt::Display::fmt(element, f),
-                Self::Unauthorized(element) => ::core::fmt::Display::fmt(element, f),
-                Self::UnexpectedValue(element) => ::core::fmt::Display::fmt(element, f),
+                Self::MetaAnchorHeaderMissing(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::MetaFirstHeaderMissing(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::NeedBitcoinAmount(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::NeedDestAddress(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::NeedDutyWindow(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::NetworkAddressNotAllowed(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::NetworkChangeLocked(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::NetworkNotAllowed(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::NoHeadersYet(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::NoJumpWhenActive(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::OracleDecimalsIncorrect(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::OracleZeroPrice(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::PrevAndTipUnmatch(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::ProgramAlreadyUsed(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::ProgramOutOfBounds(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::SlippageNotAllowed(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::TransactionOverflow(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::TransactionTooShort(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::TransferFailed(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::Unauthorized(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::UnexpectedValue(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
                 Self::UserBitcoinProgramNotAllowed(element) => {
                     ::core::fmt::Display::fmt(element, f)
-                }
-                Self::ValueOutOfBounds(element) => ::core::fmt::Display::fmt(element, f),
-                Self::Var16OutOfBounds(element) => ::core::fmt::Display::fmt(element, f),
-                Self::Var32OutOfBounds(element) => ::core::fmt::Display::fmt(element, f),
-                Self::Var64OutOfBounds(element) => ::core::fmt::Display::fmt(element, f),
-                Self::VarIntOutOfBounds(element) => ::core::fmt::Display::fmt(element, f),
-                Self::VoutOutOfBounds(element) => ::core::fmt::Display::fmt(element, f),
-                Self::WrongConversionType(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ZeroValue(element) => ::core::fmt::Display::fmt(element, f),
+                },
+                Self::ValueOutOfBounds(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::Var16OutOfBounds(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::Var32OutOfBounds(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::Var64OutOfBounds(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::VarIntOutOfBounds(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::VoutOutOfBounds(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::WrongConversionType(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::ZeroValue(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
         }
@@ -5005,7 +5519,9 @@ pub mod paradapp_convert {
             Self::UnexpectedValue(value)
         }
     }
-    impl ::core::convert::From<UserBitcoinProgramNotAllowed> for ParadappConvertErrors {
+    impl ::core::convert::From<UserBitcoinProgramNotAllowed>
+        for ParadappConvertErrors
+    {
         fn from(value: UserBitcoinProgramNotAllowed) -> Self {
             Self::UserBitcoinProgramNotAllowed(value)
         }
@@ -5102,7 +5618,10 @@ pub mod paradapp_convert {
         Eq,
         Hash,
     )]
-    #[ethevent(name = "ConversionCompleted", abi = "ConversionCompleted(uint256)")]
+    #[ethevent(
+        name = "ConversionCompleted",
+        abi = "ConversionCompleted(uint256)"
+    )]
     pub struct ConversionCompletedFilter {
         #[ethevent(indexed)]
         pub tx_id: ::ethers::core::types::U256,
@@ -5212,7 +5731,9 @@ pub mod paradapp_convert {
         pub new_operator: ::ethers::core::types::Address,
     }
     ///Container type for all of the contract's events
-    #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
+    #[derive(
+        Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash,
+    )]
     pub enum ParadappConvertEvents {
         ConversionApprovedFilter(ConversionApprovedFilter),
         ConversionCommittedFilter(ConversionCommittedFilter),
@@ -5229,47 +5750,84 @@ pub mod paradapp_convert {
             log: &::ethers::core::abi::RawLog,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
             if let Ok(decoded) = ConversionApprovedFilter::decode_log(log) {
-                return Ok(ParadappConvertEvents::ConversionApprovedFilter(decoded));
+                return Ok(ParadappConvertEvents::ConversionApprovedFilter(
+                    decoded,
+                ));
             }
             if let Ok(decoded) = ConversionCommittedFilter::decode_log(log) {
-                return Ok(ParadappConvertEvents::ConversionCommittedFilter(decoded));
+                return Ok(ParadappConvertEvents::ConversionCommittedFilter(
+                    decoded,
+                ));
             }
             if let Ok(decoded) = ConversionCompletedFilter::decode_log(log) {
-                return Ok(ParadappConvertEvents::ConversionCompletedFilter(decoded));
+                return Ok(ParadappConvertEvents::ConversionCompletedFilter(
+                    decoded,
+                ));
             }
             if let Ok(decoded) = ConversionDepositedFilter::decode_log(log) {
-                return Ok(ParadappConvertEvents::ConversionDepositedFilter(decoded));
+                return Ok(ParadappConvertEvents::ConversionDepositedFilter(
+                    decoded,
+                ));
             }
             if let Ok(decoded) = ConversionRefundedFilter::decode_log(log) {
-                return Ok(ParadappConvertEvents::ConversionRefundedFilter(decoded));
+                return Ok(ParadappConvertEvents::ConversionRefundedFilter(
+                    decoded,
+                ));
             }
             if let Ok(decoded) = FeesUpdatedFilter::decode_log(log) {
                 return Ok(ParadappConvertEvents::FeesUpdatedFilter(decoded));
             }
             if let Ok(decoded) = GlobalHeaderAppendedFilter::decode_log(log) {
-                return Ok(ParadappConvertEvents::GlobalHeaderAppendedFilter(decoded));
+                return Ok(ParadappConvertEvents::GlobalHeaderAppendedFilter(
+                    decoded,
+                ));
             }
             if let Ok(decoded) = LiquidityUpdatedFilter::decode_log(log) {
-                return Ok(ParadappConvertEvents::LiquidityUpdatedFilter(decoded));
+                return Ok(ParadappConvertEvents::LiquidityUpdatedFilter(
+                    decoded,
+                ));
             }
             if let Ok(decoded) = OperatorChangedFilter::decode_log(log) {
-                return Ok(ParadappConvertEvents::OperatorChangedFilter(decoded));
+                return Ok(ParadappConvertEvents::OperatorChangedFilter(
+                    decoded,
+                ));
             }
             Err(::ethers::core::abi::Error::InvalidData)
         }
     }
     impl ::core::fmt::Display for ParadappConvertEvents {
-        fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        fn fmt(
+            &self,
+            f: &mut ::core::fmt::Formatter<'_>,
+        ) -> ::core::fmt::Result {
             match self {
-                Self::ConversionApprovedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ConversionCommittedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ConversionCompletedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ConversionDepositedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ConversionRefundedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::FeesUpdatedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GlobalHeaderAppendedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::LiquidityUpdatedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::OperatorChangedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ConversionApprovedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::ConversionCommittedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::ConversionCompletedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::ConversionDepositedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::ConversionRefundedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::FeesUpdatedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::GlobalHeaderAppendedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::LiquidityUpdatedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::OperatorChangedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
             }
         }
     }
@@ -5278,17 +5836,23 @@ pub mod paradapp_convert {
             Self::ConversionApprovedFilter(value)
         }
     }
-    impl ::core::convert::From<ConversionCommittedFilter> for ParadappConvertEvents {
+    impl ::core::convert::From<ConversionCommittedFilter>
+        for ParadappConvertEvents
+    {
         fn from(value: ConversionCommittedFilter) -> Self {
             Self::ConversionCommittedFilter(value)
         }
     }
-    impl ::core::convert::From<ConversionCompletedFilter> for ParadappConvertEvents {
+    impl ::core::convert::From<ConversionCompletedFilter>
+        for ParadappConvertEvents
+    {
         fn from(value: ConversionCompletedFilter) -> Self {
             Self::ConversionCompletedFilter(value)
         }
     }
-    impl ::core::convert::From<ConversionDepositedFilter> for ParadappConvertEvents {
+    impl ::core::convert::From<ConversionDepositedFilter>
+        for ParadappConvertEvents
+    {
         fn from(value: ConversionDepositedFilter) -> Self {
             Self::ConversionDepositedFilter(value)
         }
@@ -5303,7 +5867,9 @@ pub mod paradapp_convert {
             Self::FeesUpdatedFilter(value)
         }
     }
-    impl ::core::convert::From<GlobalHeaderAppendedFilter> for ParadappConvertEvents {
+    impl ::core::convert::From<GlobalHeaderAppendedFilter>
+        for ParadappConvertEvents
+    {
         fn from(value: GlobalHeaderAppendedFilter) -> Self {
             Self::GlobalHeaderAppendedFilter(value)
         }
@@ -5368,7 +5934,10 @@ pub mod paradapp_convert {
         Eq,
         Hash,
     )]
-    #[ethcall(name = "CONFIRMATIONS_REQUIRED", abi = "CONFIRMATIONS_REQUIRED()")]
+    #[ethcall(
+        name = "CONFIRMATIONS_REQUIRED",
+        abi = "CONFIRMATIONS_REQUIRED()"
+    )]
     pub struct ConfirmationsRequiredCall;
     ///Container type for all input parameters for the `DEPOSIT_BLOCKS_WINDOW` function with signature `DEPOSIT_BLOCKS_WINDOW()` and selector `0x64f367f3`
     #[derive(
@@ -5860,7 +6429,10 @@ pub mod paradapp_convert {
         Eq,
         Hash,
     )]
-    #[ethcall(name = "globalHeightToHashLE", abi = "globalHeightToHashLE(uint256)")]
+    #[ethcall(
+        name = "globalHeightToHashLE",
+        abi = "globalHeightToHashLE(uint256)"
+    )]
     pub struct GlobalHeightToHashLECall(pub ::ethers::core::types::U256);
     ///Container type for all input parameters for the `globalTipHeight` function with signature `globalTipHeight()` and selector `0xf7b21a16`
     #[derive(
@@ -5997,7 +6569,10 @@ pub mod paradapp_convert {
         Eq,
         Hash,
     )]
-    #[ethcall(name = "refundIfNotApproved", abi = "refundIfNotApproved(uint256)")]
+    #[ethcall(
+        name = "refundIfNotApproved",
+        abi = "refundIfNotApproved(uint256)"
+    )]
     pub struct RefundIfNotApprovedCall {
         pub tx_id: ::ethers::core::types::U256,
     }
@@ -6025,7 +6600,10 @@ pub mod paradapp_convert {
         Eq,
         Hash,
     )]
-    #[ethcall(name = "removeNativeLiquidity", abi = "removeNativeLiquidity(uint256)")]
+    #[ethcall(
+        name = "removeNativeLiquidity",
+        abi = "removeNativeLiquidity(uint256)"
+    )]
     pub struct RemoveNativeLiquidityCall {
         pub amount: ::ethers::core::types::U256,
     }
@@ -6180,7 +6758,10 @@ pub mod paradapp_convert {
         Eq,
         Hash,
     )]
-    #[ethcall(name = "usedParadappPrograms", abi = "usedParadappPrograms(bytes)")]
+    #[ethcall(
+        name = "usedParadappPrograms",
+        abi = "usedParadappPrograms(bytes)"
+    )]
     pub struct UsedParadappProgramsCall(pub ::ethers::core::types::Bytes);
     ///Container type for all input parameters for the `usedProofs` function with signature `usedProofs(bytes32)` and selector `0xc30a0f25`
     #[derive(
@@ -6211,7 +6792,9 @@ pub mod paradapp_convert {
         pub tx_id: ::ethers::core::types::U256,
     }
     ///Container type for all of the contract's call
-    #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
+    #[derive(
+        Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash,
+    )]
     pub enum ParadappConvertCalls {
         ApprovalWindowSec(ApprovalWindowSecCall),
         BpsDenom(BpsDenomCall),
@@ -6230,7 +6813,9 @@ pub mod paradapp_convert {
         AddNativeLiquidity(AddNativeLiquidityCall),
         AddNetwork(AddNetworkCall),
         AnchorInfo(AnchorInfoCall),
-        ApproveAndStartWithAnchorAndFirst(ApproveAndStartWithAnchorAndFirstCall),
+        ApproveAndStartWithAnchorAndFirst(
+            ApproveAndStartWithAnchorAndFirstCall,
+        ),
         BitcoinUsdPriceId(BitcoinUsdPriceIdCall),
         ClaimNativeAfterOperatorExpired(ClaimNativeAfterOperatorExpiredCall),
         CloseNoBitcoinBitcoinToNative(CloseNoBitcoinBitcoinToNativeCall),
@@ -6256,7 +6841,9 @@ pub mod paradapp_convert {
         NextTxId(NextTxIdCall),
         Operator(OperatorCall),
         ProofInfo(ProofInfoCall),
-        RefundAfterNoProofNativeToBitcoin(RefundAfterNoProofNativeToBitcoinCall),
+        RefundAfterNoProofNativeToBitcoin(
+            RefundAfterNoProofNativeToBitcoinCall,
+        ),
         RefundIfNotApproved(RefundIfNotApprovedCall),
         RemovableNative(RemovableNativeCall),
         RemoveNativeLiquidity(RemoveNativeLiquidityCall),
@@ -6276,17 +6863,24 @@ pub mod paradapp_convert {
     impl ::ethers::core::abi::AbiDecode for ParadappConvertCalls {
         fn decode(
             data: impl AsRef<[u8]>,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError>
+        {
             let data = data.as_ref();
             if let Ok(decoded) =
                 <ApprovalWindowSecCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::ApprovalWindowSec(decoded));
             }
-            if let Ok(decoded) = <BpsDenomCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <BpsDenomCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::BpsDenom(decoded));
             }
-            if let Ok(decoded) = <BtcDecimalsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <BtcDecimalsCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
+            {
                 return Ok(Self::BtcDecimals(decoded));
             }
             if let Ok(decoded) =
@@ -6299,21 +6893,29 @@ pub mod paradapp_convert {
             {
                 return Ok(Self::DepositBlocksWindow(decoded));
             }
-            if let Ok(decoded) = <DiffPeriodCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <DiffPeriodCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::DiffPeriod(decoded));
             }
             if let Ok(decoded) =
-                <MaxTimespanSecCall as ::ethers::core::abi::AbiDecode>::decode(data)
+                <MaxTimespanSecCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::MaxTimespanSec(decoded));
             }
             if let Ok(decoded) =
-                <MinTimespanSecCall as ::ethers::core::abi::AbiDecode>::decode(data)
+                <MinTimespanSecCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::MinTimespanSec(decoded));
             }
             if let Ok(decoded) =
-                <NativeDecimalsCall as ::ethers::core::abi::AbiDecode>::decode(data)
+                <NativeDecimalsCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::NativeDecimals(decoded));
             }
@@ -6323,7 +6925,9 @@ pub mod paradapp_convert {
                 return Ok(Self::ProofBlocksWindow(decoded));
             }
             if let Ok(decoded) =
-                <ReserveMarginBpsCall as ::ethers::core::abi::AbiDecode>::decode(data)
+                <ReserveMarginBpsCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::ReserveMarginBps(decoded));
             }
@@ -6332,7 +6936,10 @@ pub mod paradapp_convert {
             {
                 return Ok(Self::RetargetPeriodSec(decoded));
             }
-            if let Ok(decoded) = <SelfNetworkIdCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <SelfNetworkIdCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::SelfNetworkId(decoded));
             }
@@ -6346,10 +6953,14 @@ pub mod paradapp_convert {
             {
                 return Ok(Self::AddNativeLiquidity(decoded));
             }
-            if let Ok(decoded) = <AddNetworkCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <AddNetworkCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::AddNetwork(decoded));
             }
-            if let Ok(decoded) = <AnchorInfoCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <AnchorInfoCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::AnchorInfo(decoded));
             }
             if let Ok(decoded) =
@@ -6382,7 +6993,9 @@ pub mod paradapp_convert {
                 return Ok(Self::CommitBitcoinToNative(decoded));
             }
             if let Ok(decoded) =
-                <CommitFeeNativeCall as ::ethers::core::abi::AbiDecode>::decode(data)
+                <CommitFeeNativeCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::CommitFeeNative(decoded));
             }
@@ -6396,7 +7009,11 @@ pub mod paradapp_convert {
             {
                 return Ok(Self::CommitNativeToBitcoin(decoded));
             }
-            if let Ok(decoded) = <ConversionsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <ConversionsCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
+            {
                 return Ok(Self::Conversions(decoded));
             }
             if let Ok(decoded) =
@@ -6419,7 +7036,10 @@ pub mod paradapp_convert {
             {
                 return Ok(Self::EstimateNativeFromBitcoin(decoded));
             }
-            if let Ok(decoded) = <ExpectedNextCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <ExpectedNextCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::ExpectedNext(decoded));
             }
@@ -6429,11 +7049,16 @@ pub mod paradapp_convert {
                 return Ok(Self::GetConversionWithPhase(decoded));
             }
             if let Ok(decoded) =
-                <GetTxIdsByFilterCall as ::ethers::core::abi::AbiDecode>::decode(data)
+                <GetTxIdsByFilterCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::GetTxIdsByFilter(decoded));
             }
-            if let Ok(decoded) = <GlobalHeadersCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <GlobalHeadersCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::GlobalHeaders(decoded));
             }
@@ -6443,37 +7068,53 @@ pub mod paradapp_convert {
                 return Ok(Self::GlobalHeightToHashLE(decoded));
             }
             if let Ok(decoded) =
-                <GlobalTipHeightCall as ::ethers::core::abi::AbiDecode>::decode(data)
+                <GlobalTipHeightCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::GlobalTipHeight(decoded));
             }
             if let Ok(decoded) =
-                <MinAnchorHeightCall as ::ethers::core::abi::AbiDecode>::decode(data)
+                <MinAnchorHeightCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::MinAnchorHeight(decoded));
             }
             if let Ok(decoded) =
-                <NativeLiquidityCall as ::ethers::core::abi::AbiDecode>::decode(data)
+                <NativeLiquidityCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::NativeLiquidity(decoded));
             }
             if let Ok(decoded) =
-                <NativeUsdPriceIdCall as ::ethers::core::abi::AbiDecode>::decode(data)
+                <NativeUsdPriceIdCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::NativeUsdPriceId(decoded));
             }
             if let Ok(decoded) =
-                <NetworkConfigsCall as ::ethers::core::abi::AbiDecode>::decode(data)
+                <NetworkConfigsCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::NetworkConfigs(decoded));
             }
-            if let Ok(decoded) = <NextTxIdCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <NextTxIdCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::NextTxId(decoded));
             }
-            if let Ok(decoded) = <OperatorCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <OperatorCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::Operator(decoded));
             }
-            if let Ok(decoded) = <ProofInfoCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <ProofInfoCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::ProofInfo(decoded));
             }
             if let Ok(decoded) =
@@ -6489,7 +7130,9 @@ pub mod paradapp_convert {
                 return Ok(Self::RefundIfNotApproved(decoded));
             }
             if let Ok(decoded) =
-                <RemovableNativeCall as ::ethers::core::abi::AbiDecode>::decode(data)
+                <RemovableNativeCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::RemovableNative(decoded));
             }
@@ -6498,18 +7141,30 @@ pub mod paradapp_convert {
             {
                 return Ok(Self::RemoveNativeLiquidity(decoded));
             }
-            if let Ok(decoded) = <RemoveNetworkCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <RemoveNetworkCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::RemoveNetwork(decoded));
             }
-            if let Ok(decoded) = <ServiceFeeBpsCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) =
+                <ServiceFeeBpsCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
             {
                 return Ok(Self::ServiceFeeBps(decoded));
             }
-            if let Ok(decoded) = <SetFeesCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <SetFeesCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::SetFees(decoded));
             }
-            if let Ok(decoded) = <SetOperatorCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <SetOperatorCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
+            {
                 return Ok(Self::SetOperator(decoded));
             }
             if let Ok(decoded) =
@@ -6544,10 +7199,14 @@ pub mod paradapp_convert {
             {
                 return Ok(Self::UsedParadappPrograms(decoded));
             }
-            if let Ok(decoded) = <UsedProofsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <UsedProofsCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::UsedProofs(decoded));
             }
-            if let Ok(decoded) = <WindowsForCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) =
+                <WindowsForCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::WindowsFor(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -6556,190 +7215,367 @@ pub mod paradapp_convert {
     impl ::ethers::core::abi::AbiEncode for ParadappConvertCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::ApprovalWindowSec(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::BpsDenom(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::BtcDecimals(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ApprovalWindowSec(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::BpsDenom(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::BtcDecimals(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::ConfirmationsRequired(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::DepositBlocksWindow(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::DiffPeriod(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::MaxTimespanSec(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::MinTimespanSec(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NativeDecimals(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ProofBlocksWindow(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ReserveMarginBps(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::RetargetPeriodSec(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::SelfNetworkId(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::DiffPeriod(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::MaxTimespanSec(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::MinTimespanSec(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::NativeDecimals(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::ProofBlocksWindow(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::ReserveMarginBps(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::RetargetPeriodSec(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::SelfNetworkId(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::ActiveOpenConversions(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::AddNativeLiquidity(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::AddNetwork(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::AnchorInfo(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::AddNetwork(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::AnchorInfo(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::ApproveAndStartWithAnchorAndFirst(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::BitcoinUsdPriceId(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::BitcoinUsdPriceId(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::ClaimNativeAfterOperatorExpired(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::CloseNoBitcoinBitcoinToNative(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::CommitBitcoinToNative(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::CommitFeeNative(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::CommitFeeNative(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::CommitGlobalBitcoinHeader80(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::CommitNativeToBitcoin(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::Conversions(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::DebugDecodeHeader(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::Conversions(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::DebugDecodeHeader(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::DepositApprovedConversion(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::EstimateBitcoinFromNative(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::EstimateNativeFromBitcoin(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ExpectedNext(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::ExpectedNext(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::GetConversionWithPhase(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::GetTxIdsByFilter(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::GlobalHeaders(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::GetTxIdsByFilter(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::GlobalHeaders(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::GlobalHeightToHashLE(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::GlobalTipHeight(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::MinAnchorHeight(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NativeLiquidity(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NativeUsdPriceId(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NetworkConfigs(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NextTxId(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::Operator(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ProofInfo(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::GlobalTipHeight(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::MinAnchorHeight(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::NativeLiquidity(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::NativeUsdPriceId(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::NetworkConfigs(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::NextTxId(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::Operator(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::ProofInfo(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::RefundAfterNoProofNativeToBitcoin(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::RefundIfNotApproved(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::RemovableNative(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::RemovableNative(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::RemoveNativeLiquidity(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::RemoveNetwork(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ServiceFeeBps(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::SetFees(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::SetOperator(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::RemoveNetwork(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::ServiceFeeBps(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::SetFees(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::SetOperator(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
                 Self::SubmitBitcoinMerkleProofWithTx(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::TimeoutNoDepositNativetoBitcoin(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::TotalHeldCommitFees(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::TotalLockedDeposits(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::TotalReservedNative(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                },
                 Self::UsedParadappPrograms(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::UsedProofs(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::WindowsFor(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                },
+                Self::UsedProofs(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
+                Self::WindowsFor(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                },
             }
         }
     }
     impl ::core::fmt::Display for ParadappConvertCalls {
-        fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        fn fmt(
+            &self,
+            f: &mut ::core::fmt::Formatter<'_>,
+        ) -> ::core::fmt::Result {
             match self {
-                Self::ApprovalWindowSec(element) => ::core::fmt::Display::fmt(element, f),
-                Self::BpsDenom(element) => ::core::fmt::Display::fmt(element, f),
-                Self::BtcDecimals(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ConfirmationsRequired(element) => ::core::fmt::Display::fmt(element, f),
-                Self::DepositBlocksWindow(element) => ::core::fmt::Display::fmt(element, f),
-                Self::DiffPeriod(element) => ::core::fmt::Display::fmt(element, f),
-                Self::MaxTimespanSec(element) => ::core::fmt::Display::fmt(element, f),
-                Self::MinTimespanSec(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NativeDecimals(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ProofBlocksWindow(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ReserveMarginBps(element) => ::core::fmt::Display::fmt(element, f),
-                Self::RetargetPeriodSec(element) => ::core::fmt::Display::fmt(element, f),
-                Self::SelfNetworkId(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ActiveOpenConversions(element) => ::core::fmt::Display::fmt(element, f),
-                Self::AddNativeLiquidity(element) => ::core::fmt::Display::fmt(element, f),
-                Self::AddNetwork(element) => ::core::fmt::Display::fmt(element, f),
-                Self::AnchorInfo(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ApprovalWindowSec(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::BpsDenom(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::BtcDecimals(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::ConfirmationsRequired(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::DepositBlocksWindow(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::DiffPeriod(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::MaxTimespanSec(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::MinTimespanSec(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::NativeDecimals(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::ProofBlocksWindow(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::ReserveMarginBps(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::RetargetPeriodSec(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::SelfNetworkId(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::ActiveOpenConversions(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::AddNativeLiquidity(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::AddNetwork(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::AnchorInfo(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
                 Self::ApproveAndStartWithAnchorAndFirst(element) => {
                     ::core::fmt::Display::fmt(element, f)
-                }
-                Self::BitcoinUsdPriceId(element) => ::core::fmt::Display::fmt(element, f),
+                },
+                Self::BitcoinUsdPriceId(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
                 Self::ClaimNativeAfterOperatorExpired(element) => {
                     ::core::fmt::Display::fmt(element, f)
-                }
+                },
                 Self::CloseNoBitcoinBitcoinToNative(element) => {
                     ::core::fmt::Display::fmt(element, f)
-                }
-                Self::CommitBitcoinToNative(element) => ::core::fmt::Display::fmt(element, f),
-                Self::CommitFeeNative(element) => ::core::fmt::Display::fmt(element, f),
-                Self::CommitGlobalBitcoinHeader80(element) => ::core::fmt::Display::fmt(element, f),
-                Self::CommitNativeToBitcoin(element) => ::core::fmt::Display::fmt(element, f),
-                Self::Conversions(element) => ::core::fmt::Display::fmt(element, f),
-                Self::DebugDecodeHeader(element) => ::core::fmt::Display::fmt(element, f),
-                Self::DepositApprovedConversion(element) => ::core::fmt::Display::fmt(element, f),
-                Self::EstimateBitcoinFromNative(element) => ::core::fmt::Display::fmt(element, f),
-                Self::EstimateNativeFromBitcoin(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ExpectedNext(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GetConversionWithPhase(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GetTxIdsByFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GlobalHeaders(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GlobalHeightToHashLE(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GlobalTipHeight(element) => ::core::fmt::Display::fmt(element, f),
-                Self::MinAnchorHeight(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NativeLiquidity(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NativeUsdPriceId(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NetworkConfigs(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NextTxId(element) => ::core::fmt::Display::fmt(element, f),
-                Self::Operator(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ProofInfo(element) => ::core::fmt::Display::fmt(element, f),
+                },
+                Self::CommitBitcoinToNative(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::CommitFeeNative(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::CommitGlobalBitcoinHeader80(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::CommitNativeToBitcoin(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::Conversions(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::DebugDecodeHeader(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::DepositApprovedConversion(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::EstimateBitcoinFromNative(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::EstimateNativeFromBitcoin(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::ExpectedNext(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::GetConversionWithPhase(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::GetTxIdsByFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::GlobalHeaders(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::GlobalHeightToHashLE(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::GlobalTipHeight(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::MinAnchorHeight(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::NativeLiquidity(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::NativeUsdPriceId(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::NetworkConfigs(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::NextTxId(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::Operator(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::ProofInfo(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
                 Self::RefundAfterNoProofNativeToBitcoin(element) => {
                     ::core::fmt::Display::fmt(element, f)
-                }
-                Self::RefundIfNotApproved(element) => ::core::fmt::Display::fmt(element, f),
-                Self::RemovableNative(element) => ::core::fmt::Display::fmt(element, f),
-                Self::RemoveNativeLiquidity(element) => ::core::fmt::Display::fmt(element, f),
-                Self::RemoveNetwork(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ServiceFeeBps(element) => ::core::fmt::Display::fmt(element, f),
+                },
+                Self::RefundIfNotApproved(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::RemovableNative(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::RemoveNativeLiquidity(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::RemoveNetwork(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::ServiceFeeBps(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
                 Self::SetFees(element) => ::core::fmt::Display::fmt(element, f),
-                Self::SetOperator(element) => ::core::fmt::Display::fmt(element, f),
+                Self::SetOperator(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
                 Self::SubmitBitcoinMerkleProofWithTx(element) => {
                     ::core::fmt::Display::fmt(element, f)
-                }
+                },
                 Self::TimeoutNoDepositNativetoBitcoin(element) => {
                     ::core::fmt::Display::fmt(element, f)
-                }
-                Self::TotalHeldCommitFees(element) => ::core::fmt::Display::fmt(element, f),
-                Self::TotalLockedDeposits(element) => ::core::fmt::Display::fmt(element, f),
-                Self::TotalReservedNative(element) => ::core::fmt::Display::fmt(element, f),
-                Self::UsedParadappPrograms(element) => ::core::fmt::Display::fmt(element, f),
-                Self::UsedProofs(element) => ::core::fmt::Display::fmt(element, f),
-                Self::WindowsFor(element) => ::core::fmt::Display::fmt(element, f),
+                },
+                Self::TotalHeldCommitFees(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::TotalLockedDeposits(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::TotalReservedNative(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::UsedParadappPrograms(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::UsedProofs(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
+                Self::WindowsFor(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                },
             }
         }
     }
@@ -6828,7 +7664,9 @@ pub mod paradapp_convert {
             Self::AnchorInfo(value)
         }
     }
-    impl ::core::convert::From<ApproveAndStartWithAnchorAndFirstCall> for ParadappConvertCalls {
+    impl ::core::convert::From<ApproveAndStartWithAnchorAndFirstCall>
+        for ParadappConvertCalls
+    {
         fn from(value: ApproveAndStartWithAnchorAndFirstCall) -> Self {
             Self::ApproveAndStartWithAnchorAndFirst(value)
         }
@@ -6838,12 +7676,16 @@ pub mod paradapp_convert {
             Self::BitcoinUsdPriceId(value)
         }
     }
-    impl ::core::convert::From<ClaimNativeAfterOperatorExpiredCall> for ParadappConvertCalls {
+    impl ::core::convert::From<ClaimNativeAfterOperatorExpiredCall>
+        for ParadappConvertCalls
+    {
         fn from(value: ClaimNativeAfterOperatorExpiredCall) -> Self {
             Self::ClaimNativeAfterOperatorExpired(value)
         }
     }
-    impl ::core::convert::From<CloseNoBitcoinBitcoinToNativeCall> for ParadappConvertCalls {
+    impl ::core::convert::From<CloseNoBitcoinBitcoinToNativeCall>
+        for ParadappConvertCalls
+    {
         fn from(value: CloseNoBitcoinBitcoinToNativeCall) -> Self {
             Self::CloseNoBitcoinBitcoinToNative(value)
         }
@@ -6858,7 +7700,9 @@ pub mod paradapp_convert {
             Self::CommitFeeNative(value)
         }
     }
-    impl ::core::convert::From<CommitGlobalBitcoinHeader80Call> for ParadappConvertCalls {
+    impl ::core::convert::From<CommitGlobalBitcoinHeader80Call>
+        for ParadappConvertCalls
+    {
         fn from(value: CommitGlobalBitcoinHeader80Call) -> Self {
             Self::CommitGlobalBitcoinHeader80(value)
         }
@@ -6878,17 +7722,23 @@ pub mod paradapp_convert {
             Self::DebugDecodeHeader(value)
         }
     }
-    impl ::core::convert::From<DepositApprovedConversionCall> for ParadappConvertCalls {
+    impl ::core::convert::From<DepositApprovedConversionCall>
+        for ParadappConvertCalls
+    {
         fn from(value: DepositApprovedConversionCall) -> Self {
             Self::DepositApprovedConversion(value)
         }
     }
-    impl ::core::convert::From<EstimateBitcoinFromNativeCall> for ParadappConvertCalls {
+    impl ::core::convert::From<EstimateBitcoinFromNativeCall>
+        for ParadappConvertCalls
+    {
         fn from(value: EstimateBitcoinFromNativeCall) -> Self {
             Self::EstimateBitcoinFromNative(value)
         }
     }
-    impl ::core::convert::From<EstimateNativeFromBitcoinCall> for ParadappConvertCalls {
+    impl ::core::convert::From<EstimateNativeFromBitcoinCall>
+        for ParadappConvertCalls
+    {
         fn from(value: EstimateNativeFromBitcoinCall) -> Self {
             Self::EstimateNativeFromBitcoin(value)
         }
@@ -6898,7 +7748,9 @@ pub mod paradapp_convert {
             Self::ExpectedNext(value)
         }
     }
-    impl ::core::convert::From<GetConversionWithPhaseCall> for ParadappConvertCalls {
+    impl ::core::convert::From<GetConversionWithPhaseCall>
+        for ParadappConvertCalls
+    {
         fn from(value: GetConversionWithPhaseCall) -> Self {
             Self::GetConversionWithPhase(value)
         }
@@ -6958,7 +7810,9 @@ pub mod paradapp_convert {
             Self::ProofInfo(value)
         }
     }
-    impl ::core::convert::From<RefundAfterNoProofNativeToBitcoinCall> for ParadappConvertCalls {
+    impl ::core::convert::From<RefundAfterNoProofNativeToBitcoinCall>
+        for ParadappConvertCalls
+    {
         fn from(value: RefundAfterNoProofNativeToBitcoinCall) -> Self {
             Self::RefundAfterNoProofNativeToBitcoin(value)
         }
@@ -6998,12 +7852,16 @@ pub mod paradapp_convert {
             Self::SetOperator(value)
         }
     }
-    impl ::core::convert::From<SubmitBitcoinMerkleProofWithTxCall> for ParadappConvertCalls {
+    impl ::core::convert::From<SubmitBitcoinMerkleProofWithTxCall>
+        for ParadappConvertCalls
+    {
         fn from(value: SubmitBitcoinMerkleProofWithTxCall) -> Self {
             Self::SubmitBitcoinMerkleProofWithTx(value)
         }
     }
-    impl ::core::convert::From<TimeoutNoDepositNativetoBitcoinCall> for ParadappConvertCalls {
+    impl ::core::convert::From<TimeoutNoDepositNativetoBitcoinCall>
+        for ParadappConvertCalls
+    {
         fn from(value: TimeoutNoDepositNativetoBitcoinCall) -> Self {
             Self::TimeoutNoDepositNativetoBitcoin(value)
         }
@@ -7336,7 +8194,9 @@ pub mod paradapp_convert {
         pub expected_prev_hash_le: [u8; 32],
     }
     ///Container type for all return fields from the `getConversionWithPhase` function with signature `getConversionWithPhase(uint256)` and selector `0x7593a73a`
-    #[derive(Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec)]
+    #[derive(
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec,
+    )]
     pub struct GetConversionWithPhaseReturn {
         pub c: Conversion,
         pub phase: u8,

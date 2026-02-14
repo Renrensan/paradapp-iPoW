@@ -1,9 +1,9 @@
-use crate::context::CoreContext;
 use anyhow::{Result, anyhow, bail};
 use bip32::secp256k1::sha2::{Digest, Sha256, Sha512};
 use bitcoin::{
-    Address as BTCAddress, Amount, CompressedPublicKey, EcdsaSighashType, Network, OutPoint,
-    PrivateKey, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid, Witness,
+    Address as BTCAddress, Amount, CompressedPublicKey, EcdsaSighashType,
+    Network, OutPoint, PrivateKey, ScriptBuf, Sequence, Transaction, TxIn,
+    TxOut, Txid, Witness,
     absolute::LockTime,
     bip32::{DerivationPath, Xpriv, Xpub},
     consensus::serialize,
@@ -21,6 +21,8 @@ use serde::Deserialize;
 use serde_json::Value;
 use std::str::FromStr;
 use tracing::{error, info, warn};
+
+use crate::dependencies::context::CoreContext;
 
 pub fn epoch_start(height: u64) -> u64 {
     height - (height % 2016)
@@ -47,35 +49,26 @@ pub fn from_0x(s: &str) -> &str {
 }
 
 pub fn to_0x(s: &str) -> String {
-    if s.starts_with("0x") {
-        s.to_owned()
-    } else {
-        format!("0x{}", s)
-    }
+    if s.starts_with("0x") { s.to_owned() } else { format!("0x{}", s) }
 }
 
-pub async fn header80_by_height(ctx: &CoreContext, height: u64) -> Result<(String, String)> {
+pub async fn header80_by_height(
+    ctx: &CoreContext,
+    height: u64,
+) -> Result<(String, String)> {
     // 1. Acquire the permit from the global rate limiter
-    let _permit = ctx
-        .rpc_limiter
-        .acquire()
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to acquire RPC permit for header fetch: {}", e))?;
+    let _permit = ctx.rpc_limiter.acquire().await.map_err(|e| {
+        anyhow::anyhow!("Failed to acquire RPC permit for header fetch: {}", e)
+    })?;
 
     // 2. GET block hash by height (BE)
     let url_hash = format!("{}/block-height/{}", ctx.cfg.esplora_base, height);
-    let block_hash_be = ctx
-        .http
-        .get(&url_hash)
-        .send()
-        .await?
-        .text()
-        .await?
-        .trim()
-        .to_string();
+    let block_hash_be =
+        ctx.http.get(&url_hash).send().await?.text().await?.trim().to_string();
 
     // 3. GET block header hex
-    let url_header = format!("{}/block/{}/header", ctx.cfg.esplora_base, block_hash_be);
+    let url_header =
+        format!("{}/block/{}/header", ctx.cfg.esplora_base, block_hash_be);
     let header_hex = ctx
         .http
         .get(&url_header)
@@ -113,7 +106,8 @@ pub async fn btc_tip_height(ctx: &CoreContext) -> Result<u64> {
     let trimmed = text.trim();
 
     // Parse height as number and sub with 6 as high finality confirmed block
-    let height: u64 = (trimmed.parse::<u64>()?).saturating_sub(0);
+    let height: u64 = (trimmed.parse::<u64>()?)
+        .saturating_sub(ctx.cfg.high_finality_confirmed_block as u64);
 
     Ok(height)
 }
@@ -126,7 +120,9 @@ pub fn dsha256(buf: &[u8]) -> [u8; 32] {
     out
 }
 
-pub fn header_hash_both_from_header80(header80_0x: &str) -> Result<(String, String)> {
+pub fn header_hash_both_from_header80(
+    header80_0x: &str,
+) -> Result<(String, String)> {
     let hex = &header80_0x[2..];
     let raw = hex::decode(hex)?;
     if raw.len() != 80 {
@@ -196,20 +192,25 @@ pub fn check_work_le(header80_0x: &str) -> Result<(bool, u32, U256, U256)> {
     Ok((h_val <= target, bits, target, h_val))
 }
 
-pub async fn check_hedera_alive(provider: &Provider<ethers::providers::Http>) -> bool {
+pub async fn check_hedera_alive(
+    provider: &Provider<ethers::providers::Http>,
+) -> bool {
     match provider.get_block_number().await {
         Ok(bn) => {
             info!(block_number = %bn, "Hedera RPC alive");
             true
-        }
+        },
         Err(e) => {
             error!(error = %e, "Hedera RPC health check failed");
             false
-        }
+        },
     }
 }
 
-pub async fn check_bitcoin_alive(ctx: &CoreContext, esplora_base: &str) -> bool {
+pub async fn check_bitcoin_alive(
+    ctx: &CoreContext,
+    esplora_base: &str,
+) -> bool {
     let url = format!("{esplora_base}/blocks/tip/height");
 
     match ctx.http.get(url).send().await {
@@ -218,7 +219,7 @@ pub async fn check_bitcoin_alive(ctx: &CoreContext, esplora_base: &str) -> bool 
                 Ok(tip) => {
                     info!(tip_height = tip, "Bitcoin Esplora alive");
                     true
-                }
+                },
                 Err(_) => false,
             },
             Err(_) => false,
@@ -226,7 +227,7 @@ pub async fn check_bitcoin_alive(ctx: &CoreContext, esplora_base: &str) -> bool 
         Err(e) => {
             error!(error = %e, "Bitcoin Esplora health failed");
             false
-        }
+        },
     }
 }
 
@@ -235,7 +236,9 @@ pub fn decode_header80(header80_hex: &str) -> Result<TypesBytes, String> {
 
     let decoded = match hex::decode(clean) {
         Ok(bytes) => bytes,
-        Err(_) => return Err(format!("invalid hex in header80: {header80_hex}")),
+        Err(_) => {
+            return Err(format!("invalid hex in header80: {header80_hex}"));
+        },
     };
 
     if decoded.len() != 80 {
@@ -265,13 +268,14 @@ pub fn hex_le_from_be32(hex: &str) -> Result<String> {
     Ok(format!("0x{}", rev))
 }
 
-pub async fn tx_merkle_proof(ctx: &CoreContext, txid_be: &str) -> Result<Value> {
+pub async fn tx_merkle_proof(
+    ctx: &CoreContext,
+    txid_be: &str,
+) -> Result<Value> {
     // 1. Acquire permit from the global rate limiter
-    let _permit = ctx
-        .rpc_limiter
-        .acquire()
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to acquire RPC permit for merkle proof: {}", e))?;
+    let _permit = ctx.rpc_limiter.acquire().await.map_err(|e| {
+        anyhow::anyhow!("Failed to acquire RPC permit for merkle proof: {}", e)
+    })?;
 
     let url = format!("{}/tx/{}/merkle-proof", ctx.cfg.esplora_base, txid_be);
     let json = ctx.http.get(url).send().await?.json::<Value>().await?;
@@ -284,11 +288,9 @@ pub async fn tx_merkle_proof(ctx: &CoreContext, txid_be: &str) -> Result<Value> 
 
 pub async fn tx_hex(ctx: &CoreContext, txid_be: &str) -> Result<String> {
     // 1. Acquire permit from the global rate limiter
-    let _permit = ctx
-        .rpc_limiter
-        .acquire()
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to acquire RPC permit for tx hex: {}", e))?;
+    let _permit = ctx.rpc_limiter.acquire().await.map_err(|e| {
+        anyhow::anyhow!("Failed to acquire RPC permit for tx hex: {}", e)
+    })?;
 
     let url = format!("{}/tx/{}/hex", ctx.cfg.esplora_base, txid_be);
     let hex = ctx.http.get(url).send().await?.text().await?;
@@ -334,23 +336,27 @@ pub fn read_varint(buf: &[u8], o: usize) -> Result<(u64, usize)> {
             let lo = *buf.get(o + 1).ok_or(anyhow!("varint: 0xfd lo"))? as u64;
             let hi = *buf.get(o + 2).ok_or(anyhow!("varint: 0xfd hi"))? as u64;
             ((hi << 8) | lo, o + 3)
-        }
+        },
 
         0xFE => {
             let mut v = 0u64;
             for i in 0..4 {
-                v |= (*buf.get(o + 1 + i).ok_or(anyhow!("varint: 0xfe"))? as u64) << (8 * i);
+                v |= (*buf.get(o + 1 + i).ok_or(anyhow!("varint: 0xfe"))?
+                    as u64)
+                    << (8 * i);
             }
             (v, o + 5)
-        }
+        },
 
         0xFF => {
             let mut v = 0u64;
             for i in 0..8 {
-                v |= (*buf.get(o + 1 + i).ok_or(anyhow!("varint: 0xff"))? as u64) << (8 * i);
+                v |= (*buf.get(o + 1 + i).ok_or(anyhow!("varint: 0xff"))?
+                    as u64)
+                    << (8 * i);
             }
             (v, o + 9)
-        }
+        },
 
         _ => unreachable!(),
     })
@@ -485,25 +491,31 @@ pub async fn get_confirmed_receive_by_txid(
                 continue;
             }
 
-            let confirmed = tx["status"]["confirmed"].as_bool().unwrap_or(false);
+            let confirmed =
+                tx["status"]["confirmed"].as_bool().unwrap_or(false);
             if !confirmed {
                 return Err(anyhow!("tx not confirmed"));
             }
 
-            let vouts = tx["vout"].as_array().ok_or(anyhow!("malformed vout"))?;
+            let vouts =
+                tx["vout"].as_array().ok_or(anyhow!("malformed vout"))?;
             for (i, vout) in vouts.iter().enumerate() {
-                let spk_addr = vout["scriptpubkey_address"].as_str().unwrap_or("");
+                let spk_addr =
+                    vout["scriptpubkey_address"].as_str().unwrap_or("");
                 let value_sats = vout["value"].as_u64().unwrap_or(0);
 
                 if spk_addr == address && value_sats > 0 {
-                    let script_hex = vout["scriptpubkey"].as_str().unwrap_or("");
+                    let script_hex =
+                        vout["scriptpubkey"].as_str().unwrap_or("");
 
                     return Ok(ConfirmedReceive {
                         txid_be: txid.to_string(),
                         vout_index: i,
                         value_sats,
                         script_pubkey_hex: format!("0x{}", script_hex),
-                        block_height: tx["status"]["block_height"].as_u64().unwrap_or(0),
+                        block_height: tx["status"]["block_height"]
+                            .as_u64()
+                            .unwrap_or(0),
                         block_hash_be: tx["status"]["block_hash"]
                             .as_str()
                             .unwrap_or("")
@@ -550,12 +562,12 @@ pub async fn build_proof_bundle(
         .as_array()
         .ok_or_else(|| anyhow!("missing field `merkle`"))?;
 
-    let pos = proof["pos"]
-        .as_u64()
-        .ok_or_else(|| anyhow!("missing field `pos`"))?;
+    let pos =
+        proof["pos"].as_u64().ok_or_else(|| anyhow!("missing field `pos`"))?;
 
     // 2. Header
-    let (_hash_be_check, header80) = header80_by_height(ctx, block_height).await?;
+    let (_hash_be_check, header80) =
+        header80_by_height(ctx, block_height).await?;
     let header80_raw = from_0x(&header80);
     let header_root_le = format!("0x{}", &header80_raw[72..136]);
 
@@ -627,6 +639,7 @@ pub struct TxStatus {
 
     pub block_height: Option<u64>,
     pub block_hash: Option<String>,
+    pub mempool_height: Option<u64>,
 }
 
 #[derive(Debug)]
@@ -638,7 +651,9 @@ pub struct BitcoinMerkleProofPayload {
     pub block_height: U256,
     pub branch: Vec<[u8; 32]>,
     pub index: U256,
+    pub mempool_height: Option<u64>,
 }
+
 pub async fn check_confirmation_and_build_proof(
     ctx: &CoreContext,
     tx_id: U256,
@@ -648,7 +663,8 @@ pub async fn check_confirmation_and_build_proof(
     // We do a manual limit here since it's a raw HTTP call
     let status = {
         let _permit = ctx.rpc_limiter.acquire().await?;
-        let status_url = format!("{}/tx/{}/status", ctx.cfg.esplora_base, btc_txid);
+        let status_url =
+            format!("{}/tx/{}/status", ctx.cfg.esplora_base, btc_txid);
         let res = ctx.http.get(&status_url).send().await?;
 
         if !res.status().is_success() {
@@ -662,17 +678,63 @@ pub async fn check_confirmation_and_build_proof(
     };
 
     if !status.confirmed {
-        // Check if eligible for RBF
-        info!("BTC tx {} not confirmed yet", btc_txid);
-        return Ok(None);
+        // This logs the entire status struct as a raw debug string
+        // --- Calculate ETA Block ---
+        let tx_url = format!("{}/tx/{}", ctx.cfg.esplora_base, btc_txid);
+        let tx_res = ctx
+            .http
+            .get(&tx_url)
+            .send()
+            .await?
+            .json::<serde_json::Value>()
+            .await?;
+
+        let fee = tx_res["fee"].as_f64().unwrap_or(0.0);
+        let weight = tx_res["weight"].as_f64().unwrap_or(1.0);
+        let fee_rate = fee / (weight / 4.0);
+
+        let blocks_url =
+            format!("{}/v1/fees/mempool-blocks", ctx.cfg.esplora_base);
+        let mempool_data = ctx
+            .http
+            .get(&blocks_url)
+            .send()
+            .await?
+            .json::<Vec<serde_json::Value>>()
+            .await?;
+
+        let mut eta_blocks = 0;
+        for block in mempool_data {
+            eta_blocks += 1;
+            if block["feeRange"]
+                .as_array()
+                .and_then(|f| f.first()?.as_f64())
+                .is_some_and(|min_fee| fee_rate >= min_fee)
+            {
+                break;
+            }
+        }
+
+        let tip_height = btc_tip_height(ctx).await?;
+        let eta_block_height = tip_height + eta_blocks;
+
+        return Ok(Some(BitcoinMerkleProofPayload {
+            tx_id,
+            legacy_tx: ethers::types::Bytes::new(),
+            vout_index: U256::zero(),
+            block_hash_le: [0u8; 32],
+            block_height: U256::zero(),
+            branch: vec![],
+            index: U256::zero(),
+            mempool_height: Some(eta_block_height),
+        }));
     }
 
     info!("BTC tx {} confirmed! Building merkle proof…", btc_txid);
 
     // ---- 2) Extract block info ----
-    let block_height = status
-        .block_height
-        .ok_or_else(|| anyhow!("missing block_height"))?;
+    let block_height =
+        status.block_height.ok_or_else(|| anyhow!("missing block_height"))?;
     let block_hash_be = status
         .block_hash
         .as_ref()
@@ -682,14 +744,23 @@ pub async fn check_confirmation_and_build_proof(
     // This calls tx_merkle_proof, header80, and tx_hex.
     // They EACH have their own permit/sleep, so the 250ms gap is enforced 3 times here.
     let vout_index_usize: usize = 0;
-    let proof =
-        build_proof_bundle(ctx, btc_txid, vout_index_usize, block_hash_be, block_height).await?;
+    let proof = build_proof_bundle(
+        ctx,
+        btc_txid,
+        vout_index_usize,
+        block_hash_be,
+        block_height,
+    )
+    .await?;
 
     // ---- 4) Convert fields to contract-ready types ----
-    let legacy_tx =
-        ethers::types::Bytes::from(hex::decode(proof.legacy_0x.trim_start_matches("0x"))?);
+    let legacy_tx = ethers::types::Bytes::from(hex::decode(
+        proof.legacy_0x.trim_start_matches("0x"),
+    )?);
     let mut block_hash_le = [0u8; 32];
-    block_hash_le.copy_from_slice(&hex::decode(proof.block_hash_le.trim_start_matches("0x"))?);
+    block_hash_le.copy_from_slice(&hex::decode(
+        proof.block_hash_le.trim_start_matches("0x"),
+    )?);
 
     let branch = proof
         .branch
@@ -710,19 +781,8 @@ pub async fn check_confirmation_and_build_proof(
         block_height: U256::from(proof.block_height),
         branch,
         index: U256::from(proof.index),
+        mempool_height: status.mempool_height,
     }))
-}
-
-pub fn derive_address_from_script_bytes(
-    ctx: &CoreContext,
-    script_bytes: &[u8],
-) -> Result<BTCAddress> {
-    let script = ScriptBuf::from_bytes(script_bytes.to_vec());
-
-    let addr = BTCAddress::from_script(&script, ctx.btc_network)
-        .map_err(|e| anyhow!("cannot derive address: {}", e))?;
-
-    Ok(addr)
 }
 
 /// Derive a P2WPKH receive address from an XPUB at m/0/<index>
@@ -732,7 +792,8 @@ pub fn derive_p2wpkh_address(
     network: Network,
 ) -> Result<(u32, String, Vec<u8>)> {
     // 1️⃣ Parse XPUB
-    let root_xpub: Xpub = xpub.parse().map_err(|e| anyhow!("Invalid XPUB: {e}"))?;
+    let root_xpub: Xpub =
+        xpub.parse().map_err(|e| anyhow!("Invalid XPUB: {e}"))?;
 
     // 2️⃣ Derive child pubkey: m/0/<index>
     let secp = Secp256k1::verification_only();
@@ -763,7 +824,10 @@ pub struct AddressInfo {
     pub chain_stats: Option<Stats>,
     pub mempool_stats: Option<Stats>,
 }
-pub async fn get_address_balance_sats(ctx: &CoreContext, address: &str) -> Result<u128> {
+pub async fn get_address_balance_sats(
+    ctx: &CoreContext,
+    address: &str,
+) -> Result<u128> {
     if address.is_empty() {
         return Err(anyhow!("address empty"));
     }
@@ -784,15 +848,13 @@ pub async fn get_address_balance_sats(ctx: &CoreContext, address: &str) -> Resul
         .await
         .map_err(|e| anyhow!("JSON decode error for {}: {}", address, e))?;
 
-    let chain = json.chain_stats.unwrap_or(Stats {
-        funded_txo_sum: Some(0),
-        spent_txo_sum: Some(0),
-    });
+    let chain = json
+        .chain_stats
+        .unwrap_or(Stats { funded_txo_sum: Some(0), spent_txo_sum: Some(0) });
 
-    let mem = json.mempool_stats.unwrap_or(Stats {
-        funded_txo_sum: Some(0),
-        spent_txo_sum: Some(0),
-    });
+    let mem = json
+        .mempool_stats
+        .unwrap_or(Stats { funded_txo_sum: Some(0), spent_txo_sum: Some(0) });
 
     let funded = chain.funded_txo_sum.unwrap_or(0) as u128;
     let spent = chain.spent_txo_sum.unwrap_or(0) as u128;
@@ -804,9 +866,13 @@ pub async fn get_address_balance_sats(ctx: &CoreContext, address: &str) -> Resul
     Ok(total)
 }
 
-pub async fn maybe_rebalance_btc_wallets(ctx: &CoreContext) -> anyhow::Result<()> {
+pub async fn maybe_rebalance_btc_wallets(
+    ctx: &CoreContext,
+) -> anyhow::Result<()> {
     if ctx.cfg.btc_hot_address.is_none() || ctx.cfg.btc_main_address.is_none() {
-        info!("BTC_HOT_ADDRESS / BTC_MAIN_ADDRESS not set; skipping wallet rebalance simulation.");
+        info!(
+            "BTC_HOT_ADDRESS / BTC_MAIN_ADDRESS not set; skipping wallet rebalance simulation."
+        );
         return Ok(());
     }
 
@@ -819,7 +885,7 @@ pub async fn maybe_rebalance_btc_wallets(ctx: &CoreContext) -> anyhow::Result<()
         Err(e) => {
             error!(error=%e, "Failed to fetch hot wallet balance");
             return Ok(());
-        }
+        },
     };
 
     // Convert to U256
@@ -872,11 +938,9 @@ pub async fn send_to_user_program(
     user_program: &[u8],
     amount_sats: u64,
 ) -> Result<String> {
-    let _permit = ctx
-        .rpc_limiter
-        .acquire()
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to acquire RPC permit for broadcast: {}", e))?;
+    let _permit = ctx.rpc_limiter.acquire().await.map_err(|e| {
+        anyhow::anyhow!("Failed to acquire RPC permit for broadcast: {}", e)
+    })?;
 
     let mempool_api = &ctx.cfg.mempool_api;
     let dev_address = &ctx.cfg.operator_btc_wallet_address;
@@ -923,7 +987,7 @@ pub async fn send_to_user_program(
 
         // let est_vbytes = (selected.len() as u64 * 59) + (2 * 31) + 10;
         // final_fee = est_vbytes * fee_rate;
-        final_fee = 140;
+        final_fee = 120;
 
         if input_sum >= amount_sats + final_fee {
             break;
@@ -965,10 +1029,7 @@ pub async fn send_to_user_program(
     for utxo in &selected {
         let txid = Txid::from_str(&utxo.txid)?;
         tx.input.push(TxIn {
-            previous_output: OutPoint {
-                txid,
-                vout: utxo.vout,
-            },
+            previous_output: OutPoint { txid, vout: utxo.vout },
             script_sig: ScriptBuf::new(),
             sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
             witness: Witness::new(),
@@ -994,9 +1055,7 @@ pub async fn send_to_user_program(
         sig_ser.push(EcdsaSighashType::All as u8);
 
         tx.input[i].witness.push(sig_ser);
-        tx.input[i]
-            .witness
-            .push(private_key.public_key(&secp).to_bytes());
+        tx.input[i].witness.push(private_key.public_key(&secp).to_bytes());
     }
 
     // Serialize and broadcast
@@ -1040,7 +1099,8 @@ pub async fn rbf_send_to_user_program(
         .await?
         .text()
         .await?;
-    let old_tx: Transaction = bitcoin::consensus::encode::deserialize(&hex::decode(tx_hex)?)?;
+    let old_tx: Transaction =
+        bitcoin::consensus::encode::deserialize(&hex::decode(tx_hex)?)?;
 
     // 2. Fetch UTXO values and calculate old fee
     let mut selected = vec![];
@@ -1054,24 +1114,20 @@ pub async fn rbf_send_to_user_program(
             .send()
             .await?;
         let tx_val: serde_json::Value = res.json().await?;
-        let value = tx_val["vout"][prev_vout as usize]["value"]
-            .as_u64()
-            .unwrap();
+        let value =
+            tx_val["vout"][prev_vout as usize]["value"].as_u64().unwrap();
 
-        selected.push(Utxo {
-            txid: prev_txid,
-            vout: prev_vout,
-            value,
-        });
+        selected.push(Utxo { txid: prev_txid, vout: prev_vout, value });
         input_sum += value;
     }
 
     // --- FEE BUMP CALCULATION ---
     // Calculate what we paid last time
-    let current_output_sum: u64 = old_tx.output.iter().map(|o| o.value.to_sat()).sum();
+    let current_output_sum: u64 =
+        old_tx.output.iter().map(|o| o.value.to_sat()).sum();
     let old_absolute_fee = input_sum.saturating_sub(current_output_sum);
     let old_vsize = old_tx.vsize() as f64;
-    let old_fee_rate = (old_absolute_fee as f64 / old_vsize as f64).ceil() as u64;
+    let old_fee_rate = old_absolute_fee as f64 / old_vsize as f64;
 
     // Get current market recommendation
     let fee_res: FeeRecommended = ctx
@@ -1084,8 +1140,8 @@ pub async fn rbf_send_to_user_program(
 
     // The +2 Rule: We beat the old rate by 2 OR follow the market, whichever is higher
     // 1. Prioritize Economy Fee
-    let market_rate = fee_res.economy_fee as f64;
-    let old_rate = old_fee_rate as f64;
+    let market_rate = fee_res.economy_fee;
+    let old_rate = old_fee_rate;
 
     let new_fee_rate = if market_rate > old_rate {
         // If economy is already higher, jump straight to it
@@ -1102,9 +1158,10 @@ pub async fn rbf_send_to_user_program(
 
     let final_fee = old_vsize * new_fee_rate;
     let final_fee = final_fee.ceil() as u64;
-    let change = input_sum
-        .checked_sub(amount_sats + final_fee)
-        .ok_or_else(|| anyhow!("Insufficient funds: Fee bump would deplete change output"))?;
+    let change =
+        input_sum.checked_sub(amount_sats + final_fee).ok_or_else(|| {
+            anyhow!("Insufficient funds: Fee bump would deplete change output")
+        })?;
 
     // 4. Rebuild
     let mut tx = Transaction {
@@ -1147,9 +1204,7 @@ pub async fn rbf_send_to_user_program(
         sig_ser.push(EcdsaSighashType::All as u8);
         tx.input[i].witness.clear();
         tx.input[i].witness.push(sig_ser);
-        tx.input[i]
-            .witness
-            .push(private_key.public_key(&secp).to_bytes());
+        tx.input[i].witness.push(private_key.public_key(&secp).to_bytes());
     }
 
     let tx_hex = hex::encode(serialize(&tx));
@@ -1178,22 +1233,21 @@ fn mnemonic_to_seed_unchecked(mnemonic: &str, passphrase: &str) -> [u8; 64] {
     let mut seed = [0u8; 64];
     let salt = format!("mnemonic{}", passphrase);
 
-    pbkdf2_hmac::<Sha512>(mnemonic.as_bytes(), salt.as_bytes(), 2048, &mut seed);
+    pbkdf2_hmac::<Sha512>(
+        mnemonic.as_bytes(),
+        salt.as_bytes(),
+        2048,
+        &mut seed,
+    );
 
     seed
 }
 pub async fn derive_address_from_mnemonic(
     ctx: &CoreContext,
+    mnemonic_str: &str,
     indices: Vec<u32>,
 ) -> Result<Vec<DerivedAddressInfo>> {
     let network: Network = ctx.btc_network;
-
-    let mnemonic_str = ctx
-        .cfg
-        .btc_mnemonic
-        .as_deref()
-        .ok_or_else(|| anyhow!("btc_mnemonic not set"))?
-        .trim();
 
     // let mnemonic = Mnemonic::parse(mnemonic_str).map_err(|e| {
     //     error!("Failed to parse mnemonic: {}", e);
@@ -1226,15 +1280,17 @@ pub async fn derive_address_from_mnemonic(
     for idx in indices.into_iter() {
         let path_str = format!("m/84'/{}'/0'/0/{}", coin_type, idx);
 
-        let derivation_path: DerivationPath = path_str.parse().map_err(|e| {
-            error!("Invalid derivation path {}: {}", path_str, e);
-            anyhow!("invalid derivation path {}: {}", path_str, e)
-        })?;
+        let derivation_path: DerivationPath =
+            path_str.parse().map_err(|e| {
+                error!("Invalid derivation path {}: {}", path_str, e);
+                anyhow!("invalid derivation path {}: {}", path_str, e)
+            })?;
 
-        let child_xprv = xprv.derive_priv(&secp, &derivation_path).map_err(|e| {
-            error!("derive_priv failed for {}: {}", path_str, e);
-            anyhow!("derive_priv failed for {}: {}", path_str, e)
-        })?;
+        let child_xprv =
+            xprv.derive_priv(&secp, &derivation_path).map_err(|e| {
+                error!("derive_priv failed for {}: {}", path_str, e);
+                anyhow!("derive_priv failed for {}: {}", path_str, e)
+            })?;
 
         let secret_key = child_xprv.private_key;
 
@@ -1247,10 +1303,18 @@ pub async fn derive_address_from_mnemonic(
         let wif = privkey.to_wif();
         let priv_hex = hex::encode(secret_key.secret_bytes());
 
-        let pubkey = CompressedPublicKey::from_private_key(&secp, &privkey).map_err(|e| {
-            error!("Failed to derive compressed pubkey for {}: {}", path_str, e);
-            anyhow!("failed to derive compressed pubkey for {}: {}", path_str, e)
-        })?;
+        let pubkey = CompressedPublicKey::from_private_key(&secp, &privkey)
+            .map_err(|e| {
+                error!(
+                    "Failed to derive compressed pubkey for {}: {}",
+                    path_str, e
+                );
+                anyhow!(
+                    "failed to derive compressed pubkey for {}: {}",
+                    path_str,
+                    e
+                )
+            })?;
 
         let address = BTCAddress::p2wpkh(&pubkey, network);
 
@@ -1285,7 +1349,8 @@ pub async fn send_all_btc_from_account_to_dev(
     let secp = Secp256k1::new();
 
     let url = format!("{}/v1/fees/recommended", mempool_api);
-    let fee_res: FeeRecommended = ctx.http.get(&url).send().await?.json().await?;
+    let fee_res: FeeRecommended =
+        ctx.http.get(&url).send().await?.json().await?;
     let dynamic_rate = fee_res.economy_fee.ceil() as u64;
     let fee_rate = 1u64.max(dynamic_rate.min(2));
 
@@ -1335,10 +1400,7 @@ pub async fn send_all_btc_from_account_to_dev(
     for utxo in &selected {
         let txid = Txid::from_str(&utxo.txid)?;
         tx.input.push(TxIn {
-            previous_output: OutPoint {
-                txid,
-                vout: utxo.vout,
-            },
+            previous_output: OutPoint { txid, vout: utxo.vout },
             script_sig: ScriptBuf::new(),
             sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
             witness: Witness::new(),
@@ -1359,9 +1421,7 @@ pub async fn send_all_btc_from_account_to_dev(
         let mut sig_ser = sig.serialize_der().to_vec();
         sig_ser.push(EcdsaSighashType::All as u8);
         tx.input[i].witness.push(sig_ser);
-        tx.input[i]
-            .witness
-            .push(private_key.public_key(&secp).to_bytes());
+        tx.input[i].witness.push(private_key.public_key(&secp).to_bytes());
     }
 
     let tx_bytes = serialize(&tx);
@@ -1377,5 +1437,151 @@ pub async fn send_all_btc_from_account_to_dev(
         .text()
         .await?;
 
+    Ok(response)
+}
+
+pub async fn sweep_btc_to_main(
+    ctx: &CoreContext,
+    mnemonic_str: &str,
+    start_idx: u32,
+    end_idx: u32,
+) -> anyhow::Result<String> {
+    let network = ctx.btc_network;
+    let mempool_api = &ctx.cfg.mempool_api;
+    let dev_address_str = &ctx.cfg.operator_btc_wallet_address;
+    let secp = secp256k1::Secp256k1::new();
+
+    let seed = mnemonic_to_seed_unchecked(mnemonic_str, "");
+    let xprv = bitcoin::bip32::Xpriv::new_master(network, &seed)?;
+    let coin_type = match network {
+        bitcoin::Network::Bitcoin => 0u32,
+        _ => 1u32,
+    };
+
+    let mut all_inputs = Vec::new();
+    let mut total_balance: u64 = 0;
+
+    info!(start_idx, end_idx, "Starting comprehensive BTC sweep scan...");
+
+    // 2. Scan chains: 0 (Receive) and 1 (Change)
+    for chain in [0u32, 1u32] {
+        let chain_name = if chain == 0 { "Receive" } else { "Change" };
+
+        for idx in start_idx..end_idx {
+            let path_str = format!("m/84'/{}'/0'/{}/{}", coin_type, chain, idx);
+            let derivation_path: bitcoin::bip32::DerivationPath =
+                path_str.parse()?;
+            let child_xprv = xprv.derive_priv(&secp, &derivation_path)?;
+            let priv_key = bitcoin::PrivateKey {
+                inner: child_xprv.private_key,
+                network: network.into(),
+                compressed: true,
+            };
+
+            let pubkey = bitcoin::CompressedPublicKey::from_private_key(
+                &secp, &priv_key,
+            )
+            .map_err(|e| anyhow::anyhow!("Pubkey derivation failed: {}", e))?;
+            let address = bitcoin::Address::p2wpkh(&pubkey, network);
+
+            // Fetch UTXOs
+            let url = format!("{}/address/{}/utxo", mempool_api, address);
+            let utxos: Vec<Utxo> =
+                ctx.http.get(&url).send().await?.json().await?;
+
+            if !utxos.is_empty() {
+                info!(%address, %path_str, "Found {} UTXOs on {} chain", utxos.len(), chain_name);
+                for utxo in utxos {
+                    total_balance += utxo.value;
+                    all_inputs.push((utxo, priv_key, address.script_pubkey()));
+                }
+            }
+        }
+    }
+
+    if all_inputs.is_empty() {
+        info!("Scan complete: No funds found.");
+        return Ok(String::new());
+    }
+
+    // 3. Fetch Recommended Fee
+    let fee_url = format!("{}/v1/fees/recommended", mempool_api);
+    let fee_res: FeeRecommended =
+        ctx.http.get(&fee_url).send().await?.json().await?;
+    let fee_rate = (fee_res.economy_fee.ceil() as u64).max(1);
+
+    // 4. Build One Transaction for all inputs
+    let mut tx = bitcoin::Transaction {
+        version: bitcoin::transaction::Version::TWO,
+        lock_time: bitcoin::absolute::LockTime::ZERO,
+        input: vec![],
+        output: vec![],
+    };
+
+    let est_vbytes = 10 + (all_inputs.len() as u64 * 68) + 31;
+    let total_fee = est_vbytes * fee_rate;
+
+    if total_balance <= total_fee + 546 {
+        return Err(anyhow::anyhow!(
+            "Total balance {} too low for fees {}",
+            total_balance,
+            total_fee
+        ));
+    }
+
+    let send_amount = total_balance - total_fee;
+    let to_address = bitcoin::Address::from_str(dev_address_str)?
+        .require_network(network)?;
+
+    tx.output.push(bitcoin::TxOut {
+        value: bitcoin::Amount::from_sat(send_amount),
+        script_pubkey: to_address.script_pubkey(),
+    });
+
+    for (utxo, _, _) in &all_inputs {
+        tx.input.push(bitcoin::TxIn {
+            previous_output: bitcoin::OutPoint {
+                txid: bitcoin::Txid::from_str(&utxo.txid)?,
+                vout: utxo.vout,
+            },
+            script_sig: bitcoin::ScriptBuf::new(),
+            sequence: bitcoin::Sequence::ENABLE_RBF_NO_LOCKTIME,
+            witness: bitcoin::Witness::new(),
+        });
+    }
+
+    // 5. Sign each input with its specific key
+    for (i, (utxo, priv_key, script_pubkey)) in all_inputs.iter().enumerate() {
+        let mut cache = bitcoin::sighash::SighashCache::new(&tx);
+        let sighash = cache.p2wpkh_signature_hash(
+            i,
+            script_pubkey,
+            bitcoin::Amount::from_sat(utxo.value),
+            bitcoin::EcdsaSighashType::All,
+        )?;
+
+        let msg = secp256k1::Message::from_digest_slice(&sighash[..])?;
+        let sig = secp.sign_ecdsa(&msg, &priv_key.inner);
+        let mut sig_ser = sig.serialize_der().to_vec();
+        sig_ser.push(bitcoin::EcdsaSighashType::All as u8);
+
+        tx.input[i].witness.push(sig_ser);
+        tx.input[i].witness.push(priv_key.public_key(&secp).to_bytes());
+    }
+
+    // 6. Broadcast
+    let tx_hex = hex::encode(bitcoin::consensus::serialize(&tx));
+    let broadcast_url = format!("{}/tx", mempool_api);
+    let response = ctx
+        .http
+        .post(&broadcast_url)
+        .header("Content-Type", "text/plain")
+        .body(tx_hex)
+        .send()
+        .await?
+        .text()
+        .await?;
+
+    info!(txid = %response, "Sweep transaction successful!");
     Ok(response)
 }

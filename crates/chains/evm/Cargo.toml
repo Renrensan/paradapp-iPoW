@@ -12,14 +12,10 @@ anyhow = "1.0.100"
 async-trait = "0.1.89"
 tracing = "0.1.44"
 futures = "0.3.31"
-sqlx = { version = "0.8", features = [
-    "sqlite",
-    "runtime-tokio",
-    "macros",
-] }
 chrono = "0.4.43"
 hex = "0.4.3"
 tokio = "1.49.0"
+config = "0.15.19"
 
 [build-dependencies]
 ethers-contract-abigen = "2"

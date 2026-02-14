@@ -1,17 +1,16 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
-
 use crate::{
     consts::supported_network_enum::SupportedNetwork,
-    context::CoreContext,
+    dependencies::context::CoreContext,
     traits::{
-        approving_adapter::ApprovingAdapter, chain_provider_adapter::ChainProviderAdapter,
-        converting_adapter::ConvertingAdapter, streaming_adapter::StreamingAdapter,
+        approving_adapter::ApprovingAdapter,
+        chain_provider_adapter::ChainProviderAdapter,
+        converting_adapter::ConvertingAdapter,
+        streaming_adapter::StreamingAdapter,
     },
 };
 
-#[async_trait]
 pub trait ChainStack: Send + Sync {
     fn converting(&self) -> Arc<dyn ConvertingAdapter>;
     fn approving(&self) -> Arc<dyn ApprovingAdapter>;

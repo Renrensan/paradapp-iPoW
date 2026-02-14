@@ -4,18 +4,37 @@ rust = "1.91.1"
 [env]
 _.file = ".env"
 
+[tasks.ensure-redis]
+description = "Ensure the Redis container from docker-compose is running"
+run = "docker compose up -d redis"
+
+[tasks.template]
+description = "Generate .env.example and config.example.yml from current local files"
+run = """
+sed 's/=.*$/=/' .env > .env.example
+sed 's/: .*$/: /' config.yml > config.example.yml
+echo "✅ Templates generated: .env.example, config.example.yml"
+"""
+
 [tasks.build]
 description = "Build all operator binaries"
 run = "cargo build --release"
 
 [tasks.run-all]
+depends = ["ensure-redis"]
 description = "Run monolith operator (All networks, all engines)"
 run = "cargo run -- --mode monolith"
+
+[tasks.rebalance-all]
+depends = ["ensure-redis"]
+description = "Run rebalance engine for all supported networks"
+run = "cargo run -- --mode monolith --engine rebalance"
 
 
 # --- Network Specific Helpers ---
 
 [tasks.run-hedera]
+depends = ["ensure-redis"]
 description = "Usage: [ENGINE=...] mise run run-hedera [watch...]. Engines: all, approver, streamer, converter."
 run = '''
 bash -c '
@@ -29,6 +48,7 @@ fi
 '''
 
 [tasks.run-ethereum]
+depends = ["ensure-redis"]
 description = "Usage: [ENGINE=...] mise run run-ethereum [watch...]. Engines: all, approver, streamer, converter."
 run = '''
 bash -c '

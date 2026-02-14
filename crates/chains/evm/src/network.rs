@@ -25,12 +25,41 @@ impl EvmNetwork {
         }
     }
 
-    pub fn rpc_env(&self) -> &'static str {
+    pub fn string_identifier(&self) -> &'static str {
         match self {
-            Self::EthereumSepolia => "ETH_SEPOLIA_RPC",
-            Self::Hedera => "HEDERA_RPC",
+            Self::EthereumSepolia => "ethereum",
+            Self::Hedera => "hedera",
         }
     }
+
+    // --- config.yml PATHS ---
+
+    pub fn rpc_config_path(&self) -> &'static str {
+        match self {
+            Self::EthereumSepolia => "networks.eth_sepolia.rpc_url",
+            Self::Hedera => "networks.hedera.rpc_url",
+        }
+    }
+
+    pub fn min_limit_config_path(&self) -> &'static str {
+        match self {
+            Self::EthereumSepolia => {
+                "networks.eth_sepolia.min_transaction_limit"
+            },
+            Self::Hedera => "networks.hedera.min_transaction_limit",
+        }
+    }
+
+    pub fn max_limit_config_path(&self) -> &'static str {
+        match self {
+            Self::EthereumSepolia => {
+                "networks.eth_sepolia.max_transaction_limit"
+            },
+            Self::Hedera => "networks.hedera.max_transaction_limit",
+        }
+    }
+
+    // --- .env KEYS ---
 
     pub fn contract_env(&self) -> &'static str {
         match self {
@@ -43,22 +72,6 @@ impl EvmNetwork {
         match self {
             Self::EthereumSepolia => "ETH_SEPOLIA_OPERATOR_PRIVATE_KEY",
             Self::Hedera => "HEDERA_OPERATOR_PRIVATE_KEY",
-        }
-    }
-
-    pub fn string_identifier(&self) -> &'static str {
-        match self {
-            Self::EthereumSepolia => "ethereum",
-            Self::Hedera => "hedera",
-        }
-    }
-
-    // Temporary
-    pub fn shared_sqlite_db(&self) -> &'static str {
-        // Returning a unified name ensures that different variants
-        // resolve to the same SQLite file path/identifier.
-        match self {
-            Self::EthereumSepolia | Self::Hedera => "shared_chain_db",
         }
     }
 

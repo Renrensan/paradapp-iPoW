@@ -19,6 +19,7 @@ docs/
 .env
 _.log
 _.tmp
+config.yml
 
 # OS-specific
 .DS_Store

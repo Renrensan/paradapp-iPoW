@@ -17,15 +17,7 @@ Ensure you have the following installed:
     cd paradapp-operator-service
     ```
 
-2.  **Prepare Local Storage:**
-
-    The operator uses SQLite for local state tracking. You must create a `data` folder in the root directory:
-
-    ```sh
-    mkdir data
-    ```
-
-3.  **Configure Environment:**
+2.  **Configure Environment:**
 
     The application uses environment variables for configuration. Copy the example file:
 
@@ -33,9 +25,9 @@ Ensure you have the following installed:
     cp .env.example .env
     ```
 
-    Modify `.env` to set your RPC endpoints, private keys, and ensure your database path points to the `data` folder (e.g., `DATABASE_URL=sqlite://data/operator.db`).
+    Modify `.env` to set your RPC endpoints, private keys, etc
 
-4.  **Install Tools:**
+3.  **Install Tools:**
 
     Install the project tools managed by `mise`:
 

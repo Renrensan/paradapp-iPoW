@@ -17,6 +17,7 @@ Cargo.lock
 .env
 *.log
 *.tmp
+config.yml
 
 # OS-specific
 .DS_Store

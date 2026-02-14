@@ -1,0 +1,21 @@
+# Bitcoin Configuration
+bitcoin:
+  network: 
+  rbf_blocks_since_anchor: 
+  rbf_blocks_from_tip_to_unconfirmed: 
+  high_finality_confirmed_block: 
+  mempool_api: 
+  esplora_base: 
+
+# Network Specific Configurations
+networks:
+  hedera:
+    contract_address: 
+    min_transaction_limit: 
+    max_transaction_limit: 
+    rpc_url: 
+  eth_sepolia:
+    contract_address: 
+    min_transaction_limit: 
+    max_transaction_limit: 
+    rpc_url: 

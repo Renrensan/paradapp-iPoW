@@ -27,9 +27,6 @@ For a deep dive into the design, see [ARCHITECTURE.md](./docs/architecture.md).
 git clone <repo-url>
 cd paradapp-operator-service
 
-# Setup local data directory for SQLite
-mkdir data
-
 # Install toolchain and dependencies via mise
 mise install
 
@@ -77,7 +74,6 @@ Production environments should leverage the `ENGINE` environment variable to sca
 │   ├── core/         # Logic, Traits, and Models
 │   ├── chains/       # EVM, Solana, and other networks adapters
 │   └── operator/     # Main entrypoint and task spawner
-├── data/             # Local SQLite storage (Git ignored)
 ├── docs/             # Technical documentation
 └── mise.toml         # Task definitions
 ```

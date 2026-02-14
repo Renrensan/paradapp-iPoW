@@ -20,7 +20,11 @@ pub trait ApprovingAdapter: Send + Sync {
         xpub: &str,
     ) -> Result<(u32, String, Vec<u8>)>;
 
-    async fn handle_operator_closes_for_active(&self, tx_id: U256, conf_req: u64) -> Result<()>;
+    async fn handle_operator_closes_for_active(
+        &self,
+        tx_id: U256,
+        conf_req: u64,
+    ) -> Result<()>;
 
     async fn discover_user_close_candidates(
         &self,
@@ -33,5 +37,9 @@ pub trait ApprovingAdapter: Send + Sync {
         candidates: Vec<(U256, &'static str)>,
     ) -> anyhow::Result<()>;
 
-    async fn approve_one_tx(&self, tx_id: U256, duty_seconds: u64) -> Result<()>;
+    async fn approve_one_tx(
+        &self,
+        tx_id: U256,
+        duty_seconds: u64,
+    ) -> Result<()>;
 }

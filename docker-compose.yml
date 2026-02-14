@@ -15,13 +15,15 @@ services:
         "all",
         "--watch-sources",
         "eth",
-        "base",
       ]
     env_file: .env
     environment:
-      SQLITE_DB_DIR: "/app/data"
-    volumes:
-      - hedera_data:/app/data
+      REDIS_URL: "redis://operator-service-redis:6379"
+    networks:
+      - bridge-network
+    depends_on:
+      redis:
+        condition: service_started
     restart: unless-stopped
 
   # --- ETHEREUM OPERATOR ---
@@ -42,11 +44,28 @@ services:
       ]
     env_file: .env
     environment:
-      SQLITE_DB_DIR: "/app/data"
+      REDIS_URL: "redis://operator-service-redis:6379"
+    networks:
+      - bridge-network
+    depends_on:
+      redis:
+        condition: service_started
+    restart: unless-stopped
+  redis:
+    image: redis:7.4-alpine
+    container_name: operator-service-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - bridge-network
+    command: ["redis-server", "--appendonly", "yes", "--loglevel", "warning"]
     volumes:
-      - ethereum_data:/app/data
-    restart: unless-stoppedc
+      - redis_data:/data
+
+networks:
+  bridge-network:
+    driver: bridge
 
 volumes:
-  hedera_data:
-  ethereum_data:
+  redis_data:
