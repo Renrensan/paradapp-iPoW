@@ -520,6 +520,28 @@ impl ChainOperator {
         for (tx_id, conv) in ready_h2b {
             // Case A: BTC already sent → check confirmation & submit proof
             if let Some(btc_txid) = processed_map.get(&tx_id) {
+                // --- CACHE CHECK START ---
+                // Fetch submitted proof info from contract
+                let info = stack.chain_provider().proof_info(tx_id).await?;
+
+                // Check if cached: attempts > 0 and current_tip < proof_block_height
+                if info.attempts > 0 {
+                    let chain_height =
+                        stack.chain_provider().global_tip_height().await?;
+
+                    if chain_height < info.block_height {
+                        info!(
+                            %tx_id,
+                            proof_h = %info.block_height,
+                            tip_h = %chain_height,
+                            attempts = %info.attempts,
+                            "Merkle proof already cached. Skipping height check."
+                        );
+                        continue;
+                    }
+                }
+                // --- CACHE CHECK END ---
+
                 match stack
                     .converting()
                     .check_confirmation_and_build_proof(tx_id, btc_txid)
@@ -634,6 +656,7 @@ impl ChainOperator {
                 warn!(%tx_id, ?err, "Error handling NATIVE→BTC conversion");
             }
         }
+
         // 4. Handle BTC → NATIVE
         for (tx_id, _conv) in ready_b2h {
             if let Err(err) =
@@ -926,10 +949,7 @@ impl ChainOperator {
         } else {
             let user_close_candidates = stack
                 .approving()
-                .discover_user_close_candidates(
-                    state.next_tx_id - U256::one(),
-                    state.confirmations_required,
-                )
+                .discover_user_close_candidates(state.next_tx_id - U256::one())
                 .await
                 .unwrap_or_default();
 
@@ -949,11 +969,22 @@ impl ChainOperator {
                     user_close_candidates
                         .into_iter()
                         .map(|(tx_id, kind)| {
-                            if kind.contains("refundAfterNoProof") {
-                                (tx_id, "refundAfterNoProof_NativeTokentoBTC")
-                            } else {
-                                (tx_id, "claimNative_AfterOperatorExpired")
-                            }
+                            let static_kind = match kind.as_str() {
+                                "timeoutNoDeposit_NativeToBitcoin" => {
+                                    "timeoutNoDeposit_NativeToBitcoin"
+                                },
+                                "closeNoBitcoin_BitcoinToNative" => {
+                                    "closeNoBitcoin_BitcoinToNative"
+                                },
+                                "refundAfterNoProof_NativeTokentoBTC" => {
+                                    "refundAfterNoProof_NativeTokentoBTC"
+                                },
+                                "claimNative_AfterOperatorExpired" => {
+                                    "claimNative_AfterOperatorExpired"
+                                },
+                                _ => "claimNative_AfterOperatorExpired",
+                            };
+                            (tx_id, static_kind)
                         })
                         .collect();
 
@@ -969,6 +1000,13 @@ impl ChainOperator {
                             target_height,
                         )
                         .await?;
+                } else {
+                    info!(
+                        %network,
+                        active_open = %refreshed.active_open,
+                        global_tip = %refreshed.global_tip,
+                        "Jump skipped: active operations still pending"
+                    );
                 }
             } else {
                 info!(%network, "Streaming headers is cheaper or no candidates found");

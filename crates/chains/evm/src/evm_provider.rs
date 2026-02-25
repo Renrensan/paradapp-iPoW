@@ -24,7 +24,7 @@ use paradapp_core::{
     models::conversion::Conversion,
     traits::chain_provider_adapter::{
         AnchorInfo, BitcoinProgramType, BitcoinToNativeCommitArgs,
-        ChainProviderAdapter, GlobalChainState, TxIdFilter,
+        ChainProviderAdapter, GlobalChainState, SubmittedProofInfo, TxIdFilter,
     },
 };
 use tracing::{error, info, warn};
@@ -398,7 +398,9 @@ impl ChainProviderAdapter for EvmChainProvider {
                 info!(height = %anchor_h, "Anchor already stored (height-rewrite)");
             } else if err_msg.contains("no-jump-while-active") {
                 warn!(height = %anchor_h, "no-jump-while-active triggered — possible race!");
-                return Ok(committed_up_to);
+                return Err(anyhow!(
+                    "Jump rejected: active conversions still exist on-chain"
+                ));
             } else {
                 return Err(anyhow!(
                     "Preflight failed for anchor {anchor_h}: {err}"
@@ -415,32 +417,37 @@ impl ChainProviderAdapter for EvmChainProvider {
                 .send()
                 .await
             {
-                Ok(pending) => {
-                    match pending.await {
-                        Ok(Some(receipt)) => {
-                            info!(
-                                tx_hash = ?receipt.transaction_hash,
-                                height = %anchor_h,
-                                "ANCHOR HEADER TX MINED — jump successful"
-                            );
-                            committed_up_to = anchor_h; // Critical: update to anchor_h, not first_h!
-                        },
-                        Ok(None) => {
-                            warn!(
-                                height = %anchor_h,
-                                "ANCHOR HEADER TX dropped from mempool — will retry next cycle"
-                            );
-                            // Do not advance
-                        },
-                        Err(e) => {
-                            warn!(
-                                height = %anchor_h,
-                                error = %e,
-                                "ANCHOR HEADER TX failed while awaiting receipt — will retry next cycle"
-                            );
-                            // Do not advance
-                        },
-                    }
+                Ok(pending) => match pending.await {
+                    Ok(Some(receipt)) => {
+                        info!(
+                            tx_hash = ?receipt.transaction_hash,
+                            height = %anchor_h,
+                            "ANCHOR HEADER TX MINED — jump successful"
+                        );
+                        committed_up_to = anchor_h;
+                    },
+                    Ok(None) => {
+                        warn!(
+                            height = %anchor_h,
+                            "ANCHOR HEADER TX dropped from mempool — will retry next cycle"
+                        );
+                        return Err(anyhow!(
+                            "ANCHOR HEADER TX dropped from mempool at height {}",
+                            anchor_h
+                        ));
+                    },
+                    Err(e) => {
+                        warn!(
+                            height = %anchor_h,
+                            error = %e,
+                            "ANCHOR HEADER TX failed while awaiting receipt — will retry next cycle"
+                        );
+                        return Err(anyhow!(
+                            "ANCHOR HEADER TX failed at height {}: {}",
+                            anchor_h,
+                            e
+                        ));
+                    },
                 },
                 Err(e) => {
                     warn!(
@@ -448,7 +455,11 @@ impl ChainProviderAdapter for EvmChainProvider {
                         error = %e,
                         "Failed to broadcast anchor header — will retry next cycle"
                     );
-                    // Do not advance
+                    return Err(anyhow!(
+                        "Failed to broadcast anchor header at height {}: {}",
+                        anchor_h,
+                        e
+                    ));
                 },
             }
         }
@@ -482,6 +493,32 @@ impl ChainProviderAdapter for EvmChainProvider {
                 Err(anyhow::anyhow!(e))
             },
         }
+    }
+
+    async fn proof_info(&self, tx_id: U256) -> Result<SubmittedProofInfo> {
+        let (
+            set,
+            verified,
+            invalid,
+            attempts,
+            tx_id_le,
+            block_hash_le,
+            block_height,
+            out_value_sats,
+            out_program,
+        ) = self.ctx.c_op.proof_info(tx_id).call().await?;
+
+        Ok(SubmittedProofInfo {
+            set,
+            verified,
+            invalid,
+            attempts,
+            tx_id_le,
+            block_hash_le,
+            block_height,
+            out_value_sats,
+            out_program,
+        })
     }
 
     async fn min_anchor_height(&self) -> Result<U256> {

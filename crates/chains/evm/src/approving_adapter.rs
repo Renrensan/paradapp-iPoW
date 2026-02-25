@@ -191,94 +191,24 @@ impl ApprovingAdapter for EvmApprovingAdapter {
     async fn discover_user_close_candidates(
         &self,
         to_tx_id: U256,
-        conf_req: u64,
     ) -> Result<Vec<(U256, String)>> {
-        let conf_req_bn = U256::from(conf_req);
-
         use futures::try_join;
 
-        // --- ACTIVE_WAITING_PROOF ---
-        let (
-            native_to_btc,
-            btc_to_native,
-            native_to_native_in,
-            native_to_native_out,
-        ) = try_join!(
-            // 1. Native -> BTC
+        // Fetch IDs for both phases separately
+        let (op_expired_ids, user_expired_ids) = try_join!(
             self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
-                type_filter: TransactionType::NATIVE_TO_BITCOIN,
-                phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
+                type_filter: TransactionType::ANY,
+                phase_filter: TransactionPhase::OPERATOR_DUTY_EXPIRED,
                 to_tx_id,
                 ..Default::default()
             }),
-            // 2. BTC -> Native
             self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
-                type_filter: TransactionType::BITCOIN_TO_NATIVE,
-                phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
-                to_tx_id,
-                ..Default::default()
-            }),
-            // 3. Native -> Native IN
-            self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
-                type_filter: TransactionType::NATIVE_TO_NATIVE_IN,
-                phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
-                to_tx_id,
-                ..Default::default()
-            }),
-            // 4. Native -> Native OUT
-            self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
-                type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
-                phase_filter: TransactionPhase::ACTIVE_WAITING_PROOF,
+                type_filter: TransactionType::ANY,
+                phase_filter: TransactionPhase::USER_ACTION_EXPIRED,
                 to_tx_id,
                 ..Default::default()
             }),
         )?;
-
-        let active_txs: Vec<U256> = native_to_btc
-            .into_iter()
-            .chain(btc_to_native)
-            .chain(native_to_native_in)
-            .chain(native_to_native_out)
-            .collect();
-
-        let (
-            native_to_btc,
-            btc_to_native,
-            native_to_native_in,
-            native_to_native_out,
-        ) = try_join!(
-            self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
-                type_filter: TransactionType::NATIVE_TO_BITCOIN,
-                phase_filter: TransactionPhase::OPERATOR_DUTY_EXPIRED,
-                to_tx_id,
-                ..Default::default()
-            }),
-            self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
-                type_filter: TransactionType::BITCOIN_TO_NATIVE,
-                phase_filter: TransactionPhase::OPERATOR_DUTY_EXPIRED,
-                to_tx_id,
-                ..Default::default()
-            }),
-            self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
-                type_filter: TransactionType::NATIVE_TO_NATIVE_IN,
-                phase_filter: TransactionPhase::OPERATOR_DUTY_EXPIRED,
-                to_tx_id,
-                ..Default::default()
-            }),
-            self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
-                type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
-                phase_filter: TransactionPhase::OPERATOR_DUTY_EXPIRED,
-                to_tx_id,
-                ..Default::default()
-            }),
-        )?;
-
-        let duty_expired_txs: Vec<U256> = native_to_btc
-            .into_iter()
-            .chain(btc_to_native)
-            .chain(native_to_native_in)
-            .chain(native_to_native_out)
-            .collect();
 
         let mut seen = std::collections::HashSet::<U256>::new();
         let mut candidates: Vec<(U256, String)> = Vec::new();
@@ -286,8 +216,8 @@ impl ApprovingAdapter for EvmApprovingAdapter {
         let contract = self.ctx.contract.clone();
         let c_op = self.ctx.c_op.clone();
 
-        // --- ACTIVE logic ---
-        for tx_id in active_txs {
+        // 1. Logic for USER_ACTION_EXPIRED
+        for tx_id in user_expired_ids {
             if !seen.insert(tx_id) {
                 continue;
             }
@@ -295,42 +225,33 @@ impl ApprovingAdapter for EvmApprovingAdapter {
             let (conv, _phase): (Conversion, u8) =
                 contract.get_conversion_with_phase(tx_id).call().await?;
 
-            let (
-                headers_started,
-                _start_height,
-                last_height,
-                _deposit_end,
-                proof_end,
-                _duty_expires_at,
-            ) = contract.windows_for(tx_id).call().await?;
-
-            if !headers_started
-                || !conv.is_native_to_bitcoin
-                || !conv.approved
-                || conv.completed
-                || conv.refunded
-                || !conv.deposited
-            {
-                continue;
-            }
-
-            let end_height = proof_end + (conf_req_bn - U256::from(1));
-            if last_height > end_height
-                && c_op
-                    .refund_after_no_proof_native_to_bitcoin(tx_id)
+            if conv.is_native_to_bitcoin {
+                if c_op
+                    .timeout_no_deposit_nativeto_bitcoin(tx_id)
                     .call()
                     .await
                     .is_ok()
+                {
+                    candidates.push((
+                        tx_id,
+                        "timeoutNoDeposit_NativeToBitcoin".to_string(),
+                    ));
+                }
+            } else if c_op
+                .close_no_bitcoin_bitcoin_to_native(tx_id)
+                .call()
+                .await
+                .is_ok()
             {
                 candidates.push((
                     tx_id,
-                    "refundAfterNoProof_NativeTokentoBTC".to_string(),
+                    "closeNoBitcoin_BitcoinToNative".to_string(),
                 ));
             }
         }
 
-        // --- DUTY_EXPIRED logic ---
-        for tx_id in duty_expired_txs {
+        // 2. Logic for OPERATOR_DUTY_EXPIRED
+        for tx_id in op_expired_ids {
             if !seen.insert(tx_id) {
                 continue;
             }
@@ -338,6 +259,7 @@ impl ApprovingAdapter for EvmApprovingAdapter {
             let (conv, _phase): (Conversion, u8) =
                 contract.get_conversion_with_phase(tx_id).call().await?;
 
+            // Filter out already finalized transactions
             if !conv.approved || conv.completed || conv.refunded {
                 continue;
             }
@@ -369,7 +291,7 @@ impl ApprovingAdapter for EvmApprovingAdapter {
 
         info!(
             count = candidates.len(),
-            "Discovered user-close candidates (for jump cost comparison)"
+            "Discovered candidates (Direct User Expiry + Validated Operator Expiry)"
         );
 
         Ok(candidates)
@@ -383,23 +305,74 @@ impl ApprovingAdapter for EvmApprovingAdapter {
 
         for (tx_id, kind) in candidates {
             match kind {
-                "refundAfterNoProof_NativeTokentoBTC" => {
-                    info!(
-                        tx_id = %tx_id,
-                        "[jump] User-close refundAfterNoProof_NativeTokentoBTC"
-                    );
+                "timeoutNoDeposit_NativeToBitcoin" => {
+                    info!(tx_id = %tx_id, "[jump] User-close timeoutNoDeposit_NativeToBitcoin");
 
-                    // 1. static call
+                    let can_execute = c_op
+                        .timeout_no_deposit_nativeto_bitcoin(tx_id)
+                        .call()
+                        .await;
+                    if let Err(e) = can_execute {
+                        error!(tx_id = %tx_id, error = ?e, "Static call failed: timeoutNoDeposit_NativeToBitcoin");
+                        continue;
+                    }
+
+                    match c_op
+                        .timeout_no_deposit_nativeto_bitcoin(tx_id)
+                        .send()
+                        .await
+                    {
+                        Ok(pending) => {
+                            let tx_hash = pending.tx_hash();
+                            let _ = pending.await;
+                            info!(tx_hash = ?tx_hash, tx_id = %tx_id, "timeoutNoDeposit_NativeToBitcoin tx mined");
+                        },
+                        Err(e) => {
+                            warn!(tx_id = %tx_id, error = %e, "Failed to send timeoutNoDeposit_NativeToBitcoin")
+                        },
+                    }
+                },
+
+                "closeNoBitcoin_BitcoinToNative" => {
+                    info!(tx_id = %tx_id, "[jump] User-close closeNoBitcoin_BitcoinToNative");
+
+                    let can_execute = c_op
+                        .close_no_bitcoin_bitcoin_to_native(tx_id)
+                        .call()
+                        .await;
+                    if let Err(e) = can_execute {
+                        error!(tx_id = %tx_id, error = ?e, "Static call failed: closeNoBitcoin_BitcoinToNative");
+                        continue;
+                    }
+
+                    match c_op
+                        .close_no_bitcoin_bitcoin_to_native(tx_id)
+                        .send()
+                        .await
+                    {
+                        Ok(pending) => {
+                            let tx_hash = pending.tx_hash();
+                            let _ = pending.await;
+                            info!(tx_hash = ?tx_hash, tx_id = %tx_id, "closeNoBitcoin_BitcoinToNative tx mined");
+                        },
+                        Err(e) => {
+                            warn!(tx_id = %tx_id, error = %e, "Failed to send closeNoBitcoin_BitcoinToNative")
+                        },
+                    }
+                },
+
+                "refundAfterNoProof_NativeTokentoBTC" => {
+                    info!(tx_id = %tx_id, "[jump] User-close refundAfterNoProof_NativeTokentoBTC");
+
                     let can_execute = c_op
                         .refund_after_no_proof_native_to_bitcoin(tx_id)
                         .call()
                         .await;
-
-                    if can_execute.is_err() {
+                    if let Err(e) = can_execute {
+                        error!(tx_id = %tx_id, error = ?e, "Static call failed: refundAfterNoProof_NativeTokentoBTC");
                         continue;
                     }
 
-                    // 2. send real transaction
                     match c_op
                         .refund_after_no_proof_native_to_bitcoin(tx_id)
                         .send()
@@ -408,40 +381,26 @@ impl ApprovingAdapter for EvmApprovingAdapter {
                         Ok(pending) => {
                             let tx_hash = pending.tx_hash();
                             let _ = pending.await;
-
-                            info!(
-                                tx_hash = ?tx_hash,
-                                tx_id = %tx_id,
-                                "refundAfterNoProof_NativeTokentoBTC tx mined"
-                            );
+                            info!(tx_hash = ?tx_hash, tx_id = %tx_id, "refundAfterNoProof_NativeTokentoBTC tx mined");
                         },
                         Err(e) => {
-                            warn!(
-                                tx_id = %tx_id,
-                                error = %e,
-                                "Failed to send refundAfterNoProof_NativeTokentoBTC — retrying next cycle"
-                            );
+                            warn!(tx_id = %tx_id, error = %e, "Failed to send refundAfterNoProof_NativeTokentoBTC")
                         },
                     }
                 },
 
                 "claimNative_AfterOperatorExpired" => {
-                    info!(
-                        tx_id = %tx_id,
-                        "[jump] User-close claimNative_AfterOperatorExpired"
-                    );
+                    info!(tx_id = %tx_id, "[jump] User-close claimNative_AfterOperatorExpired");
 
-                    // 1. static call
                     let can_execute = c_op
                         .claim_native_after_operator_expired(tx_id)
                         .call()
                         .await;
-
-                    if can_execute.is_err() {
+                    if let Err(e) = can_execute {
+                        error!(tx_id = %tx_id, error = ?e, "Static call failed: claimNative_AfterOperatorExpired");
                         continue;
                     }
 
-                    // 2. send real transaction
                     match c_op
                         .claim_native_after_operator_expired(tx_id)
                         .send()
@@ -450,19 +409,10 @@ impl ApprovingAdapter for EvmApprovingAdapter {
                         Ok(pending) => {
                             let tx_hash = pending.tx_hash();
                             let _ = pending.await;
-
-                            info!(
-                                tx_hash = ?tx_hash,
-                                tx_id = %tx_id,
-                                "claimNative_AfterOperatorExpired tx mined"
-                            );
+                            info!(tx_hash = ?tx_hash, tx_id = %tx_id, "claimNative_AfterOperatorExpired tx mined");
                         },
                         Err(e) => {
-                            warn!(
-                                tx_id = %tx_id,
-                                error = %e,
-                                "Failed to send claimNative_AfterOperatorExpired — retrying next cycle"
-                            );
+                            warn!(tx_id = %tx_id, error = %e, "Failed to send claimNative_AfterOperatorExpired")
                         },
                     }
                 },

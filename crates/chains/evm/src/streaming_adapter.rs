@@ -290,7 +290,7 @@ impl StreamingAdapter for EvmStreamingAdapter {
                         height = %h,
                         "height already stored, skipping"
                     );
-                    new_tip = h; // still advance tip (assume it's stored)
+                    new_tip = h;
                     continue;
                 } else if err_msg.contains("no-jump-while-active") {
                     warn!(

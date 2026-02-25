@@ -29,7 +29,6 @@ pub trait ApprovingAdapter: Send + Sync {
     async fn discover_user_close_candidates(
         &self,
         to_tx_id: U256,
-        conf_req: u64,
     ) -> Result<Vec<(U256, String)>>;
 
     async fn execute_user_closes(

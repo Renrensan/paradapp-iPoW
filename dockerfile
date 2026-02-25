@@ -15,6 +15,8 @@ COPY crates/chains/evm/src/lib.rs crates/chains/evm/src/lib.rs
 COPY crates/operator/Cargo.toml crates/operator/Cargo.toml
 COPY crates/operator/src/main.rs crates/operator/src/main.rs
 
+COPY crates/api/Cargo.toml crates/api/Cargo.toml
+COPY crates/api/src/lib.rs crates/api/src/lib.rs
 
 RUN cargo chef prepare --recipe-path recipe.json
 
@@ -50,6 +52,5 @@ ENV RUST_LOG=info
 ENV REDIS_URL=redis://redis:6379
 
 EXPOSE 8080
-VOLUME ["/app/data"]
 
 ENTRYPOINT ["app"]

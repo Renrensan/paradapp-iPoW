@@ -69,6 +69,18 @@ pub struct GlobalChainState {
     pub active_open: u64,
     pub btc_tip: u64,
 }
+
+pub struct SubmittedProofInfo {
+    pub set: bool,
+    pub verified: bool,
+    pub invalid: bool,
+    pub attempts: u8,
+    pub tx_id_le: [u8; 32],
+    pub block_hash_le: [u8; 32],
+    pub block_height: U256,
+    pub out_value_sats: u64,
+    pub out_program: ethers::core::types::Bytes,
+}
 #[async_trait]
 pub trait ChainProviderAdapter: Send + Sync {
     async fn check_rpc_health(&self) -> Result<()>;
@@ -95,6 +107,8 @@ pub trait ChainProviderAdapter: Send + Sync {
     ) -> Result<u64>;
 
     async fn global_tip_height(&self) -> Result<U256>;
+
+    async fn proof_info(&self, tx_id: U256) -> Result<SubmittedProofInfo>;
 
     async fn min_anchor_height(&self) -> Result<U256>;
 

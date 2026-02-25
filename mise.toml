@@ -22,8 +22,14 @@ run = "cargo build --release"
 
 [tasks.run-all]
 depends = ["ensure-redis"]
-description = "Run monolith operator (All networks, all engines)"
-run = "cargo run -- --mode monolith"
+description = "Usage: [PORT=8888] [ENGINE=all] mise run run-all"
+run = '''
+bash -c '
+P_FLAG=${PORT:-8888}
+E_FLAG=${ENGINE:-all}
+cargo run -- monolith --port "$P_FLAG" --engine "$E_FLAG"
+'
+'''
 
 [tasks.rebalance-all]
 depends = ["ensure-redis"]
@@ -40,9 +46,9 @@ run = '''
 bash -c '
 E_FLAG=${ENGINE:-all}
 if [ "$#" -gt 0 ]; then
-    cargo run -- --mode operator --src hedera --engine "$E_FLAG" --watch-sources "$@"
+    cargo run -- operator --src hedera --engine "$E_FLAG" --watch-sources "$@"
 else
-    cargo run -- --mode operator --src hedera --engine "$E_FLAG"
+    cargo run -- operator --src hedera --engine "$E_FLAG"
 fi
 ' -- "$@"
 '''
@@ -54,9 +60,9 @@ run = '''
 bash -c '
 E_FLAG=${ENGINE:-all}
 if [ "$#" -gt 0 ]; then
-    cargo run -- --mode operator --src eth --engine "$E_FLAG" --watch-sources "$@"
+    cargo run -- operator --src eth --engine "$E_FLAG" --watch-sources "$@"
 else
-    cargo run -- --mode operator --src eth --engine "$E_FLAG"
+    cargo run -- operator --src eth --engine "$E_FLAG"
 fi
 ' -- "$@"
 '''
@@ -69,11 +75,21 @@ E_FLAG=${ENGINE:-all}
 SRC="$1"
 shift || true
 if [ "$#" -gt 0 ]; then
-    cargo run -- --mode operator --src "$SRC" --engine "$E_FLAG" --watch-sources "$@"
+    cargo run -- operator --src "$SRC" --engine "$E_FLAG" --watch-sources "$@"
 else
-    cargo run -- --mode operator --src "$SRC" --engine "$E_FLAG"
+    cargo run -- operator --src "$SRC" --engine "$E_FLAG"
 fi
 ' -- "$@"
+'''
+
+[tasks.run-api]
+depends = ["ensure-redis"]
+description = "Usage: [PORT=8888] mise run run-api"
+run = '''
+bash -c '
+P_FLAG=${PORT:-8888}
+cargo run -- api --port "$P_FLAG"
+'
 '''
 
 # --- Docker & CI/CD ---
