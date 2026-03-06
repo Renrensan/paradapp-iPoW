@@ -7,7 +7,6 @@ services:
     build: .
     command:
       [
-        "--mode",
         "operator",
         "--src",
         "hedera",
@@ -33,7 +32,6 @@ services:
     image: renrensan/paradapp-interoperability-service
     command:
       [
-        "--mode",
         "operator",
         "--src",
         "eth",
@@ -51,6 +49,29 @@ services:
       redis:
         condition: service_started
     restart: unless-stopped
+
+  # --- API SERVICE ---
+  operator-api:
+    container_name: operator-api
+    image: renrensan/paradapp-interoperability-service
+    command:
+      [
+        "api",
+        "--port",
+        "8888"
+      ]
+    ports:
+      - "8888:8888"
+    env_file: .env
+    environment:
+      REDIS_URL: "redis://operator-service-redis:6379"
+    networks:
+      - bridge-network
+    depends_on:
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
   redis:
     image: redis:7.4-alpine
     container_name: operator-service-redis

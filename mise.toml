@@ -34,7 +34,7 @@ cargo run -- monolith --port "$P_FLAG" --engine "$E_FLAG"
 [tasks.rebalance-all]
 depends = ["ensure-redis"]
 description = "Run rebalance engine for all supported networks"
-run = "cargo run -- --mode monolith --engine rebalance"
+run = "cargo run -- monolith --engine rebalance"
 
 
 # --- Network Specific Helpers ---
