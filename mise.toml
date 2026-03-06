@@ -13,7 +13,7 @@ description = "Generate .env.example and config.example.yml from current local f
 run = """
 sed 's/=.*$/=/' .env > .env.example
 sed 's/: .*$/: /' config.yml > config.example.yml
-echo "✅ Templates generated: .env.example, config.example.yml"
+echo "Templates generated: .env.example, config.example.yml"
 """
 
 [tasks.build]
