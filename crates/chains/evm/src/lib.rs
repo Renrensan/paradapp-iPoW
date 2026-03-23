@@ -1,7 +1,9 @@
-pub mod approve;
+pub mod approving_adapter;
 pub mod bindings;
 pub mod common;
-pub mod convert;
+pub mod converting_adapter;
 pub mod dependencies;
+pub mod evm_provider;
+pub mod evm_stack;
 pub mod network;
-pub mod streaming;
+pub mod streaming_adapter;

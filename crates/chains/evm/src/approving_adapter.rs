@@ -1,0 +1,567 @@
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use ethers::{
+    types::{Bytes, U256},
+    utils::hex,
+};
+use paradapp_core::{
+    btc::btc_service::derive_p2wpkh_address,
+    consts::{
+        transaction_phase::TransactionPhase, transaction_type::TransactionType,
+    },
+    dependencies::context::CoreContext,
+    traits::{
+        approving_adapter::ApprovingAdapter,
+        chain_provider_adapter::{ChainProviderAdapter, TxIdFilter},
+    },
+};
+use tracing::{error, info, warn};
+
+use crate::{
+    bindings::paradapp_convert::Conversion, dependencies::context::EvmContext,
+};
+use anyhow::{Result, anyhow};
+
+pub struct EvmApprovingAdapter {
+    pub ctx: Arc<EvmContext>,
+    pub core_ctx: Arc<CoreContext>,
+    pub chain_provider: Arc<dyn ChainProviderAdapter>,
+}
+
+#[async_trait]
+impl ApprovingAdapter for EvmApprovingAdapter {
+    async fn get_or_create_index_for_tx(&self, tx_id: U256) -> Result<u32> {
+        let network = self.ctx.cfg.network.string_identifier();
+        let tx_id_str = tx_id.to_string();
+
+        self.core_ctx
+            .redis_storage
+            .get_or_create_index_for_tx(network, &tx_id_str)
+            .await
+    }
+
+    async fn get_or_create_receive_program_for_tx(
+        &self,
+        tx_id: U256,
+        xpub: &str,
+    ) -> Result<(u32, String, Vec<u8>)> {
+        // --------------------------------------------------
+        // Get or create deterministic receive index
+        // --------------------------------------------------
+        let index = self.get_or_create_index_for_tx(tx_id).await?;
+
+        // --------------------------------------------------
+        //  BTC derivation
+        // --------------------------------------------------
+        let (idx, address, script) =
+            derive_p2wpkh_address(xpub, index, self.core_ctx.btc_network)?;
+
+        Ok((idx, address, script))
+    }
+
+    async fn handle_operator_closes_for_active(
+        &self,
+        tx_id: U256,
+        conf_req: u64,
+    ) -> Result<()> {
+        // 1. Fetch conversion info
+        let (conv, _phase): (Conversion, u8) =
+            self.ctx.contract.get_conversion_with_phase(tx_id).call().await?;
+
+        let now_sec = chrono::Utc::now().timestamp() as u64;
+
+        // 2. Fetch window info
+        let (
+            headers_started,
+            _start_height,
+            last_height,
+            deposit_end,
+            proof_end,
+            duty_expires_at,
+        ) = self.ctx.contract.windows_for(tx_id).call().await?;
+
+        if !headers_started {
+            return Ok(());
+        }
+
+        let c_op = self.ctx.c_op.clone();
+
+        // 3. Native → BTC
+        if conv.is_native_to_bitcoin {
+            if !conv.approved || conv.completed || conv.refunded {
+                return Ok(());
+            }
+
+            if !conv.deposited {
+                let deposit_over = last_height > deposit_end;
+                let duty_active = duty_expires_at != U256::zero()
+                    && now_sec <= duty_expires_at.as_u64();
+
+                if deposit_over && duty_active {
+                    info!(
+                        tx_id = %tx_id,
+                        "[op] Native→BTC txId={} padeposit, timeoutNoDeposit_NativeTokentoBTC",
+                        tx_id
+                    );
+
+                    // STATIC CALL
+                    let _ = c_op
+                        .timeout_no_deposit_nativeto_bitcoin(tx_id)
+                        .call()
+                        .await?;
+
+                    // SEND TX
+                    match c_op
+                        .timeout_no_deposit_nativeto_bitcoin(tx_id)
+                        .send()
+                        .await
+                    {
+                        Ok(pending) => {
+                            info!(
+                                tx_hash = ?pending.tx_hash(),
+                                tx_id = %tx_id,
+                                "timeout_no_deposit_nativeto_bitcoin tx sent"
+                            );
+                        },
+                        Err(e) => {
+                            warn!(
+                                tx_id = %tx_id,
+                                error = %e,
+                                "Failed to send timeout_no_deposit_hba_rto_btc — retrying next cycle"
+                            );
+                            return Ok(());
+                        },
+                    }
+                }
+            }
+        } else {
+            // 4. BTC → Native
+            if !conv.approved || conv.completed || conv.refunded {
+                return Ok(());
+            }
+
+            let end_height = proof_end + (conf_req - 1);
+            let window_over = last_height > end_height;
+            let duty_active = duty_expires_at != U256::zero()
+                && now_sec <= duty_expires_at.as_u64();
+
+            if window_over && duty_active {
+                info!(
+                    tx_id = %tx_id,
+                    "[op] BTC→Native txId={} window over, closeNoBTC_BTCtoNative",
+                    tx_id
+                );
+
+                let c_op = self.ctx.c_op.clone();
+
+                // 1. Static call
+                let call_static =
+                    c_op.close_no_bitcoin_bitcoin_to_native(tx_id);
+                call_static.call().await?;
+
+                // 2. Send transaction non blocking
+                match c_op
+                    .close_no_bitcoin_bitcoin_to_native(tx_id)
+                    .send()
+                    .await
+                {
+                    Ok(pending) => {
+                        info!(
+                            tx_hash = ?pending.tx_hash(),
+                            tx_id = %tx_id,
+                            "close_no_bitcoin_bitcoin_to_native tx sent)"
+                        );
+                    },
+                    Err(e) => {
+                        warn!(
+                            tx_id = %tx_id,
+                            error = %e,
+                            "Failed to send close_no_bitcoin_bitcoin_to_native — retrying next cycle"
+                        );
+                        return Ok(());
+                    },
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn discover_user_close_candidates(
+        &self,
+        to_tx_id: U256,
+    ) -> Result<Vec<(U256, String)>> {
+        use futures::try_join;
+
+        // Fetch IDs for both phases separately
+        let (op_expired_ids, user_expired_ids) = try_join!(
+            self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
+                type_filter: TransactionType::ANY,
+                phase_filter: TransactionPhase::OPERATOR_DUTY_EXPIRED,
+                to_tx_id,
+                ..Default::default()
+            }),
+            self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
+                type_filter: TransactionType::ANY,
+                phase_filter: TransactionPhase::USER_ACTION_EXPIRED,
+                to_tx_id,
+                ..Default::default()
+            }),
+        )?;
+
+        let mut seen = std::collections::HashSet::<U256>::new();
+        let mut candidates: Vec<(U256, String)> = Vec::new();
+
+        let contract = self.ctx.contract.clone();
+        let c_op = self.ctx.c_op.clone();
+
+        // 1. Logic for USER_ACTION_EXPIRED
+        for tx_id in user_expired_ids {
+            if !seen.insert(tx_id) {
+                continue;
+            }
+
+            let (conv, _phase): (Conversion, u8) =
+                contract.get_conversion_with_phase(tx_id).call().await?;
+
+            if conv.is_native_to_bitcoin {
+                if c_op
+                    .timeout_no_deposit_nativeto_bitcoin(tx_id)
+                    .call()
+                    .await
+                    .is_ok()
+                {
+                    candidates.push((
+                        tx_id,
+                        "timeoutNoDeposit_NativeToBitcoin".to_string(),
+                    ));
+                }
+            } else if c_op
+                .close_no_bitcoin_bitcoin_to_native(tx_id)
+                .call()
+                .await
+                .is_ok()
+            {
+                candidates.push((
+                    tx_id,
+                    "closeNoBitcoin_BitcoinToNative".to_string(),
+                ));
+            }
+        }
+
+        // 2. Logic for OPERATOR_DUTY_EXPIRED
+        for tx_id in op_expired_ids {
+            if !seen.insert(tx_id) {
+                continue;
+            }
+
+            let (conv, _phase): (Conversion, u8) =
+                contract.get_conversion_with_phase(tx_id).call().await?;
+
+            // Filter out already finalized transactions
+            if !conv.approved || conv.completed || conv.refunded {
+                continue;
+            }
+
+            if conv.is_native_to_bitcoin {
+                if c_op
+                    .refund_after_no_proof_native_to_bitcoin(tx_id)
+                    .call()
+                    .await
+                    .is_ok()
+                {
+                    candidates.push((
+                        tx_id,
+                        "refundAfterNoProof_NativeTokentoBTC".to_string(),
+                    ));
+                }
+            } else if c_op
+                .claim_native_after_operator_expired(tx_id)
+                .call()
+                .await
+                .is_ok()
+            {
+                candidates.push((
+                    tx_id,
+                    "claimNative_AfterOperatorExpired".to_string(),
+                ));
+            }
+        }
+
+        info!(
+            count = candidates.len(),
+            "Discovered candidates (Direct User Expiry + Validated Operator Expiry)"
+        );
+
+        Ok(candidates)
+    }
+
+    async fn execute_user_closes(
+        &self,
+        candidates: Vec<(U256, &'static str)>,
+    ) -> Result<()> {
+        let c_op = self.ctx.c_op.clone();
+
+        for (tx_id, kind) in candidates {
+            match kind {
+                "timeoutNoDeposit_NativeToBitcoin" => {
+                    info!(tx_id = %tx_id, "[jump] User-close timeoutNoDeposit_NativeToBitcoin");
+
+                    let can_execute = c_op
+                        .timeout_no_deposit_nativeto_bitcoin(tx_id)
+                        .call()
+                        .await;
+                    if let Err(e) = can_execute {
+                        error!(tx_id = %tx_id, error = ?e, "Static call failed: timeoutNoDeposit_NativeToBitcoin");
+                        continue;
+                    }
+
+                    match c_op
+                        .timeout_no_deposit_nativeto_bitcoin(tx_id)
+                        .send()
+                        .await
+                    {
+                        Ok(pending) => {
+                            let tx_hash = pending.tx_hash();
+                            let _ = pending.await;
+                            info!(tx_hash = ?tx_hash, tx_id = %tx_id, "timeoutNoDeposit_NativeToBitcoin tx mined");
+                        },
+                        Err(e) => {
+                            warn!(tx_id = %tx_id, error = %e, "Failed to send timeoutNoDeposit_NativeToBitcoin")
+                        },
+                    }
+                },
+
+                "closeNoBitcoin_BitcoinToNative" => {
+                    info!(tx_id = %tx_id, "[jump] User-close closeNoBitcoin_BitcoinToNative");
+
+                    let can_execute = c_op
+                        .close_no_bitcoin_bitcoin_to_native(tx_id)
+                        .call()
+                        .await;
+                    if let Err(e) = can_execute {
+                        error!(tx_id = %tx_id, error = ?e, "Static call failed: closeNoBitcoin_BitcoinToNative");
+                        continue;
+                    }
+
+                    match c_op
+                        .close_no_bitcoin_bitcoin_to_native(tx_id)
+                        .send()
+                        .await
+                    {
+                        Ok(pending) => {
+                            let tx_hash = pending.tx_hash();
+                            let _ = pending.await;
+                            info!(tx_hash = ?tx_hash, tx_id = %tx_id, "closeNoBitcoin_BitcoinToNative tx mined");
+                        },
+                        Err(e) => {
+                            warn!(tx_id = %tx_id, error = %e, "Failed to send closeNoBitcoin_BitcoinToNative")
+                        },
+                    }
+                },
+
+                "refundAfterNoProof_NativeTokentoBTC" => {
+                    info!(tx_id = %tx_id, "[jump] User-close refundAfterNoProof_NativeTokentoBTC");
+
+                    let can_execute = c_op
+                        .refund_after_no_proof_native_to_bitcoin(tx_id)
+                        .call()
+                        .await;
+                    if let Err(e) = can_execute {
+                        error!(tx_id = %tx_id, error = ?e, "Static call failed: refundAfterNoProof_NativeTokentoBTC");
+                        continue;
+                    }
+
+                    match c_op
+                        .refund_after_no_proof_native_to_bitcoin(tx_id)
+                        .send()
+                        .await
+                    {
+                        Ok(pending) => {
+                            let tx_hash = pending.tx_hash();
+                            let _ = pending.await;
+                            info!(tx_hash = ?tx_hash, tx_id = %tx_id, "refundAfterNoProof_NativeTokentoBTC tx mined");
+                        },
+                        Err(e) => {
+                            warn!(tx_id = %tx_id, error = %e, "Failed to send refundAfterNoProof_NativeTokentoBTC")
+                        },
+                    }
+                },
+
+                "claimNative_AfterOperatorExpired" => {
+                    info!(tx_id = %tx_id, "[jump] User-close claimNative_AfterOperatorExpired");
+
+                    let can_execute = c_op
+                        .claim_native_after_operator_expired(tx_id)
+                        .call()
+                        .await;
+                    if let Err(e) = can_execute {
+                        error!(tx_id = %tx_id, error = ?e, "Static call failed: claimNative_AfterOperatorExpired");
+                        continue;
+                    }
+
+                    match c_op
+                        .claim_native_after_operator_expired(tx_id)
+                        .send()
+                        .await
+                    {
+                        Ok(pending) => {
+                            let tx_hash = pending.tx_hash();
+                            let _ = pending.await;
+                            info!(tx_hash = ?tx_hash, tx_id = %tx_id, "claimNative_AfterOperatorExpired tx mined");
+                        },
+                        Err(e) => {
+                            warn!(tx_id = %tx_id, error = %e, "Failed to send claimNative_AfterOperatorExpired")
+                        },
+                    }
+                },
+
+                _ => continue,
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn approve_one_tx(
+        &self,
+        tx_id: U256,
+        duty_seconds: u64,
+    ) -> Result<()> {
+        let contract = &self.ctx.contract.clone();
+        let c_op = &self.ctx.c_op.clone();
+
+        // 1. Load the conversion data
+        let conv = contract.conversions(tx_id).call().await?;
+        let (
+            _user,
+            is_native_to_bitcoin,
+            _slippage,
+            _user_program,
+            _paradapp_receive_program,
+            _network_address,
+            network_id,
+            _native_amount,
+            _bitcoin_amount,
+            _created_at,
+            _approved_at,
+            _deposited_at,
+            _commit_fee,
+            _approved,
+            _deposited,
+            _completed,
+            _refunded,
+            _reserved_native,
+            _operator_duty_expires_at,
+        ) = conv;
+
+        // 2. Decide scriptArg
+        let xpub_str: &str = &self.ctx.cfg.btc_root_xpub;
+
+        let script_arg: Vec<u8> = match (
+            is_native_to_bitcoin,
+            network_id.is_zero(),
+        ) {
+            // Path A: Not Native-to-Bitcoin (B2N) OR it is N2N (Cross-network)
+            (false, _) | (true, false) => {
+                match self
+                    .get_or_create_receive_program_for_tx(tx_id, xpub_str)
+                    .await
+                {
+                    Ok((index, address, script_buf)) => {
+                        info!(
+                            tx_id = %tx_id,
+                            address = %address,
+                            index = index,
+                            is_n2n = (network_id != U256::zero()),
+                            "Assigned BTC addr via XPUB for conversion"
+                        );
+                        script_buf
+                    },
+                    Err(err) => {
+                        warn!(
+                            tx_id = %tx_id,
+                            error = %err,
+                            "Failed deriving address from XPUB"
+                        );
+                        return Ok(());
+                    },
+                }
+            },
+
+            // Path B: Pure Native-to-Bitcoin (Network ID 0)
+            (true, true) => {
+                if let Some(static_program) =
+                    &self.core_ctx.cfg.paradapp_receive_program
+                {
+                    let decoded =
+                        hex::decode(static_program.trim_start_matches("0x"))
+                            .unwrap_or_default();
+
+                    info!(
+                        tx_id = %tx_id,
+                        "Native→BTC tx using static receive program from PARADAPP_RECEIVE_PROGRAM"
+                    );
+                    decoded
+                } else {
+                    info!(
+                        tx_id = %tx_id,
+                        "Cannot approve Native→BTC tx – missing PARADAPP_RECEIVE_PROGRAM"
+                    );
+                    return Err(anyhow!(
+                        "missing receive program for Native→BTC"
+                    ));
+                }
+            },
+        };
+
+        info!(
+            tx_id = %tx_id,
+            is_native_to_bitcoin = %is_native_to_bitcoin,
+            "Trying to approve transaction"
+        );
+
+        // Convert hex strings (anchor80 / first80) to Bytes
+        let script_arg_bytes = Bytes::from(script_arg);
+
+        // Build the call ONCE
+        let duty_seconds_bn = U256::from(duty_seconds);
+        let call = c_op.approve_and_start_with_anchor_and_first(
+            tx_id,
+            duty_seconds_bn,
+            script_arg_bytes.clone(),
+            1000,
+        );
+
+        // 3. callStatic once
+        if let Err(err) = call.clone().call().await {
+            error!(
+                tx_id = %tx_id,
+                err = %err,
+                "callStatic approve failed"
+            );
+            return Ok(());
+        }
+
+        // 4. Send real tx — fire-and-forget
+        match call.send().await {
+            Ok(pending) => {
+                info!(
+                    tx_hash = ?pending.tx_hash(),
+                    tx_id = %tx_id,
+                    "Sent approve tx"
+                );
+            },
+            Err(e) => {
+                warn!(
+                    tx_id = %tx_id,
+                    error = %e,
+                    "Failed to send approve tx — retrying next cycle"
+                );
+            },
+        }
+
+        Ok(())
+    }
+}

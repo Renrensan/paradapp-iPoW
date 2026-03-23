@@ -2,6 +2,7 @@
 members = [
   "crates/core",
   "crates/chains/evm",
-  "crates/operator"
+  "crates/operator",
+  "crates/api"
 ]
 resolver = "3"

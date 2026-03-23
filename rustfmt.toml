@@ -1,0 +1,24 @@
+# ---- Core Layout ----
+edition = "2024"
+max_width = 80
+hard_tabs = false
+tab_spaces = 4
+
+# ---- Imports ----
+reorder_imports = true
+reorder_modules = true
+
+# ---- Structs & Enums ----
+struct_variant_width = 40
+
+# ---- Control Flow ----
+match_block_trailing_comma = true
+
+# ---- Chains ----
+chain_width = 80
+use_small_heuristics = "Max"
+
+# ---- Misc ----
+newline_style = "Unix"
+use_field_init_shorthand = true
+force_explicit_abi = true

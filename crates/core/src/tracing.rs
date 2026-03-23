@@ -15,15 +15,11 @@ impl LogStyle {
             match val.to_lowercase().as_str() {
                 "pretty" | "human" => return LogStyle::Pretty,
                 "json" | "bunyan" => return LogStyle::Json,
-                _ => {}
+                _ => {},
             }
         }
 
-        if cfg!(debug_assertions) {
-            LogStyle::Pretty
-        } else {
-            LogStyle::Json
-        }
+        if cfg!(debug_assertions) { LogStyle::Pretty } else { LogStyle::Json }
     }
 }
 
@@ -49,12 +45,14 @@ pub fn init(service_name: &str) -> WorkerGuard {
     // -----------------------------
     // JSON / Bunyan (prod)
     // -----------------------------
-    let bunyan_layer = BunyanFormattingLayer::new(service_name.to_string(), nb_writer.clone());
+    let bunyan_layer =
+        BunyanFormattingLayer::new(service_name.to_string(), nb_writer.clone());
 
     // -----------------------------
     // Env filter (IMPORTANT)
     // -----------------------------
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info"));
 
     let registry = Registry::default().with(env_filter).with(JsonStorageLayer);
 
@@ -64,13 +62,13 @@ pub fn init(service_name: &str) -> WorkerGuard {
                 .with(pretty_layer)
                 .try_init()
                 .expect("Failed to init pretty tracing subscriber");
-        }
+        },
         LogStyle::Json => {
             registry
                 .with(bunyan_layer)
                 .try_init()
                 .expect("Failed to init bunyan tracing subscriber");
-        }
+        },
     }
 
     guard

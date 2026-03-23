@@ -1,27 +1,92 @@
 services:
+  # --- HEDERA OPERATOR ---
+  # Runs all engines: Approver, Streamer, and Converter for Hedera
   hedera-operator:
     container_name: hedera-operator
     image: renrensan/paradapp-interoperability-service
     build: .
-    command: ["--network", "hedera"]
+    command:
+      [
+        "operator",
+        "--src",
+        "hedera",
+        "--engine",
+        "all",
+        "--watch-sources",
+        "eth",
+      ]
     env_file: .env
     environment:
-      SQLITE_DB_DIR: "/app/data"
-    volumes:
-      - hedera_data:/app/data
+      REDIS_URL: "redis://operator-service-redis:6379"
+    networks:
+      - bridge-network
+    depends_on:
+      redis:
+        condition: service_started
     restart: unless-stopped
 
+  # --- ETHEREUM OPERATOR ---
+  # Runs all engines: Approver, Streamer, and Converter for Ethereum
   ethereum-operator:
     container_name: ethereum-operator
     image: renrensan/paradapp-interoperability-service
-    command: ["--network", "ethereum"]
+    command:
+      [
+        "operator",
+        "--src",
+        "eth",
+        "--engine",
+        "all",
+        "--watch-sources",
+        "hedera",
+      ]
     env_file: .env
     environment:
-      SQLITE_DB_DIR: "/app/data"
-    volumes:
-      - ethereum_data:/app/data
+      REDIS_URL: "redis://operator-service-redis:6379"
+    networks:
+      - bridge-network
+    depends_on:
+      redis:
+        condition: service_started
     restart: unless-stopped
 
+  # --- API SERVICE ---
+  operator-api:
+    container_name: operator-api
+    image: renrensan/paradapp-interoperability-service
+    command:
+      [
+        "api",
+        "--port",
+        "8888"
+      ]
+    ports:
+      - "8888:8888"
+    env_file: .env
+    environment:
+      REDIS_URL: "redis://operator-service-redis:6379"
+    networks:
+      - bridge-network
+    depends_on:
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: operator-service-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - bridge-network
+    command: ["redis-server", "--appendonly", "yes", "--loglevel", "warning"]
+    volumes:
+      - redis_data:/data
+
+networks:
+  bridge-network:
+    driver: bridge
+
 volumes:
-  hedera_data:
-  ethereum_data:
+  redis_data:

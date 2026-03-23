@@ -1,18 +1,22 @@
-use crate::{bindings::paradapp_convert::ParadappConvert, dependencies::config::EvmConfig, };
+use crate::{
+    bindings::paradapp_convert::ParadappConvert,
+    dependencies::config::EvmConfig,
+};
 use ethers::{
     middleware::SignerMiddleware,
-    providers::{Http, Provider},
+    providers::{Http, HttpRateLimitRetryPolicy, Provider, RetryClient},
     signers::{LocalWallet, Signer},
     types::Address,
 };
 use std::sync::Arc;
 
-/// Unified runtime context for EVM
+type ResilientProvider = Provider<RetryClient<Http>>;
+type ResilientSigner = SignerMiddleware<Arc<ResilientProvider>, LocalWallet>;
 #[derive(Clone)]
 pub struct EvmContext {
-    pub provider: Arc<Provider<Http>>,
-    pub contract: Arc<ParadappConvert<Provider<Http>>>,
-    pub c_op: Arc<ParadappConvert<SignerMiddleware<Provider<Http>, LocalWallet>>>,
+    pub provider: Arc<ResilientProvider>,
+    pub contract: Arc<ParadappConvert<ResilientProvider>>,
+    pub c_op: Arc<ParadappConvert<ResilientSigner>>,
     pub cfg: Arc<EvmConfig>,
 }
 
@@ -21,36 +25,31 @@ impl EvmContext {
         let cfg = Arc::new(cfg);
 
         // Provider
-        let provider = Arc::new(Provider::<Http>::try_from(cfg.rpc_url.as_str())?);
+        let client = cfg.rpc_url.parse::<Http>()?;
+        let retry_client = RetryClient::new(
+            client,
+            Box::new(HttpRateLimitRetryPolicy),
+            5,
+            2000,
+        );
+        let provider = Arc::new(Provider::new(retry_client));
 
         // Wallet
         let wallet: LocalWallet = cfg.operator_private_key.parse()?;
         let wallet = wallet.with_chain_id(cfg.network.chain_id());
-        let wallet = Arc::new(wallet);
+        let contract_address: Address = cfg.contract_address.parse()?;
 
-        // Contract
-        let contract_address: Address = cfg.contract_address.parse::<Address>()?;
-        // ---------
         // Read-only contract
-        // ---------
-        let contract = Arc::new(ParadappConvert::new(contract_address, provider.clone()));
-        // ---------
+        let contract =
+            Arc::new(ParadappConvert::new(contract_address, provider.clone()));
         // Signer middleware
-        // ---------
-        let signer = Arc::new(SignerMiddleware::new(
-            (*provider).clone(),
-            (*wallet).clone(),
-        ));
-        // ---------
-        // Operator-enabled contract
-        // ---------
-        let c_op = Arc::new(ParadappConvert::new(contract_address, signer.clone()));
+        let signer_inner = SignerMiddleware::new(provider.clone(), wallet);
+        let signer = Arc::new(signer_inner);
 
-        Ok(Self {
-            provider,
-            contract,
-            c_op,
-            cfg,
-        })
+        // Operator-enabled contract
+        let c_op =
+            Arc::new(ParadappConvert::new(contract_address, signer.clone()));
+
+        Ok(Self { provider, contract, c_op, cfg })
     }
 }

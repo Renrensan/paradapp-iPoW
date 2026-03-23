@@ -23,6 +23,23 @@ fn main() {
             .write_to_file(&out_file)
             .expect("failed to write bindings");
 
+        let mut contents = std::fs::read_to_string(&out_file)
+            .expect("failed to read generated bindings");
+
+        if !contents.contains("clippy::module_inception") {
+            contents = format!(
+                r#"// @generated — DO NOT EDIT
+#![allow(clippy::module_inception)]
+
+{}
+"#,
+                contents
+            );
+
+            std::fs::write(&out_file, contents)
+                .expect("failed to write clippy header");
+        }
+
         println!("Bindings written to {}", out_file.display());
     } else {
         println!("Bindings already exist, skipping generation.");

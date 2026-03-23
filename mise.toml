@@ -4,38 +4,114 @@ rust = "1.91.1"
 [env]
 _.file = ".env"
 
+[tasks.ensure-redis]
+description = "Ensure the Redis container from docker-compose is running"
+run = "docker compose up -d redis"
+
+[tasks.template]
+description = "Generate .env.example and config.example.yml from current local files"
+run = """
+sed 's/=.*$/=/' .env > .env.example
+sed 's/: .*$/: /' config.yml > config.example.yml
+echo "Templates generated: .env.example, config.example.yml"
+"""
+
 [tasks.build]
 description = "Build all operator binaries"
 run = "cargo build --release"
 
-[tasks.build-debug]
-description = "Build all operator binaries in debug mode"
-run = "cargo build"
-
 [tasks.run-all]
-description = "Run operator all network"
-run = "cargo run -- --network all"
+depends = ["ensure-redis"]
+description = "Usage: [PORT=8888] [ENGINE=all] mise run run-all"
+run = '''
+bash -c '
+P_FLAG=${PORT:-8888}
+E_FLAG=${ENGINE:-all}
+cargo run -- monolith --port "$P_FLAG" --engine "$E_FLAG"
+'
+'''
+
+[tasks.rebalance-all]
+depends = ["ensure-redis"]
+description = "Run rebalance engine for all supported networks"
+run = "cargo run -- monolith --engine rebalance"
+
+
+# --- Network Specific Helpers ---
 
 [tasks.run-hedera]
-description = "Run operator for Hedera network"
-run = "cargo run -- --network hedera"
+depends = ["ensure-redis"]
+description = "Usage: [ENGINE=...] mise run run-hedera [watch...]. Engines: all, approver, streamer, converter."
+run = '''
+bash -c '
+E_FLAG=${ENGINE:-all}
+if [ "$#" -gt 0 ]; then
+    cargo run -- operator --src hedera --engine "$E_FLAG" --watch-sources "$@"
+else
+    cargo run -- operator --src hedera --engine "$E_FLAG"
+fi
+' -- "$@"
+'''
 
 [tasks.run-ethereum]
-description = "Run operator for Ethereum network"
-run = "cargo run -- --network ethereum"
+depends = ["ensure-redis"]
+description = "Usage: [ENGINE=...] mise run run-ethereum [watch...]. Engines: all, approver, streamer, converter."
+run = '''
+bash -c '
+E_FLAG=${ENGINE:-all}
+if [ "$#" -gt 0 ]; then
+    cargo run -- operator --src eth --engine "$E_FLAG" --watch-sources "$@"
+else
+    cargo run -- operator --src eth --engine "$E_FLAG"
+fi
+' -- "$@"
+'''
+
+[tasks.run-custom]
+description = "Usage: [ENGINE=...] mise run run-custom <src> [watch...]. Engines: all, approver, streamer, converter."
+run = '''
+bash -c '
+E_FLAG=${ENGINE:-all}
+SRC="$1"
+shift || true
+if [ "$#" -gt 0 ]; then
+    cargo run -- operator --src "$SRC" --engine "$E_FLAG" --watch-sources "$@"
+else
+    cargo run -- operator --src "$SRC" --engine "$E_FLAG"
+fi
+' -- "$@"
+'''
+
+[tasks.run-api]
+depends = ["ensure-redis"]
+description = "Usage: [PORT=8888] mise run run-api"
+run = '''
+bash -c '
+P_FLAG=${PORT:-8888}
+cargo run -- api --port "$P_FLAG"
+'
+'''
+
+# --- Docker & CI/CD ---
 
 [tasks.docker-build]
-description = "Build Docker image for paradapp operator"
+description = "Build Docker image"
 run = "docker build -t renrensan/paradapp-interoperability-service ."
 
-[tasks.docker-compose-up]
-description = "Start services with Docker Compose"
-run = "docker compose up -d"
+[tasks.docker-push]
+description = "Push to dockerhub repository"
+run = "docker push renrensan/paradapp-interoperability-service"
 
-[tasks.docker-compose-down]
-description = "Stop services and remove containers"
-run = "docker compose down"
+# --- Quality Control ---
 
-[tasks.docker-compose-logs]
-description = "Follow logs for all services"
-run = "docker compose logs -f"
+[tasks.fmt]
+description = "Check Rust code formatting"
+run = "cargo fmt"
+
+[tasks.clippy]
+description = "Run Rust linter"
+run = "cargo clippy --all-targets --all-features -- -D warnings"
+
+[tasks.lint]
+description = "Run all Rust linters"
+depends = ["fmt", "clippy"]
