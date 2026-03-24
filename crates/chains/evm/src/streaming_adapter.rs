@@ -203,9 +203,9 @@ impl StreamingAdapter for EvmStreamingAdapter {
         }
 
         let target = if is_native_to_bitcoin && !deposited {
-            deposit_end
+            deposit_end + 1
         } else {
-            proof_end
+            proof_end + 1
         };
 
         if target == U256::zero() {
@@ -224,8 +224,6 @@ impl StreamingAdapter for EvmStreamingAdapter {
             });
         }
 
-        let target_plus = target + 1;
-
         info!(
             tx_id = %tx_id,
             last_height = %last_height,
@@ -236,7 +234,7 @@ impl StreamingAdapter for EvmStreamingAdapter {
 
         Ok(StreamTarget {
             needed: true,
-            target_height: target_plus.as_u64(),
+            target_height: target.as_u64(),
             reason: "ok".into(),
         })
     }

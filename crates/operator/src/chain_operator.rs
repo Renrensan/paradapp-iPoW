@@ -761,9 +761,9 @@ impl ChainOperator {
                 info!(%tx_id, dest = %dest_network, "Opening bridge tunnel");
 
                 // Store tx index in storage
-                dest_stack.approving().get_or_create_index_for_tx(dest_next_id).await.map_err(
-                    |e| anyhow::anyhow!("Indexing failed for tx {}: {}", dest_next_id, e),
-                )?;
+                // dest_stack.approving().get_or_create_index_for_tx(dest_next_id).await.map_err(
+                //     |e| anyhow::anyhow!("Indexing failed for tx {}: {}", dest_next_id, e),
+                // )?;
 
                 // Open tunnel by creating the native to native IN tx
                 let source_anchor = provider.anchor_info(tx_id).await?;
@@ -786,7 +786,7 @@ impl ChainOperator {
                                 info.user.as_bytes().to_vec(),
                             ),
                             duty_window_seconds: duty_window,
-                            paradapp_receive_program: info.user_program,
+                            paradapp_receive_program: info.user_program, // Use source receive program
                             locked_anchor_height: source_anchor.anchor_height,
                             slippage: info.slippage,
                         },

@@ -5,7 +5,7 @@ use ethers::types::U256;
 use paradapp_core::{
     btc::btc_service::{
         BitcoinMerkleProofPayload, check_confirmation_and_build_proof,
-        send_to_user_program,
+        send_to_user_program, btc_tip_height
     },
     consts::{
         supported_network_enum::SupportedNetwork,
@@ -89,7 +89,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
     ) -> Result<Vec<(U256, Conversion)>> {
         let mut ready = Vec::new();
         let tx_types = [
-            TransactionType::NATIVE_TO_BITCOIN,
+            // TransactionType::NATIVE_TO_BITCOIN, //Temporary turn off not to send BTC to user
             TransactionType::NATIVE_TO_NATIVE_OUT,
         ];
 
@@ -262,40 +262,60 @@ impl ConvertingAdapter for EvmConvertingAdapter {
                 anyhow::anyhow!("btc_amount overflow: {}", conv.bitcoin_amount)
             })?;
 
-        // Attempt to send BTC to user program
-        match send_to_user_program(&self.core_ctx, &user_program, amount_sats)
+        // Fetch anchor info and BTC tip height for validation
+        let anchor = self.chain_provider.anchor_info(tx_id).await?;
+        let btc_tip = btc_tip_height(&self.core_ctx).await?;
+        let btc_tip_u256 = U256::from(btc_tip);
+        let limit = anchor.anchor_height + U256::from(20);
+
+        // Only send_to_user_program if btc tip height is less than 20 + anchor height
+        if btc_tip_u256 < limit {
+            // Attempt to send BTC to user program
+            match send_to_user_program(
+                &self.core_ctx,
+                &user_program,
+                amount_sats,
+            )
             .await
-        {
-            Ok(result) => {
-                info!(
-                    tx_id = %tx_id,
-                    btc_txid = %result,
-                    "BTC sent successfully to user program"
-                );
-                self.mark_processed(tx_id, Some(result)).await?;
-            },
-            Err(e) => {
-                let err_msg = e.to_string();
+            {
+                Ok(result) => {
+                    info!(
+                        tx_id = %tx_id,
+                        btc_txid = %result,
+                        "BTC sent successfully to user program"
+                    );
+                    self.mark_processed(tx_id, Some(result)).await?;
+                },
+                Err(e) => {
+                    let err_msg = e.to_string();
 
-                if err_msg.contains("Not enough funds") {
-                    warn!(tx_id = %tx_id, "Insufficient BTC. Triggering provider-level emergency sweep.");
+                    if err_msg.contains("Not enough funds") {
+                        warn!(tx_id = %tx_id, "Insufficient BTC. Triggering provider-level emergency sweep.");
 
-                    if let Err(e) =
-                        self.chain_provider.trigger_btc_sweep().await
-                    {
-                        error!(tx_id = %tx_id, error = %e, "Emergency sweep execution failed");
-                    } else {
-                        info!(tx_id = %tx_id, "Emergency sweep completed successfully.");
+                        if let Err(e) =
+                            self.chain_provider.trigger_btc_sweep().await
+                        {
+                            error!(tx_id = %tx_id, error = %e, "Emergency sweep execution failed");
+                        } else {
+                            info!(tx_id = %tx_id, "Emergency sweep completed successfully.");
+                        }
                     }
-                }
-                error!(error = %e, tx_id = %tx_id, "Failed to send BTC to user program");
-                return Err(e);
-            },
+                    error!(error = %e, tx_id = %tx_id, "Failed to send BTC to user program");
+                    return Err(e);
+                },
+            }
+        } else {
+            warn!(
+                %tx_id,
+                btc_tip,
+                anchor_height = %anchor.anchor_height,
+                "BTC tip height too high relative to anchor; skipping send"
+            );
         }
 
         Ok(())
     }
-
+    
     async fn handle_btc_to_native_conversion(&self, tx_id: U256) -> Result<()> {
         // Log before the action so you know which ID is being targeted
         info!(%tx_id, "Marking BTC→NATIVE conversion as processed in storage.");
