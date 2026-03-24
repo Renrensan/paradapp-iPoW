@@ -1611,10 +1611,13 @@ function _computePhase(
             return Phase.WAITING_USER_ACTION;
         }
 
-        // Operator Timeout: Assets are locked (deposited), but operator failed to verify
-        if (isTimeExpired && !isDutyFulfilled) {
+        uint256 targetHeight = hw.windowStartHeight + (PROOF_BLOCKS_WINDOW - 1);
+        bool streamFinished = (globalHeightToHashLE[targetHeight] != bytes32(0));
+
+        if ((isTimeExpired || streamFinished) && !isDutyFulfilled) {
+
             return Phase.OPERATOR_DUTY_EXPIRED;
-        }
+        } 
 
         return Phase.ACTIVE_WAITING_PROOF;
 
