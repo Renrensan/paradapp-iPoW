@@ -1275,7 +1275,7 @@ function timeoutNoDeposit_NativetoBitcoin(uint256 txId) external validTx(txId) o
 
     if (!c.isNativeToBitcoin) revert WrongConversionType();
     if (!c.approved || c.deposited || c.completed || c.refunded) revert BadState();
-    if (c.operatorDutyExpiresAt < block.timestamp) revert DutyExpired();
+    if (!_isOperatorDutyFulfilled(txId)) revert DutyExpired();
 
     HeaderWindow storage hw = windows[txId];
     if (!hw.started) revert NoHeadersYet();
