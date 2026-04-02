@@ -1310,7 +1310,7 @@ function refundAfterNoProof_NativeToBitcoin(uint256 txId) external validTx(txId)
     if (dutyFulfilled) {
         // If the helper returns true, the proof is verified! 
         // The operator completed the swap. The user cannot refund here.
-        revert("Duty fulfilled: Proof verified"); 
+        revert AlreadyVerified(); 
     }
 
     // 2. If duty is NOT fulfilled, determine WHICH deadline applies
