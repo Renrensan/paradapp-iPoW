@@ -1298,36 +1298,58 @@ function timeoutNoDeposit_NativetoBitcoin(uint256 txId) external validTx(txId) o
 function refundAfterNoProof_NativeToBitcoin(uint256 txId) external validTx(txId) nonReentrant {
     Conversion storage c = conversions[txId];
     if (!c.isNativeToBitcoin) revert WrongConversionType();
+    
     if (msg.sender != c.user && msg.sender != operator) revert Unauthorized();
     if (!c.approved || c.completed || c.refunded) revert BadState();
 
     HeaderWindow storage hw = windows[txId];
-    if (!hw.started) revert NoHeadersYet();
 
-    uint256 endHeight = hw.windowStartHeight + (PROOF_BLOCKS_WINDOW - 1) + (CONFIRMATIONS_REQUIRED - 1);
-    bool confsOver = (globalTipHeight > endHeight);
-    bool operatorExpired = (c.operatorDutyExpiresAt != 0 && block.timestamp > c.operatorDutyExpiresAt);
+    // 1. Call your helper (which checks headers AND hw.proof.verified)
+    bool dutyFulfilled = _isOperatorDutyFulfilled(txId);
+
+    if (dutyFulfilled) {
+        // If the helper returns true, the proof is verified! 
+        // The operator completed the swap. The user cannot refund here.
+        revert("Duty fulfilled: Proof verified"); 
+    }
+
+    // 2. If duty is NOT fulfilled, determine WHICH deadline applies
+    if (!hw.started) {
+        // Case A: Operator ghosted and never submitted headers.
+        // Check the short timestamp deadline.
+        if (c.operatorDutyExpiresAt == 0 || block.timestamp <= c.operatorDutyExpiresAt) {
+            revert DutyNotExpired();
+        }
+    } else {
+        // Case B: Operator submitted headers, but the PROOF is not verified yet.
+        // Check the long block-height deadline to give them time for confirmations.
+        uint256 endHeight = hw.windowStartHeight
+            + (PROOF_BLOCKS_WINDOW - 1)
+            + (CONFIRMATIONS_REQUIRED - 1);
+        
+        if (globalTipHeight <= endHeight) revert IncorrectWindow();
+    }
+
+    // --- Payout Logic ---
+    c.refunded = true;
 
     if (c.deposited) {
-        // Requires either the Bitcoin window to close or the operator's time-lock to expire
-        if (!confsOver && !operatorExpired) revert IncorrectWindow();
-
-        c.refunded = true;
+        // Unwind reservations & locks
         totalLockedDeposits -= c.nativeAmount;
         totalHeldCommitFees -= c.commitFee;
+        
         _closeActive(txId);
 
         (bool ok, ) = payable(c.user).call{value: c.nativeAmount + c.commitFee}("");
         if (!ok) revert TransferFailed();
         emit ConversionRefunded(txId, c.nativeAmount, true);
+        
     } else {
-        // Simple fee refund if the operator fails to process the request
-        if (!operatorExpired) revert IncorrectWindow();
-
-        c.refunded = true;
+        // User only paid commit fee, no deposit yet
         uint256 fee = c.commitFee;
         totalHeldCommitFees -= fee;
         c.commitFee = 0;
+        
         _closeActive(txId);
 
         (bool ok2, ) = payable(c.user).call{value: fee}("");
