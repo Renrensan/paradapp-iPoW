@@ -128,17 +128,27 @@ impl ChainProviderAdapter for EvmChainProvider {
         )
         .await
         {
-            Ok(btc_txid) => {
+            Ok((btc_txid, actual_end_idx)) => {
                 if !btc_txid.is_empty() {
-                    info!(%btc_txid, start, end, "Sweep successful");
+                    info!(%btc_txid, start, end = actual_end_idx, "Sweep successful");
+                } else if actual_end_idx < end {
+                    info!(
+                        start,
+                        checkpoint = actual_end_idx,
+                        "Sweep deferred: Funds found but threshold not met or fees too high."
+                    );
                 } else {
-                    info!(start, end, "Sweep completed (no funds found)");
+                    info!(
+                        start,
+                        end = actual_end_idx,
+                        "Sweep completed: No funds found in range."
+                    );
                 }
 
                 // 3. Update the last swept index in Redis so we don't repeat work
                 self.core_ctx
                     .redis_storage
-                    .set_last_swept_index(network, end)
+                    .set_last_swept_index(network, actual_end_idx)
                     .await?;
             },
             Err(e) => anyhow::bail!("Provider sweep failed: {}", e),

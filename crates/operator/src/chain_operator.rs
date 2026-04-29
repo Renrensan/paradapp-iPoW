@@ -3,9 +3,7 @@ use chrono::Utc;
 use ethers_core::types::U256;
 use futures::future::join_all;
 use paradapp_core::{
-    btc::btc_service::{
-        btc_tip_height, maybe_rebalance_btc_wallets, rbf_send_to_user_program,
-    },
+    btc::btc_service::{btc_tip_height, rbf_send_to_user_program},
     consts::{
         supported_network_enum::SupportedNetwork,
         transaction_phase::TransactionPhase, transaction_type::TransactionType,
@@ -113,7 +111,7 @@ impl ChainOperator {
         }
 
         // 5. Scheduled BTC Sweeping Loop
-        if engine == Engine::Rebalance {
+        if engine == Engine::Rebalance || engine == Engine::All {
             let s = stack.clone();
             handles.push(tokio::spawn(async move {
                 // 1. Initial Delay (Safety buffer)
@@ -124,17 +122,16 @@ impl ChainOperator {
                 let _ = Self::tick_sweeping(s.clone()).await;
 
                 // 3. Setup interval for subsequent runs
-                let thirty_days =
-                    std::time::Duration::from_secs(30 * 24 * 60 * 60);
-                // interval_at starting "thirty_days" from now
+                let one_day = std::time::Duration::from_secs(24 * 60 * 60);
+
                 let mut interval = tokio::time::interval_at(
-                    tokio::time::Instant::now() + thirty_days,
-                    thirty_days,
+                    tokio::time::Instant::now() + one_day,
+                    one_day,
                 );
 
                 loop {
                     interval.tick().await;
-                    info!("Starting scheduled 30-day BTC sweep check");
+                    info!("Starting scheduled 1-day BTC sweep check");
                     let _ = Self::tick_sweeping(s.clone()).await;
                 }
             }));
@@ -501,11 +498,11 @@ impl ChainOperator {
 
         if !ready_h2b.is_empty() || !ready_b2h.is_empty() {
             info!(
-                h2b = ready_h2b.len(),
-                b2h = ready_b2h.len(),
-                "Ready: H2B {:?}, B2H {:?}",
-                h2b_ids,
-                b2h_ids
+                h2b_count = ready_h2b.len(),
+                b2h_count = ready_b2h.len(),
+                h2b_members = ?h2b_ids,
+                b2h_members = ?b2h_ids,
+                "Conversion status updated"
             );
         } else {
             info!("No conversions found.");
@@ -558,8 +555,8 @@ impl ChainOperator {
                                 warn!(%tx_id, ?err, "Error submitting merkle proof");
                             }
                         } else {
-                            // Transaction is still in mempool, use the fetched mempool_height for RBF
-                            info!(%tx_id, "BTC transaction not yet confirmed, checking RBF criteria...");
+                            // Transaction is still in mempool, use the fetched estimated_confirmation_height for RBF
+                            info!(%tx_id, "BTC transaction not yet confirmed, evaluating RBF eligibility...");
 
                             // 1. Fetch Anchor Info from the contract
                             let anchor = stack
@@ -568,42 +565,64 @@ impl ChainOperator {
                                 .await?;
 
                             // 2. Fetch current Bitcoin Tip Height
-                            let tip_height =
+                            let current_tip_height =
                                 btc_tip_height(&stack.core_context()).await?;
 
                             // 3. Define thresholds (Configurable)
-                            let anchor_threshold = stack
+                            let anchor_block_threshold = stack
                                 .core_context()
                                 .cfg
-                                .rbf_blocks_since_anchor; // Blocks since anchor tx
-                            let rbf_threshold = stack
+                                .rbf_blocks_since_anchor; // Min blocks since anchor tx before RBF allowed
+
+                            let confirmation_delay_threshold_blocks = stack
                                 .core_context()
                                 .cfg
-                                .rbf_blocks_from_tip_to_unconfirmed; // Blocks from latest tip to block eta to suitable RBF
+                                .rbf_blocks_from_tip_to_unconfirmed; // Max acceptable delay before RBF
 
-                            let is_past_anchor = tip_height
-                                >= (anchor.anchor_height.as_u64()
-                                    + anchor_threshold);
+                            let anchor_height = anchor.anchor_height.as_u64();
+                            let anchor_rbf_eligible_height =
+                                anchor_height + anchor_block_threshold;
 
-                            // Use the real mempool_height returned in the proof payload
-                            let btc_tx_initial_height =
-                                proof.mempool_height.unwrap_or(tip_height);
-                            let rbf_eligible = tip_height + rbf_threshold
-                                >= btc_tx_initial_height;
+                            let is_past_anchor_threshold = current_tip_height
+                                >= anchor_rbf_eligible_height;
+
+                            // Use the estimated confirmation height returned in the proof payload
+                            let estimated_confirmation_height = proof
+                                .mempool_height
+                                .unwrap_or(current_tip_height);
+
+                            let estimated_blocks_until_confirmation =
+                                estimated_confirmation_height
+                                    .saturating_sub(current_tip_height);
+
+                            let is_confirmation_delay_over_threshold =
+                                estimated_blocks_until_confirmation
+                                    > confirmation_delay_threshold_blocks;
 
                             info!(
-                                tip = %tip_height,
-                                anchor = %anchor.anchor_height,
-                                anchor_limit = %(anchor.anchor_height.as_u64() + anchor_threshold),
-                                tx_eta_block = %btc_tx_initial_height,
-                                rbf_threshold = %rbf_threshold,
-                                is_past_anchor = %is_past_anchor,
-                                rbf_eligible = %rbf_eligible,
-                                "RBF Parameter Check"
+                                tx_id = %tx_id,
+                                current_tip_height = %current_tip_height,
+                                anchor_height = %anchor_height,
+                                anchor_block_threshold = %anchor_block_threshold,
+                                anchor_rbf_eligible_height = %anchor_rbf_eligible_height,
+                                is_past_anchor_threshold = %is_past_anchor_threshold,
+                                estimated_confirmation_height = %estimated_confirmation_height,
+                                estimated_blocks_until_confirmation = %estimated_blocks_until_confirmation,
+                                confirmation_delay_threshold_blocks = %confirmation_delay_threshold_blocks,
+                                is_confirmation_delay_over_threshold = %is_confirmation_delay_over_threshold,
+                                "RBF eligibility parameters evaluated"
                             );
-
-                            if is_past_anchor && rbf_eligible {
-                                info!(%tx_id, tip=%tip_height, anchor=%anchor.anchor_height, "RBF criteria met. Proceeding with fee bump.");
+                            if is_past_anchor_threshold
+                                && is_confirmation_delay_over_threshold
+                            {
+                                info!(
+                                    %tx_id,
+                                    current_tip_height = %current_tip_height,
+                                    anchor_height = %anchor_height,
+                                    estimated_confirmation_height = %estimated_confirmation_height,
+                                    estimated_blocks_until_confirmation = %estimated_blocks_until_confirmation,
+                                    "RBF criteria met. Proceeding with fee bump."
+                                );
 
                                 let amount_sats = conv.bitcoin_amount.as_u64();
                                 let user_program = conv.user_program.0.to_vec();
@@ -617,7 +636,12 @@ impl ChainOperator {
                                 .await
                                 {
                                     Ok(new_btc_txid) => {
-                                        info!(%tx_id, old = %btc_txid, new = %new_btc_txid, "RBF Successful");
+                                        info!(
+                                            %tx_id,
+                                            old_btc_txid = %btc_txid,
+                                            new_btc_txid = %new_btc_txid,
+                                            "RBF successful"
+                                        );
 
                                         // Update storage
                                         if let Err(e) = stack
@@ -628,15 +652,37 @@ impl ChainOperator {
                                             )
                                             .await
                                         {
-                                            error!(%tx_id, "Failed to update RBF txid in storage: {:?}", e);
+                                            error!(
+                                                %tx_id,
+                                                "Failed to update RBF txid in storage: {:?}",
+                                                e
+                                            );
                                         }
                                     },
                                     Err(e) => {
-                                        warn!(%tx_id, "RBF attempt failed or skipped by node: {:?}", e);
+                                        warn!(
+                                            %tx_id,
+                                            current_tip_height = %current_tip_height,
+                                            estimated_confirmation_height = %estimated_confirmation_height,
+                                            estimated_blocks_until_confirmation = %estimated_blocks_until_confirmation,
+                                            "RBF attempt failed or skipped by node: {:?}",
+                                            e
+                                        );
                                     },
                                 }
                             } else {
-                                debug!(%tx_id, tip=%tip_height, anchor=%anchor.anchor_height, "RBF not needed yet.");
+                                debug!(
+                                    %tx_id,
+                                    current_tip_height = %current_tip_height,
+                                    anchor_height = %anchor_height,
+                                    anchor_rbf_eligible_height = %anchor_rbf_eligible_height,
+                                    is_past_anchor_threshold = %is_past_anchor_threshold,
+                                    estimated_confirmation_height = %estimated_confirmation_height,
+                                    estimated_blocks_until_confirmation = %estimated_blocks_until_confirmation,
+                                    confirmation_delay_threshold_blocks = %confirmation_delay_threshold_blocks,
+                                    is_confirmation_delay_over_threshold = %is_confirmation_delay_over_threshold,
+                                    "RBF not needed yet"
+                                );
                             }
                         }
                     },
@@ -674,7 +720,7 @@ impl ChainOperator {
             .await?;
 
         // 6. BTC hot wallet rebalance (uses core_ctx from stack)
-        maybe_rebalance_btc_wallets(&stack.core_context()).await?;
+        // maybe_rebalance_btc_wallets(&stack.core_context()).await?;
 
         info!("Done conversion pass.");
         Ok(())
@@ -1029,81 +1075,92 @@ impl ChainOperator {
         sources: &[String],
         current: SupportedNetwork,
     ) -> Vec<BridgeIntent> {
-        let tasks = sources.iter().map(|source| {
-            let ctx = ctx.clone();
-            let source = source.clone();
+        let tasks =
+            sources.iter().map(|source| {
+                let ctx = ctx.clone();
+                let source = source.clone();
 
-            async move {
-                if let Ok(remote_stack) =
-                    crate::registry::Registry::get_stack(&source, ctx).await
-                {
-                    let remote_provider = remote_stack.chain_provider();
+                async move {
+                    if let Ok(remote_stack) =
+                        crate::registry::Registry::get_stack(&source, ctx).await
+                    {
+                        let remote_provider = remote_stack.chain_provider();
 
-                    // 1. Get remote limits
-                    let min_limit =
-                        U256::from(remote_provider.min_transaction_limit());
-                    let max_limit =
-                        U256::from(remote_provider.max_transaction_limit());
+                        // 1. Get remote limits
+                        let min_limit =
+                            U256::from(remote_provider.min_transaction_limit());
+                        let max_limit =
+                            U256::from(remote_provider.max_transaction_limit());
 
-                    let (approval_res, user_action_res) = tokio::join!(
-                        remote_provider.get_tx_ids_by_filter(TxIdFilter {
-                            type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
-                            phase_filter:
-                                TransactionPhase::WAITING_OPERATOR_APPROVAL,
-                            dest_network: Some(current),
-                            max_results: U256::from(100u64),
-                            ..Default::default()
-                        }),
-                        remote_provider.get_tx_ids_by_filter(TxIdFilter {
-                            type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
-                            phase_filter: TransactionPhase::WAITING_USER_ACTION,
-                            dest_network: Some(current),
-                            max_results: U256::from(100u64),
-                            ..Default::default()
-                        })
-                    );
+                        let (approval_res, user_action_res, proof_res) =
+                            tokio::join!(
+                    remote_provider.get_tx_ids_by_filter(TxIdFilter {
+                        type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
+                        phase_filter:
+                            TransactionPhase::WAITING_OPERATOR_APPROVAL,
+                        dest_network: Some(current),
+                        max_results: U256::from(100u64),
+                        ..Default::default()
+                    }),
+                    remote_provider.get_tx_ids_by_filter(TxIdFilter {
+                        type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
+                        phase_filter: TransactionPhase::WAITING_USER_ACTION,
+                        dest_network: Some(current),
+                        max_results: U256::from(100u64),
+                        ..Default::default()
+                    }),
+                    remote_provider.get_tx_ids_by_filter(TxIdFilter {
+                        type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
+                        phase_filter:
+                            TransactionPhase::ACTIVE_WAITING_PROOF,
+                        dest_network: Some(current),
+                        max_results: U256::from(100u64),
+                        ..Default::default()
+                    })
+                );
 
-                    let mut raw_ids = approval_res.unwrap_or_default();
-                    raw_ids.extend(user_action_res.unwrap_or_default());
+                        let mut raw_ids = approval_res.unwrap_or_default();
+                        raw_ids.extend(user_action_res.unwrap_or_default());
+                        raw_ids.extend(proof_res.unwrap_or_default());
 
-                    if raw_ids.is_empty() {
-                        return None;
-                    }
+                        if raw_ids.is_empty() {
+                            return None;
+                        }
 
-                    // 2. Filter IDs by remote conversion info and limits
-                    let mut filtered_ids = Vec::new();
-                    for id in raw_ids {
-                        if let Ok(conv) =
-                            remote_provider.get_conversion_info(id).await
-                        {
-                            if conv.native_amount >= min_limit
-                                && conv.native_amount <= max_limit
+                        // 2. Filter IDs by remote conversion info and limits
+                        let mut filtered_ids = Vec::new();
+                        for id in raw_ids {
+                            if let Ok(conv) =
+                                remote_provider.get_conversion_info(id).await
                             {
-                                filtered_ids.push(id);
-                            } else {
-                                info!(
-                                    tx_id = %id,
-                                    from_net = %source,
-                                    amount = %conv.native_amount,
-                                    "Intent ignored: outside limits"
-                                );
+                                if conv.native_amount >= min_limit
+                                    && conv.native_amount <= max_limit
+                                {
+                                    filtered_ids.push(id);
+                                } else {
+                                    info!(
+                                        tx_id = %id,
+                                        from_net = %source,
+                                        amount = %conv.native_amount,
+                                        "Intent ignored: outside limits"
+                                    );
+                                }
                             }
                         }
-                    }
 
-                    if !filtered_ids.is_empty() {
-                        filtered_ids.sort();
-                        filtered_ids.dedup();
+                        if !filtered_ids.is_empty() {
+                            filtered_ids.sort();
+                            filtered_ids.dedup();
 
-                        return Some(BridgeIntent {
-                            stack: remote_stack,
-                            tx_ids: filtered_ids,
-                        });
+                            return Some(BridgeIntent {
+                                stack: remote_stack,
+                                tx_ids: filtered_ids,
+                            });
+                        }
                     }
+                    None
                 }
-                None
-            }
-        });
+            });
 
         let results = join_all(tasks).await;
         results.into_iter().flatten().collect()

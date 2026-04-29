@@ -159,7 +159,7 @@ async fn start_api(
     config: Arc<RwLock<std::collections::HashMap<String, EvmConfig>>>,
     port: u16,
 ) {
-    let app = create_router(config); // This will call the router with the map
+    let app = create_router(config);
     let addr = format!("0.0.0.0:{}", port);
 
     match tokio::net::TcpListener::bind(&addr).await {

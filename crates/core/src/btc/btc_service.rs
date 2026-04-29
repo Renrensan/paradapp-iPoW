@@ -12,7 +12,6 @@ use bitcoin::{
     sighash::SighashCache,
 };
 use ethers::{
-    providers::{Middleware, Provider},
     types::{Bytes as TypesBytes, U256},
     utils::{hex, parse_units},
 };
@@ -61,55 +60,127 @@ pub async fn header80_by_height(
         anyhow::anyhow!("Failed to acquire RPC permit for header fetch: {}", e)
     })?;
 
-    // 2. GET block hash by height (BE)
-    let url_hash = format!("{}/block-height/{}", ctx.cfg.esplora_base, height);
-    let block_hash_be =
-        ctx.http.get(&url_hash).send().await?.text().await?.trim().to_string();
+    // Define the available endpoints for rotation
+    let endpoints = [&ctx.cfg.mempool_api, &ctx.cfg.esplora_base];
+    let mut last_error = None;
 
-    // 3. GET block header hex
-    let url_header =
-        format!("{}/block/{}/header", ctx.cfg.esplora_base, block_hash_be);
-    let header_hex = ctx
-        .http
-        .get(&url_header)
-        .send()
-        .await?
-        .text()
-        .await?
-        .trim()
-        .to_string();
+    for base_url in endpoints {
+        // 2. GET block hash by height (BE)
+        let url_hash = format!("{}/block-height/{}", base_url, height);
+        let block_hash_be_res = ctx.http.get(&url_hash).send().await;
 
-    // 4. Validate length (80 bytes → 160 hex chars)
-    if header_hex.len() != 160 {
-        bail!("header80 hex has {} chars, expected 160", header_hex.len());
+        let block_hash_be = match block_hash_be_res {
+            Ok(resp) => match resp.text().await {
+                Ok(t) => t.trim().to_string(),
+                Err(e) => {
+                    last_error = Some(e.into());
+                    continue;
+                },
+            },
+            Err(e) => {
+                last_error = Some(e.into());
+                continue;
+            },
+        };
+
+        // 3. GET block header hex
+        let url_header = format!("{}/block/{}/header", base_url, block_hash_be);
+        let header_hex_res = ctx.http.get(&url_header).send().await;
+
+        let header_hex = match header_hex_res {
+            Ok(resp) => match resp.text().await {
+                Ok(t) => t.trim().to_string(),
+                Err(e) => {
+                    last_error = Some(e.into());
+                    continue;
+                },
+            },
+            Err(e) => {
+                last_error = Some(e.into());
+                continue;
+            },
+        };
+
+        // 4. Validate length (80 bytes → 160 hex chars)
+        if header_hex.len() != 160 {
+            last_error = Some(anyhow!(
+                "header80 hex has {} chars, expected 160",
+                header_hex.len()
+            ));
+            continue;
+        }
+
+        // 5. Ensure "0x" prefix
+        let header80_prefixed = if header_hex.starts_with("0x") {
+            header_hex
+        } else {
+            format!("0x{}", header_hex)
+        };
+
+        // 6. Mandatory 250ms gap enforcement before releasing the permit.
+        // This protects the Esplora API from rapid-fire sequential calls
+        // from different worker tasks.
+        tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
+
+        return Ok((block_hash_be, header80_prefixed));
     }
 
-    // 5. Ensure "0x" prefix
-    let header80_prefixed = if header_hex.starts_with("0x") {
-        header_hex
-    } else {
-        format!("0x{}", header_hex)
-    };
-
-    // 6. Mandatory 250ms gap enforcement before releasing the permit.
-    // This protects the Esplora API from rapid-fire sequential calls
-    // from different worker tasks.
-    tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
-
-    Ok((block_hash_be, header80_prefixed))
+    // If we exhausted all endpoints, return the last error encountered
+    Err(last_error.unwrap_or_else(|| anyhow!("All RPC endpoints failed")))
 }
+
 pub async fn btc_tip_height(ctx: &CoreContext) -> Result<u64> {
-    let url = format!("{}/blocks/tip/height", ctx.cfg.esplora_base);
+    // Define the available endpoints for rotation
+    let endpoints = [&ctx.cfg.mempool_api, &ctx.cfg.esplora_base];
+    let mut last_error = None;
 
-    // Fetch text from the endpoint
-    let text = ctx.http.get(&url).send().await?.text().await?;
-    let trimmed = text.trim();
+    for base_url in endpoints {
+        let url = format!("{}/blocks/tip/height", base_url);
 
-    // Parse height as number and sub with 6 as high finality confirmed block
-    let height: u64 = (trimmed.parse::<u64>()?)
-        .saturating_sub(ctx.cfg.high_finality_confirmed_block as u64);
+        // Fetch text from the endpoint
+        let response = match ctx.http.get(&url).send().await {
+            Ok(res) => res,
+            Err(e) => {
+                last_error = Some(anyhow::anyhow!(e));
+                continue;
+            },
+        };
 
-    Ok(height)
+        let text = match response.text().await {
+            Ok(t) => t,
+            Err(e) => {
+                last_error = Some(anyhow::anyhow!(e));
+                continue;
+            },
+        };
+
+        let trimmed = text.trim();
+
+        // Parse height as number and sub with 6 as high finality confirmed block
+        let height_res = trimmed.parse::<u64>();
+
+        match height_res {
+            Ok(h) => {
+                let height = h.saturating_sub(
+                    ctx.cfg.high_finality_confirmed_block as u64,
+                );
+                return Ok(height);
+            },
+            Err(e) => {
+                last_error = Some(anyhow::anyhow!(
+                    "Failed to parse height '{}': {}",
+                    trimmed,
+                    e
+                ));
+                continue;
+            },
+        }
+    }
+
+    // If we exhausted all endpoints, return the last error encountered
+    Err(last_error.unwrap_or_else(|| {
+        anyhow::anyhow!("All RPC endpoints failed to fetch tip height")
+    }))
 }
 
 pub fn dsha256(buf: &[u8]) -> [u8; 32] {
@@ -192,45 +263,6 @@ pub fn check_work_le(header80_0x: &str) -> Result<(bool, u32, U256, U256)> {
     Ok((h_val <= target, bits, target, h_val))
 }
 
-pub async fn check_hedera_alive(
-    provider: &Provider<ethers::providers::Http>,
-) -> bool {
-    match provider.get_block_number().await {
-        Ok(bn) => {
-            info!(block_number = %bn, "Hedera RPC alive");
-            true
-        },
-        Err(e) => {
-            error!(error = %e, "Hedera RPC health check failed");
-            false
-        },
-    }
-}
-
-pub async fn check_bitcoin_alive(
-    ctx: &CoreContext,
-    esplora_base: &str,
-) -> bool {
-    let url = format!("{esplora_base}/blocks/tip/height");
-
-    match ctx.http.get(url).send().await {
-        Ok(resp) => match resp.text().await {
-            Ok(text) => match text.parse::<u32>() {
-                Ok(tip) => {
-                    info!(tip_height = tip, "Bitcoin Esplora alive");
-                    true
-                },
-                Err(_) => false,
-            },
-            Err(_) => false,
-        },
-        Err(e) => {
-            error!(error = %e, "Bitcoin Esplora health failed");
-            false
-        },
-    }
-}
-
 pub fn decode_header80(header80_hex: &str) -> Result<TypesBytes, String> {
     let clean = header80_hex.trim_start_matches("0x");
 
@@ -277,13 +309,42 @@ pub async fn tx_merkle_proof(
         anyhow::anyhow!("Failed to acquire RPC permit for merkle proof: {}", e)
     })?;
 
-    let url = format!("{}/tx/{}/merkle-proof", ctx.cfg.esplora_base, txid_be);
-    let json = ctx.http.get(url).send().await?.json::<Value>().await?;
+    // Define the available endpoints, prioritizing mempool_api
+    let endpoints = [&ctx.cfg.mempool_api, &ctx.cfg.esplora_base];
+    let mut last_error = None;
 
-    // 2. Mandatory 250ms gap before releasing the permit
-    tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
+    for base_url in endpoints {
+        let url = format!("{}/tx/{}/merkle-proof", base_url, txid_be);
 
-    Ok(json)
+        // Fetch JSON from the endpoint
+        let response = match ctx.http.get(url).send().await {
+            Ok(res) => res,
+            Err(e) => {
+                last_error = Some(anyhow::anyhow!(e));
+                continue;
+            },
+        };
+
+        let json_res = response.json::<Value>().await;
+
+        match json_res {
+            Ok(json) => {
+                // 2. Mandatory 250ms gap before releasing the permit
+                tokio::time::sleep(tokio::time::Duration::from_millis(250))
+                    .await;
+                return Ok(json);
+            },
+            Err(e) => {
+                last_error = Some(anyhow::anyhow!(e));
+                continue;
+            },
+        }
+    }
+
+    // If we exhausted all endpoints, return the last error encountered
+    Err(last_error.unwrap_or_else(|| {
+        anyhow::anyhow!("All RPC endpoints failed to fetch merkle proof")
+    }))
 }
 
 pub async fn tx_hex(ctx: &CoreContext, txid_be: &str) -> Result<String> {
@@ -292,13 +353,42 @@ pub async fn tx_hex(ctx: &CoreContext, txid_be: &str) -> Result<String> {
         anyhow::anyhow!("Failed to acquire RPC permit for tx hex: {}", e)
     })?;
 
-    let url = format!("{}/tx/{}/hex", ctx.cfg.esplora_base, txid_be);
-    let hex = ctx.http.get(url).send().await?.text().await?;
+    // Define the available endpoints, prioritizing mempool_api
+    let endpoints = [&ctx.cfg.mempool_api, &ctx.cfg.esplora_base];
+    let mut last_error = None;
 
-    // 2. Mandatory 250ms gap before releasing the permit
-    tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
+    for base_url in endpoints {
+        let url = format!("{}/tx/{}/hex", base_url, txid_be);
 
-    Ok(format!("0x{}", hex.trim()))
+        // Fetch text from the endpoint
+        let response = match ctx.http.get(url).send().await {
+            Ok(res) => res,
+            Err(e) => {
+                last_error = Some(anyhow::anyhow!(e));
+                continue;
+            },
+        };
+
+        let hex_res = response.text().await;
+
+        match hex_res {
+            Ok(hex) => {
+                // 2. Mandatory 250ms gap before releasing the permit
+                tokio::time::sleep(tokio::time::Duration::from_millis(250))
+                    .await;
+                return Ok(format!("0x{}", hex.trim()));
+            },
+            Err(e) => {
+                last_error = Some(anyhow::anyhow!(e));
+                continue;
+            },
+        }
+    }
+
+    // If we exhausted all endpoints, return the last error encountered
+    Err(last_error.unwrap_or_else(|| {
+        anyhow::anyhow!("All RPC endpoints failed to fetch tx hex")
+    }))
 }
 
 /// Convert BigInt-like counts to Bitcoin varint bytes
@@ -467,19 +557,43 @@ pub async fn get_confirmed_receive_by_txid(
             .await
             .map_err(|e| anyhow!("Failed to acquire RPC permit: {}", e))?;
 
-        let url = if let Some(ref last) = last_seen_txid {
-            format!(
-                "{}/address/{}/txs/chain/{}",
-                ctx.cfg.esplora_base, address, last
-            )
-        } else {
-            format!("{}/address/{}/txs", ctx.cfg.esplora_base, address)
-        };
+        // Define the available endpoints, prioritizing mempool_api
+        let endpoints = [&ctx.cfg.mempool_api, &ctx.cfg.esplora_base];
+        let mut txs: Option<Value> = None;
+        let mut last_error = None;
 
-        let client = ctx.http.clone();
-        let txs: Value = client.get(&url).send().await?.json().await?;
+        for base_url in endpoints {
+            let url = if let Some(ref last) = last_seen_txid {
+                format!("{}/address/{}/txs/chain/{}", base_url, address, last)
+            } else {
+                format!("{}/address/{}/txs", base_url, address)
+            };
 
-        let arr = txs.as_array().ok_or(anyhow!("tx not found"))?;
+            let client = ctx.http.clone();
+            match client.get(&url).send().await {
+                Ok(resp) => {
+                    match resp.json::<Value>().await {
+                        Ok(json) => {
+                            txs = Some(json);
+                            break; // Success! Break out of the endpoint rotation loop
+                        },
+                        Err(e) => last_error = Some(anyhow!(e)),
+                    }
+                },
+                Err(e) => last_error = Some(anyhow!(e)),
+            }
+        }
+
+        // If no endpoint worked for this page, return the last error
+        let txs_val = txs.ok_or_else(|| {
+            last_error.unwrap_or_else(|| {
+                anyhow!(
+                    "All RPC endpoints failed to fetch address transactions"
+                )
+            })
+        })?;
+
+        let arr = txs_val.as_array().ok_or(anyhow!("tx not found"))?;
         if arr.is_empty() {
             return Err(anyhow!("tx not found"));
         }
@@ -538,6 +652,7 @@ pub async fn get_confirmed_receive_by_txid(
         tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
     }
 }
+
 #[derive(Debug)]
 pub struct ProofBundle {
     pub legacy_0x: String,
@@ -660,48 +775,77 @@ pub async fn check_confirmation_and_build_proof(
     btc_txid: &str,
 ) -> Result<Option<BitcoinMerkleProofPayload>> {
     // ---- 1) Check BTC confirmation ----
-    // We do a manual limit here since it's a raw HTTP call
     let status = {
         let _permit = ctx.rpc_limiter.acquire().await?;
-        let status_url =
-            format!("{}/tx/{}/status", ctx.cfg.esplora_base, btc_txid);
-        let res = ctx.http.get(&status_url).send().await?;
+        let endpoints = [&ctx.cfg.mempool_api, &ctx.cfg.esplora_base];
+        let mut result = None;
 
-        if !res.status().is_success() {
-            info!("Mempool API error for txid {}, will retry later", btc_txid);
-            tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
-            return Ok(None);
+        for base_url in endpoints {
+            let status_url = format!("{}/tx/{}/status", base_url, btc_txid);
+            if let Ok(res) = ctx.http.get(&status_url).send().await {
+                if res.status().is_success() {
+                    if let Ok(s) = res.json::<TxStatus>().await {
+                        result = Some(s);
+                        break;
+                    }
+                }
+            }
         }
-        let s: TxStatus = res.json().await?;
-        tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
-        s
+
+        match result {
+            Some(s) => {
+                tokio::time::sleep(tokio::time::Duration::from_millis(250))
+                    .await;
+                s
+            },
+            None => {
+                info!(
+                    "All RPC APIs error for txid:{} btc_txid {}, will retry later",
+                    tx_id, btc_txid
+                );
+                tokio::time::sleep(tokio::time::Duration::from_millis(250))
+                    .await;
+                return Ok(None);
+            },
+        }
     };
 
     if !status.confirmed {
-        // This logs the entire status struct as a raw debug string
-        // --- Calculate ETA Block ---
-        let tx_url = format!("{}/tx/{}", ctx.cfg.esplora_base, btc_txid);
-        let tx_res = ctx
-            .http
-            .get(&tx_url)
-            .send()
-            .await?
-            .json::<serde_json::Value>()
-            .await?;
+        let endpoints = [&ctx.cfg.mempool_api, &ctx.cfg.esplora_base];
+
+        // --- Fetch TX Data for Fee/Weight ---
+        let mut tx_res_val = None;
+        for base_url in endpoints {
+            let tx_url = format!("{}/tx/{}", base_url, btc_txid);
+            if let Ok(res) = ctx.http.get(&tx_url).send().await {
+                if let Ok(json) = res.json::<serde_json::Value>().await {
+                    tx_res_val = Some(json);
+                    break;
+                }
+            }
+        }
+        let tx_res = tx_res_val.ok_or_else(|| {
+            anyhow!("Failed to fetch tx data from all endpoints")
+        })?;
 
         let fee = tx_res["fee"].as_f64().unwrap_or(0.0);
         let weight = tx_res["weight"].as_f64().unwrap_or(1.0);
         let fee_rate = fee / (weight / 4.0);
 
-        let blocks_url =
-            format!("{}/v1/fees/mempool-blocks", ctx.cfg.esplora_base);
-        let mempool_data = ctx
-            .http
-            .get(&blocks_url)
-            .send()
-            .await?
-            .json::<Vec<serde_json::Value>>()
-            .await?;
+        // --- Fetch Mempool Fee Estimations ---
+        let mut mempool_data_val = None;
+        for base_url in endpoints {
+            let blocks_url = format!("{}/v1/fees/mempool-blocks", base_url);
+            if let Ok(res) = ctx.http.get(&blocks_url).send().await {
+                if let Ok(json) = res.json::<Vec<serde_json::Value>>().await {
+                    mempool_data_val = Some(json);
+                    break;
+                }
+            }
+        }
+        let mempool_data = mempool_data_val.ok_or_else(|| {
+            anyhow!("Failed to fetch mempool blocks from all endpoints")
+        })?;
 
         let mut eta_blocks = 0;
         for block in mempool_data {
@@ -716,7 +860,7 @@ pub async fn check_confirmation_and_build_proof(
         }
 
         let tip_height = btc_tip_height(ctx).await?;
-        let eta_block_height = tip_height + eta_blocks;
+        let eta_block_confirmation_height = tip_height + eta_blocks;
 
         return Ok(Some(BitcoinMerkleProofPayload {
             tx_id,
@@ -726,7 +870,7 @@ pub async fn check_confirmation_and_build_proof(
             block_height: U256::zero(),
             branch: vec![],
             index: U256::zero(),
-            mempool_height: Some(eta_block_height),
+            mempool_height: Some(eta_block_confirmation_height),
         }));
     }
 
@@ -741,8 +885,6 @@ pub async fn check_confirmation_and_build_proof(
         .ok_or_else(|| anyhow!("missing block_hash"))?;
 
     // ---- 3) Build proof bundle ----
-    // This calls tx_merkle_proof, header80, and tx_hex.
-    // They EACH have their own permit/sleep, so the 250ms gap is enforced 3 times here.
     let vout_index_usize: usize = 0;
     let proof = build_proof_bundle(
         ctx,
@@ -824,6 +966,7 @@ pub struct AddressInfo {
     pub chain_stats: Option<Stats>,
     pub mempool_stats: Option<Stats>,
 }
+
 pub async fn get_address_balance_sats(
     ctx: &CoreContext,
     address: &str,
@@ -832,21 +975,43 @@ pub async fn get_address_balance_sats(
         return Err(anyhow!("address empty"));
     }
 
-    let url = format!("{}/address/{}", ctx.cfg.esplora_base, address);
-    let client = &ctx.http;
+    // Define endpoints with Mempool first
+    let endpoints = [&ctx.cfg.mempool_api, &ctx.cfg.esplora_base];
+    let mut last_error = None;
+    let mut address_info: Option<AddressInfo> = None;
 
-    // HTTP GET
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| anyhow!("HTTP error for {}: {}", address, e))?;
+    for base_url in endpoints {
+        let url = format!("{}/address/{}", base_url, address);
 
-    // JSON parse
-    let json: AddressInfo = resp
-        .json()
-        .await
-        .map_err(|e| anyhow!("JSON decode error for {}: {}", address, e))?;
+        // Attempt HTTP GET
+        let resp = match ctx.http.get(&url).send().await {
+            Ok(r) => r,
+            Err(e) => {
+                last_error = Some(anyhow!("HTTP error for {}: {}", address, e));
+                continue;
+            },
+        };
+
+        // Attempt JSON parse
+        match resp.json::<AddressInfo>().await {
+            Ok(json) => {
+                address_info = Some(json);
+                break;
+            },
+            Err(e) => {
+                last_error =
+                    Some(anyhow!("JSON decode error for {}: {}", address, e));
+                continue;
+            },
+        }
+    }
+
+    // Ensure we actually got data
+    let json = address_info.ok_or_else(|| {
+        last_error.unwrap_or_else(|| {
+            anyhow!("All RPC endpoints failed for address {}", address)
+        })
+    })?;
 
     let chain = json
         .chain_stats
@@ -861,11 +1026,11 @@ pub async fn get_address_balance_sats(
     let mem_funded = mem.funded_txo_sum.unwrap_or(0) as u128;
     let mem_spent = mem.spent_txo_sum.unwrap_or(0) as u128;
 
+    // Standard UTXO balance calculation: (Confirmed In - Out) + (Unconfirmed In - Out)
     let total = funded - spent + (mem_funded - mem_spent);
 
     Ok(total)
 }
-
 pub async fn maybe_rebalance_btc_wallets(
     ctx: &CoreContext,
 ) -> anyhow::Result<()> {
@@ -880,15 +1045,17 @@ pub async fn maybe_rebalance_btc_wallets(
     let main = ctx.cfg.btc_main_address.as_ref().unwrap().clone();
 
     // Fetch balance (in sats)
+    // Note: get_address_balance_sats now rotates between Mempool and Esplora automatically
     let hot_bal_sats = match get_address_balance_sats(ctx, &hot).await {
         Ok(v) => v,
         Err(e) => {
-            error!(error=%e, "Failed to fetch hot wallet balance");
+            // If both RPCs fail, we log and exit gracefully to avoid crashing the worker
+            error!(error=%e, "Failed to fetch hot wallet balance from all RPC providers");
             return Ok(());
         },
     };
 
-    // Convert to U256
+    // Convert to U256 (Assuming 1e8 for BTC sats)
     let hot_bal = U256::from(hot_bal_sats);
 
     // threshold
@@ -942,9 +1109,9 @@ pub async fn send_to_user_program(
         anyhow::anyhow!("Failed to acquire RPC permit for broadcast: {}", e)
     })?;
 
-    let mempool_api = &ctx.cfg.mempool_api;
     let dev_address = &ctx.cfg.operator_btc_wallet_address;
     let network = ctx.btc_network;
+    let endpoints = [&ctx.cfg.mempool_api, &ctx.cfg.esplora_base];
 
     // Parse operator private key
     let wif = &ctx.cfg.operator_btc_wallet_private_key;
@@ -953,41 +1120,44 @@ pub async fn send_to_user_program(
     let secret_key = private_key.inner;
     let secp = Secp256k1::new();
 
-    // Get fee rate
-    // let fee_res: FeeRecommended = ctx
-    //     .http
-    //     .get(format!("{}/v1/fees/recommended", mempool_api))
-    //     .send()
-    //     .await?
-    //     .json()
-    //     .await?;
-    // let dynamic_rate = fee_res.economy_fee.ceil() as u64;
-    // let fee_rate = dynamic_rate.clamp(1, 500);
+    // --- 1. Get operator UTXOs (With Rotation) ---
+    let mut utxos: Option<Vec<Utxo>> = None;
+    let mut utxo_err: Option<String> = None;
 
-    // Get operator UTXOs
-    let utxos: Vec<Utxo> = ctx
-        .http
-        .get(format!("{}/address/{}/utxo", mempool_api, dev_address))
-        .send()
-        .await?
-        .json()
-        .await?;
+    for base_url in endpoints {
+        let url = format!("{}/address/{}/utxo", base_url, dev_address);
+        match ctx.http.get(&url).send().await {
+            Ok(resp) => {
+                if let Ok(v) = resp.json::<Vec<Utxo>>().await {
+                    utxos = Some(v);
+                    break;
+                } else {
+                    utxo_err = Some("JSON decode failed".to_string());
+                }
+            },
+            Err(e) => utxo_err = Some(e.to_string()),
+        }
+    }
+
+    let utxos = utxos.ok_or_else(|| {
+        anyhow!(
+            "UTXO fetch failed. Last error: {}",
+            utxo_err.unwrap_or_default()
+        )
+    })?;
+
     if utxos.is_empty() {
         return Err(anyhow::anyhow!("No UTXOs available"));
     }
 
-    // Select UTXOs and calculate fee
+    // --- 2. Select UTXOs and calculate fee ---
     let mut selected = vec![];
     let mut input_sum: u64 = 0;
-    let mut final_fee: u64 = 0;
+    let final_fee: u64 = 120; // Static fee
 
     for utxo in &utxos {
         selected.push(utxo.clone());
         input_sum += utxo.value;
-
-        // let est_vbytes = (selected.len() as u64 * 59) + (2 * 31) + 10;
-        // final_fee = est_vbytes * fee_rate;
-        final_fee = 120;
 
         if input_sum >= amount_sats + final_fee {
             break;
@@ -1000,7 +1170,7 @@ pub async fn send_to_user_program(
 
     let change = input_sum - amount_sats - final_fee;
 
-    // Build transaction
+    // --- 3. Build transaction ---
     let mut tx = Transaction {
         version: bitcoin::transaction::Version::TWO,
         lock_time: LockTime::ZERO,
@@ -1008,13 +1178,11 @@ pub async fn send_to_user_program(
         output: vec![],
     };
 
-    // Output to user program (raw script)
     tx.output.push(TxOut {
         value: Amount::from_sat(amount_sats),
         script_pubkey: ScriptBuf::from(user_program.to_vec()),
     });
 
-    // Change output back to operator wallet
     if change > 0 {
         let change_script = BTCAddress::from_str(dev_address)?
             .require_network(network)?
@@ -1025,7 +1193,6 @@ pub async fn send_to_user_program(
         });
     }
 
-    // Inputs
     for utxo in &selected {
         let txid = Txid::from_str(&utxo.txid)?;
         tx.input.push(TxIn {
@@ -1036,7 +1203,7 @@ pub async fn send_to_user_program(
         });
     }
 
-    // Sign inputs
+    // --- 4. Sign inputs ---
     for (i, utxo) in selected.iter().enumerate() {
         let mut cache = SighashCache::new(&tx);
         let script_pubkey = BTCAddress::from_str(dev_address)?
@@ -1058,17 +1225,47 @@ pub async fn send_to_user_program(
         tx.input[i].witness.push(private_key.public_key(&secp).to_bytes());
     }
 
-    // Serialize and broadcast
+    // --- 5. Serialize and Broadcast (With Rotation) ---
     let tx_hex = hex::encode(serialize(&tx));
-    let response = ctx
-        .http
-        .post(format!("{}/tx", mempool_api))
-        .header("Content-Type", "text/plain")
-        .body(tx_hex)
-        .send()
-        .await?
-        .text()
-        .await?;
+    let mut broadcast_resp = None;
+    let mut broadcast_err: Option<String> = None;
+
+    for base_url in endpoints {
+        let url = format!("{}/tx", base_url);
+        // We clone tx_hex so it's available for the next iteration if the first fails
+        match ctx
+            .http
+            .post(&url)
+            .header("Content-Type", "text/plain")
+            .body(tx_hex.clone())
+            .send()
+            .await
+        {
+            Ok(res) => {
+                if res.status().is_success() {
+                    if let Ok(text) = res.text().await {
+                        broadcast_resp = Some(text);
+                        break;
+                    }
+                } else {
+                    let status = res.status();
+                    let body = res
+                        .text()
+                        .await
+                        .unwrap_or_else(|_| "No body".to_string());
+                    broadcast_err = Some(format!("HTTP {}: {}", status, body));
+                }
+            },
+            Err(e) => broadcast_err = Some(e.to_string()),
+        }
+    }
+
+    let response = broadcast_resp.ok_or_else(|| {
+        anyhow!(
+            "Broadcast failed on all endpoints. Last error: {}",
+            broadcast_err.unwrap_or_default()
+        )
+    })?;
 
     tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
 
@@ -1082,88 +1279,108 @@ pub async fn rbf_send_to_user_program(
     amount_sats: u64,
 ) -> Result<String> {
     let _permit = ctx.rpc_limiter.acquire().await?;
-    let mempool_api = &ctx.cfg.mempool_api;
     let dev_address = &ctx.cfg.operator_btc_wallet_address;
     let network = ctx.btc_network;
+    let endpoints = [&ctx.cfg.mempool_api, &ctx.cfg.esplora_base];
 
     let wif = &ctx.cfg.operator_btc_wallet_private_key;
     let private_key = bitcoin::PrivateKey::from_wif(wif)?;
     let secret_key = private_key.inner;
     let secp = Secp256k1::new();
 
-    // 1. Fetch original TX
-    let tx_hex = ctx
-        .http
-        .get(format!("{}/tx/{}/hex", mempool_api, original_txid))
-        .send()
-        .await?
-        .text()
-        .await?;
-    let old_tx: Transaction =
-        bitcoin::consensus::encode::deserialize(&hex::decode(tx_hex)?)?;
+    // --- 1. Fetch original TX (With Rotation) ---
+    let mut old_tx_opt: Option<Transaction> = None;
+    let mut last_err: Option<String> = None;
 
-    // 2. Fetch UTXO values and calculate old fee
+    for base_url in endpoints {
+        let url = format!("{}/tx/{}/hex", base_url, original_txid);
+        if let Ok(res) = ctx.http.get(&url).send().await {
+            if let Ok(hex_str) = res.text().await {
+                if let Ok(bytes) = hex::decode(hex_str.trim()) {
+                    if let Ok(tx) =
+                        bitcoin::consensus::encode::deserialize(&bytes)
+                    {
+                        old_tx_opt = Some(tx);
+                        break;
+                    }
+                }
+            }
+        }
+        last_err = Some(format!(
+            "Failed to fetch/parse original tx from {}",
+            base_url
+        ));
+    }
+    let old_tx =
+        old_tx_opt.ok_or_else(|| anyhow!(last_err.unwrap_or_default()))?;
+
+    // --- 2. Fetch UTXO values for old fee calc (With Rotation) ---
     let mut selected = vec![];
     let mut input_sum: u64 = 0;
     for input in &old_tx.input {
         let prev_txid = input.previous_output.txid.to_string();
         let prev_vout = input.previous_output.vout;
-        let res = ctx
-            .http
-            .get(format!("{}/tx/{}", mempool_api, prev_txid))
-            .send()
-            .await?;
-        let tx_val: serde_json::Value = res.json().await?;
-        let value =
-            tx_val["vout"][prev_vout as usize]["value"].as_u64().unwrap();
 
+        let mut value_opt: Option<u64> = None;
+        for base_url in endpoints {
+            let url = format!("{}/tx/{}", base_url, prev_txid);
+            if let Ok(res) = ctx.http.get(&url).send().await {
+                if let Ok(tx_val) = res.json::<serde_json::Value>().await {
+                    if let Some(v) =
+                        tx_val["vout"][prev_vout as usize]["value"].as_u64()
+                    {
+                        value_opt = Some(v);
+                        break;
+                    }
+                }
+            }
+        }
+        let value = value_opt.ok_or_else(|| {
+            anyhow!("Could not fetch input value for {}", prev_txid)
+        })?;
         selected.push(Utxo { txid: prev_txid, vout: prev_vout, value });
         input_sum += value;
     }
 
-    // --- FEE BUMP CALCULATION ---
-    // Calculate what we paid last time
+    // --- 3. Fee Bump Calculation (With Rotation for Recommended Fees) ---
     let current_output_sum: u64 =
         old_tx.output.iter().map(|o| o.value.to_sat()).sum();
     let old_absolute_fee = input_sum.saturating_sub(current_output_sum);
     let old_vsize = old_tx.vsize() as f64;
     let old_fee_rate = old_absolute_fee as f64 / old_vsize as f64;
 
-    // Get current market recommendation
-    let fee_res: FeeRecommended = ctx
-        .http
-        .get(format!("{}/v1/fees/recommended", mempool_api))
-        .send()
-        .await?
-        .json()
-        .await?;
+    let mut fee_res_opt: Option<FeeRecommended> = None;
+    for base_url in endpoints {
+        let url = format!("{}/v1/fees/recommended", base_url);
+        if let Ok(res) = ctx.http.get(&url).send().await {
+            if let Ok(fees) = res.json::<FeeRecommended>().await {
+                fee_res_opt = Some(fees);
+                break;
+            }
+        }
+    }
+    let fee_res = fee_res_opt
+        .ok_or_else(|| anyhow!("Could not fetch fee recommendations"))?;
 
-    // The +2 Rule: We beat the old rate by 2 OR follow the market, whichever is higher
-    // 1. Prioritize Economy Fee
     let market_rate = fee_res.economy_fee;
-    let old_rate = old_fee_rate;
-
-    let new_fee_rate = if market_rate > old_rate {
-        // If economy is already higher, jump straight to it
+    let new_fee_rate = if market_rate > old_fee_rate {
         market_rate
     } else {
-        // If economy is too low, perform a minimal 0.1 bump
-        old_rate + 0.1
+        old_fee_rate + 0.1
     };
 
     info!(
-        "RBF: Old rate was {} sat/vB. Market (half-hour) is {} sat/vB. New rate chosen: {} sat/vB.",
+        "RBF: Old rate: {} sat/vB. Market: {} sat/vB. New rate: {} sat/vB.",
         old_fee_rate, market_rate, new_fee_rate
     );
 
-    let final_fee = old_vsize * new_fee_rate;
-    let final_fee = final_fee.ceil() as u64;
+    let final_fee = (old_vsize * new_fee_rate).ceil() as u64;
     let change =
         input_sum.checked_sub(amount_sats + final_fee).ok_or_else(|| {
             anyhow!("Insufficient funds: Fee bump would deplete change output")
         })?;
 
-    // 4. Rebuild
+    // --- 4. Rebuild ---
     let mut tx = Transaction {
         version: bitcoin::transaction::Version::TWO,
         lock_time: LockTime::ZERO,
@@ -1186,7 +1403,7 @@ pub async fn rbf_send_to_user_program(
         });
     }
 
-    // 5. Sign
+    // --- 5. Sign ---
     for (i, utxo) in selected.iter().enumerate() {
         let mut cache = SighashCache::new(&tx);
         let script_pubkey = BTCAddress::from_str(dev_address)?
@@ -1207,18 +1424,31 @@ pub async fn rbf_send_to_user_program(
         tx.input[i].witness.push(private_key.public_key(&secp).to_bytes());
     }
 
+    // --- 6. Broadcast (With Rotation) ---
     let tx_hex = hex::encode(serialize(&tx));
-    let response = ctx
-        .http
-        .post(format!("{}/tx", mempool_api))
-        .header("Content-Type", "text/plain")
-        .body(tx_hex)
-        .send()
-        .await?
-        .text()
-        .await?;
+    let mut broadcast_resp = None;
+    for base_url in endpoints {
+        let url = format!("{}/tx", base_url);
+        if let Ok(res) = ctx
+            .http
+            .post(&url)
+            .header("Content-Type", "text/plain")
+            .body(tx_hex.clone())
+            .send()
+            .await
+        {
+            if res.status().is_success() {
+                if let Ok(text) = res.text().await {
+                    broadcast_resp = Some(text);
+                    break;
+                }
+            }
+        }
+    }
 
-    Ok(response)
+    broadcast_resp.ok_or_else(|| {
+        anyhow!("Failed to broadcast RBF transaction to all endpoints")
+    })
 }
 
 #[derive(Debug)]
@@ -1242,6 +1472,7 @@ fn mnemonic_to_seed_unchecked(mnemonic: &str, passphrase: &str) -> [u8; 64] {
 
     seed
 }
+
 pub async fn derive_address_from_mnemonic(
     ctx: &CoreContext,
     mnemonic_str: &str,
@@ -1330,148 +1561,49 @@ pub async fn derive_address_from_mnemonic(
     Ok(out)
 }
 
-pub async fn send_all_btc_from_account_to_dev(
-    ctx: &CoreContext,
-    from_address_str: &str,
-    from_wif: &str,
-) -> Result<String> {
-    let network = ctx.btc_network;
-
-    let from_address_unchecked = BTCAddress::from_str(from_address_str)?;
-    let from_address = from_address_unchecked.require_network(network)?;
-
-    let mempool_api = &ctx.cfg.mempool_api;
-    let dev_address = &ctx.cfg.operator_btc_wallet_address;
-
-    let private_key = bitcoin::PrivateKey::from_wif(from_wif)
-        .map_err(|_| anyhow::anyhow!("Invalid WIF private key"))?;
-    let secret_key = private_key.inner;
-    let secp = Secp256k1::new();
-
-    let url = format!("{}/v1/fees/recommended", mempool_api);
-    let fee_res: FeeRecommended =
-        ctx.http.get(&url).send().await?.json().await?;
-    let dynamic_rate = fee_res.economy_fee.ceil() as u64;
-    let fee_rate = 1u64.max(dynamic_rate.min(2));
-
-    let url = format!("{}/address/{}/utxo", mempool_api, from_address);
-    let utxos: Vec<Utxo> = ctx.http.get(&url).send().await?.json().await?;
-    if utxos.is_empty() {
-        return Ok(String::new());
-    }
-
-    let mut input_sum: u64 = 0;
-    let mut selected: Vec<Utxo> = vec![];
-    let mut final_fee: u64 = 0;
-
-    for utxo in &utxos {
-        selected.push(utxo.clone());
-        input_sum += utxo.value;
-        let est_vbytes = (selected.len() as u64 * 59) + 31 + 10;
-        final_fee = est_vbytes * fee_rate;
-        final_fee = 300.max(final_fee.min(800));
-    }
-
-    if input_sum <= final_fee {
-        warn!(
-            "Skipping send from {} — balance {} sats below fee {} sats",
-            from_address, input_sum, final_fee
-        );
-        return Ok(String::new());
-    }
-
-    let send_amount = input_sum - final_fee;
-
-    let mut tx = Transaction {
-        version: bitcoin::transaction::Version::TWO,
-        lock_time: LockTime::ZERO,
-        input: vec![],
-        output: vec![],
-    };
-
-    let to_script = BTCAddress::from_str(dev_address)?
-        .require_network(network)?
-        .script_pubkey();
-    tx.output.push(TxOut {
-        value: Amount::from_sat(send_amount),
-        script_pubkey: to_script,
-    });
-
-    for utxo in &selected {
-        let txid = Txid::from_str(&utxo.txid)?;
-        tx.input.push(TxIn {
-            previous_output: OutPoint { txid, vout: utxo.vout },
-            script_sig: ScriptBuf::new(),
-            sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
-            witness: Witness::new(),
-        });
-    }
-
-    for (i, utxo) in selected.iter().enumerate() {
-        let mut cache = SighashCache::new(&tx);
-        let script_pubkey = from_address.script_pubkey();
-        let sighash = cache.p2wpkh_signature_hash(
-            i,
-            &script_pubkey,
-            Amount::from_sat(utxo.value),
-            EcdsaSighashType::All,
-        )?;
-        let msg = Message::from_digest_slice(&sighash[..])?;
-        let sig = secp.sign_ecdsa(&msg, &secret_key);
-        let mut sig_ser = sig.serialize_der().to_vec();
-        sig_ser.push(EcdsaSighashType::All as u8);
-        tx.input[i].witness.push(sig_ser);
-        tx.input[i].witness.push(private_key.public_key(&secp).to_bytes());
-    }
-
-    let tx_bytes = serialize(&tx);
-    let tx_hex = hex::encode(tx_bytes);
-    let url = format!("{}/tx", mempool_api);
-    let response = ctx
-        .http
-        .post(&url)
-        .header("Content-Type", "text/plain")
-        .body(tx_hex)
-        .send()
-        .await?
-        .text()
-        .await?;
-
-    Ok(response)
-}
+use tokio::time::{Duration, timeout};
 
 pub async fn sweep_btc_to_main(
     ctx: &CoreContext,
     mnemonic_str: &str,
     start_idx: u32,
     end_idx: u32,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<(String, u32)> {
+    // --- CONFIGURABLE SETTINGS ---
+    let sweep_threshold = 1;
+    let max_retries = 3;
+    // ----------------------------
+
     let network = ctx.btc_network;
-    let mempool_api = &ctx.cfg.mempool_api;
     let dev_address_str = &ctx.cfg.operator_btc_wallet_address;
+    let endpoints = [&ctx.cfg.mempool_api, &ctx.cfg.esplora_base];
     let secp = secp256k1::Secp256k1::new();
 
     let seed = mnemonic_to_seed_unchecked(mnemonic_str, "");
     let xprv = bitcoin::bip32::Xpriv::new_master(network, &seed)?;
-    let coin_type = match network {
-        bitcoin::Network::Bitcoin => 0u32,
-        _ => 1u32,
-    };
+    let coin_type =
+        if network == bitcoin::Network::Bitcoin { 0u32 } else { 1u32 };
 
     let mut all_inputs = Vec::new();
     let mut total_balance: u64 = 0;
+    let mut addresses_with_funds_count = 0;
 
-    info!(start_idx, end_idx, "Starting comprehensive BTC sweep scan...");
+    let mut first_funded_idx: Option<u32> = None;
+    let mut last_processed_idx = start_idx;
+    let mut api_failed = false;
 
-    // 2. Scan chains: 0 (Receive) and 1 (Change)
-    for chain in [0u32, 1u32] {
-        let chain_name = if chain == 0 { "Receive" } else { "Change" };
+    info!(
+        start_idx,
+        end_idx, sweep_threshold, "Starting BTC sweep with checkpoint logic..."
+    );
 
+    'outer: for chain in [0u32, 1u32] {
         for idx in start_idx..end_idx {
             let path_str = format!("m/84'/{}'/0'/{}/{}", coin_type, chain, idx);
             let derivation_path: bitcoin::bip32::DerivationPath =
                 path_str.parse()?;
             let child_xprv = xprv.derive_priv(&secp, &derivation_path)?;
+
             let priv_key = bitcoin::PrivateKey {
                 inner: child_xprv.private_key,
                 network: network.into(),
@@ -1482,15 +1614,48 @@ pub async fn sweep_btc_to_main(
                 &secp, &priv_key,
             )
             .map_err(|e| anyhow::anyhow!("Pubkey derivation failed: {}", e))?;
+
             let address = bitcoin::Address::p2wpkh(&pubkey, network);
 
-            // Fetch UTXOs
-            let url = format!("{}/address/{}/utxo", mempool_api, address);
-            let utxos: Vec<Utxo> =
-                ctx.http.get(&url).send().await?.json().await?;
+            let mut utxos: Vec<Utxo> = vec![];
+            let mut fetch_success = false;
+
+            for _attempt in 1..=max_retries {
+                for base_url in endpoints {
+                    let url = format!("{}/address/{}/utxo", base_url, address);
+                    let req_future = ctx.http.get(&url).send();
+
+                    match timeout(Duration::from_secs(5), req_future).await {
+                        Ok(Ok(resp)) if resp.status().is_success() => {
+                            if let Ok(v) = resp.json::<Vec<Utxo>>().await {
+                                utxos = v;
+                                fetch_success = true;
+                                break;
+                            }
+                        },
+                        _ => continue,
+                    }
+                }
+                if fetch_success {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            }
+
+            if !fetch_success {
+                warn!(idx, %address, "UTXO fetch failed. Stopping scan at this checkpoint.");
+                api_failed = true;
+                break 'outer; // Break out of both loops immediately
+            }
+
+            // Mark this index as successfully scanned
+            last_processed_idx = idx;
 
             if !utxos.is_empty() {
-                info!(%address, %path_str, "Found {} UTXOs on {} chain", utxos.len(), chain_name);
+                addresses_with_funds_count += 1;
+                if first_funded_idx.is_none() {
+                    first_funded_idx = Some(idx);
+                }
                 for utxo in utxos {
                     total_balance += utxo.value;
                     all_inputs.push((utxo, priv_key, address.script_pubkey()));
@@ -1499,18 +1664,59 @@ pub async fn sweep_btc_to_main(
         }
     }
 
-    if all_inputs.is_empty() {
-        info!("Scan complete: No funds found.");
-        return Ok(String::new());
+    // --- DECISION LOGIC ---
+
+    // 1. If we found some money but didn't hit the threshold
+    if !all_inputs.is_empty() && addresses_with_funds_count < sweep_threshold {
+        let resume_at = first_funded_idx.unwrap_or(start_idx);
+        info!(
+            found = addresses_with_funds_count,
+            resume_at, "Threshold not met. Retrying from first funded index."
+        );
+        return Ok((String::new(), resume_at));
     }
 
-    // 3. Fetch Recommended Fee
-    let fee_url = format!("{}/v1/fees/recommended", mempool_api);
-    let fee_res: FeeRecommended =
-        ctx.http.get(&fee_url).send().await?.json().await?;
-    let fee_rate = (fee_res.economy_fee.ceil() as u64).max(1);
+    // 2. If no funds were found at all (and we might have stopped early due to API fail)
+    if all_inputs.is_empty() {
+        // If API failed, return an Error so the caller knows we didn't actually finish.
+        if api_failed {
+            anyhow::bail!(
+                "Scan aborted due to API failure at index {}",
+                last_processed_idx
+            );
+        }
+        return Ok((String::new(), end_idx));
+    }
 
-    // 4. Build One Transaction for all inputs
+    // 3. Threshold is met (3+) - Proceed to sweep
+    info!(total_sats = total_balance, "Threshold met. Sweeping to main...");
+
+    let mut fee_rate = 1u64;
+    let mut fee_fetch_success = false;
+    for _ in 1..=max_retries {
+        for base_url in endpoints {
+            let url = format!("{}/v1/fees/recommended", base_url);
+            if let Ok(Ok(resp)) =
+                timeout(Duration::from_secs(5), ctx.http.get(&url).send()).await
+            {
+                if let Ok(res) = resp.json::<FeeRecommended>().await {
+                    fee_rate = (res.economy_fee.ceil() as u64).max(1);
+                    fee_fetch_success = true;
+                    break;
+                }
+            }
+        }
+        if fee_fetch_success {
+            break;
+        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+
+    if !fee_fetch_success {
+        // Fallback: don't error, just return the funded checkpoint to try again later
+        return Ok((String::new(), first_funded_idx.unwrap_or(start_idx)));
+    }
+
     let mut tx = bitcoin::Transaction {
         version: bitcoin::transaction::Version::TWO,
         lock_time: bitcoin::absolute::LockTime::ZERO,
@@ -1520,13 +1726,14 @@ pub async fn sweep_btc_to_main(
 
     let est_vbytes = 10 + (all_inputs.len() as u64 * 68) + 31;
     let total_fee = est_vbytes * fee_rate;
-
     if total_balance <= total_fee + 546 {
-        return Err(anyhow::anyhow!(
-            "Total balance {} too low for fees {}",
+        // Log specifically that it's a dust/fee issue
+        warn!(
             total_balance,
-            total_fee
-        ));
+            total_fee,
+            "Balance too low to cover fees. Returning to checkpoint."
+        );
+        return Ok((String::new(), first_funded_idx.unwrap_or(start_idx)));
     }
 
     let send_amount = total_balance - total_fee;
@@ -1550,7 +1757,6 @@ pub async fn sweep_btc_to_main(
         });
     }
 
-    // 5. Sign each input with its specific key
     for (i, (utxo, priv_key, script_pubkey)) in all_inputs.iter().enumerate() {
         let mut cache = bitcoin::sighash::SighashCache::new(&tx);
         let sighash = cache.p2wpkh_signature_hash(
@@ -1559,29 +1765,44 @@ pub async fn sweep_btc_to_main(
             bitcoin::Amount::from_sat(utxo.value),
             bitcoin::EcdsaSighashType::All,
         )?;
-
         let msg = secp256k1::Message::from_digest_slice(&sighash[..])?;
         let sig = secp.sign_ecdsa(&msg, &priv_key.inner);
         let mut sig_ser = sig.serialize_der().to_vec();
         sig_ser.push(bitcoin::EcdsaSighashType::All as u8);
-
         tx.input[i].witness.push(sig_ser);
         tx.input[i].witness.push(priv_key.public_key(&secp).to_bytes());
     }
 
-    // 6. Broadcast
     let tx_hex = hex::encode(bitcoin::consensus::serialize(&tx));
-    let broadcast_url = format!("{}/tx", mempool_api);
-    let response = ctx
-        .http
-        .post(&broadcast_url)
-        .header("Content-Type", "text/plain")
-        .body(tx_hex)
-        .send()
-        .await?
-        .text()
-        .await?;
+    let mut broadcast_res = None;
+    for _ in 1..=max_retries {
+        for base_url in endpoints {
+            let url = format!("{}/tx", base_url);
+            if let Ok(Ok(resp)) = timeout(
+                Duration::from_secs(5),
+                ctx.http.post(&url).body(tx_hex.clone()).send(),
+            )
+            .await
+            {
+                if resp.status().is_success() {
+                    if let Ok(t) = resp.text().await {
+                        broadcast_res = Some(t);
+                        break;
+                    }
+                }
+            }
+        }
+        if broadcast_res.is_some() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
 
-    info!(txid = %response, "Sweep transaction successful!");
-    Ok(response)
+    let response = broadcast_res
+        .ok_or_else(|| anyhow::anyhow!("Broadcast failed after all retries"))?;
+
+    // Success: Return end_idx if we finished the range, otherwise return the last processed idx
+    // However, if we reached this point, we definitely want the caller to know we broadcasted.
+    let final_idx = if api_failed { last_processed_idx } else { end_idx };
+    Ok((response, final_idx))
 }

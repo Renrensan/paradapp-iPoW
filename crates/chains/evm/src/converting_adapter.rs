@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use ethers::types::U256;
 use paradapp_core::{
     btc::btc_service::{
-        BitcoinMerkleProofPayload, check_confirmation_and_build_proof,
-        send_to_user_program, btc_tip_height
+        BitcoinMerkleProofPayload, btc_tip_height,
+        check_confirmation_and_build_proof, send_to_user_program,
     },
     consts::{
         supported_network_enum::SupportedNetwork,
@@ -315,7 +315,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
 
         Ok(())
     }
-    
+
     async fn handle_btc_to_native_conversion(&self, tx_id: U256) -> Result<()> {
         // Log before the action so you know which ID is being targeted
         info!(%tx_id, "Marking BTC→NATIVE conversion as processed in storage.");
@@ -393,7 +393,7 @@ impl ConvertingAdapter for EvmConvertingAdapter {
         for (i, btc_tx_id) in btc_tx_ids.into_iter().enumerate() {
             if let Some(btc_id) = btc_tx_id {
                 // Mimicking "btc_tx_id IS NOT NULL"
-                if btc_id != "unknown" {
+                if btc_id != "unknown" && btc_id != "processed_btc_to_native" {
                     result.insert(tx_ids[i], btc_id);
                 }
             }

@@ -194,7 +194,6 @@ impl ApprovingAdapter for EvmApprovingAdapter {
     ) -> Result<Vec<(U256, String)>> {
         use futures::try_join;
 
-        // Fetch IDs for both phases separately
         let (op_expired_ids, user_expired_ids) = try_join!(
             self.chain_provider.get_tx_ids_by_filter(TxIdFilter {
                 type_filter: TransactionType::ANY,
@@ -210,13 +209,18 @@ impl ApprovingAdapter for EvmApprovingAdapter {
             }),
         )?;
 
+        info!(
+            op_expired_count = op_expired_ids.len(),
+            user_expired_count = user_expired_ids.len(),
+            "Fetched expired transaction IDs from filters"
+        );
+
         let mut seen = std::collections::HashSet::<U256>::new();
         let mut candidates: Vec<(U256, String)> = Vec::new();
 
         let contract = self.ctx.contract.clone();
         let c_op = self.ctx.c_op.clone();
 
-        // 1. Logic for USER_ACTION_EXPIRED
         for tx_id in user_expired_ids {
             if !seen.insert(tx_id) {
                 continue;
@@ -232,6 +236,7 @@ impl ApprovingAdapter for EvmApprovingAdapter {
                     .await
                     .is_ok()
                 {
+                    info!(tx_id = %tx_id, method = "timeoutNoDeposit_NativeToBitcoin", "Candidate found");
                     candidates.push((
                         tx_id,
                         "timeoutNoDeposit_NativeToBitcoin".to_string(),
@@ -243,6 +248,7 @@ impl ApprovingAdapter for EvmApprovingAdapter {
                 .await
                 .is_ok()
             {
+                info!(tx_id = %tx_id, method = "closeNoBitcoin_BitcoinToNative", "Candidate found");
                 candidates.push((
                     tx_id,
                     "closeNoBitcoin_BitcoinToNative".to_string(),
@@ -250,7 +256,6 @@ impl ApprovingAdapter for EvmApprovingAdapter {
             }
         }
 
-        // 2. Logic for OPERATOR_DUTY_EXPIRED
         for tx_id in op_expired_ids {
             if !seen.insert(tx_id) {
                 continue;
@@ -259,7 +264,6 @@ impl ApprovingAdapter for EvmApprovingAdapter {
             let (conv, _phase): (Conversion, u8) =
                 contract.get_conversion_with_phase(tx_id).call().await?;
 
-            // Filter out already finalized transactions
             if !conv.approved || conv.completed || conv.refunded {
                 continue;
             }
@@ -271,6 +275,7 @@ impl ApprovingAdapter for EvmApprovingAdapter {
                     .await
                     .is_ok()
                 {
+                    info!(tx_id = %tx_id, method = "refundAfterNoProof_NativeTokentoBTC", "Candidate found");
                     candidates.push((
                         tx_id,
                         "refundAfterNoProof_NativeTokentoBTC".to_string(),
@@ -282,6 +287,7 @@ impl ApprovingAdapter for EvmApprovingAdapter {
                 .await
                 .is_ok()
             {
+                info!(tx_id = %tx_id, method = "claimNative_AfterOperatorExpired", "Candidate found");
                 candidates.push((
                     tx_id,
                     "claimNative_AfterOperatorExpired".to_string(),

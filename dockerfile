@@ -25,7 +25,7 @@ FROM lukemathwalker/cargo-chef:latest-rust-slim-bookworm AS builder
 WORKDIR /app
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    pkg-config libssl-dev \
+    pkg-config libssl-dev curl \
     && rm -rf /var/lib/apt/lists/* && apt-get clean
 
 COPY --from=planner /app/recipe.json ./
@@ -49,7 +49,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /app/target/release/paradapp-operator /usr/local/bin/app
 
 ENV RUST_LOG=info
-ENV REDIS_URL=redis://redis:6379
 
 EXPOSE 8080
 
