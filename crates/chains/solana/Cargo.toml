@@ -1,0 +1,27 @@
+[package]
+name = "paradapp-chain-solana"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anchor-client = { version = "1.0.2", features = ["async"] }
+anchor-lang = "1.0.2"
+anyhow = "1.0.102"
+async-trait = "0.1.89"
+borsh = { version = "1.6.1", features = ["derive"] }
+chrono = "0.4.44"
+config = { version = "0.15.22", features = ["yaml"] }
+dotenvy = "0.15.7"
+ethers = "2.0.14"
+futures = "0.3.32"
+paradapp-core = { path = "../../core" }
+solana-client = "3.1.14"
+solana-sdk = "3.0.0"
+tokio = { version = "1.52.2", features = ["full"] }
+tracing = "0.1.44"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(feature, values("idl-build"))',
+    'cfg(target_os, values("solana"))'
+] }

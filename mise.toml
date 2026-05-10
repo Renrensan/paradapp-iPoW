@@ -41,41 +41,58 @@ run = "cargo run -- monolith --engine rebalance"
 
 [tasks.run-hedera]
 depends = ["ensure-redis"]
-description = "Usage: [ENGINE=...] mise run run-hedera [watch...]. Engines: all, approver, streamer, converter."
+description = "Usage: [ENGINE=all] [WATCH=ethereum,solana] mise run run-hedera."
 run = '''
 bash -c '
 E_FLAG=${ENGINE:-all}
-if [ "$#" -gt 0 ]; then
-    cargo run -- operator --src hedera --engine "$E_FLAG" --watch-sources "$@"
+W_FLAG=${WATCH:-ethereum,solana}
+if [ -n "$W_FLAG" ]; then
+    cargo run -- operator --src hedera --engine "$E_FLAG" --watch-sources "$W_FLAG"
 else
     cargo run -- operator --src hedera --engine "$E_FLAG"
 fi
-' -- "$@"
+'
 '''
 
 [tasks.run-ethereum]
 depends = ["ensure-redis"]
-description = "Usage: [ENGINE=...] mise run run-ethereum [watch...]. Engines: all, approver, streamer, converter."
+description = "Usage: [ENGINE=all] [WATCH=hedera,solana] mise run run-ethereum."
 run = '''
 bash -c '
 E_FLAG=${ENGINE:-all}
-if [ "$#" -gt 0 ]; then
-    cargo run -- operator --src eth --engine "$E_FLAG" --watch-sources "$@"
+W_FLAG=${WATCH:-hedera,solana}
+if [ -n "$W_FLAG" ]; then
+    cargo run -- operator --src eth --engine "$E_FLAG" --watch-sources "$W_FLAG"
 else
     cargo run -- operator --src eth --engine "$E_FLAG"
 fi
-' -- "$@"
+'
 '''
 
-[tasks.run-custom]
-description = "Usage: [ENGINE=...] mise run run-custom <src> [watch...]. Engines: all, approver, streamer, converter."
+[tasks.run-solana]
+depends = ["ensure-redis"]
+description = "Usage: [ENGINE=all] [WATCH=hedera,eth] mise run run-solana."
 run = '''
 bash -c '
 E_FLAG=${ENGINE:-all}
+W_FLAG=${WATCH:-hedera,eth}
+if [ -n "$W_FLAG" ]; then
+    cargo run -- operator --src solana --engine "$E_FLAG" --watch-sources "$W_FLAG"
+else
+    cargo run -- operator --src solana --engine "$E_FLAG"
+fi
+'
+'''
+
+[tasks.run-custom]
+description = "Usage: [ENGINE=all] [WATCH=...] mise run run-custom <src>."
+run = '''
+bash -c '
+E_FLAG=${ENGINE:-all}
+W_FLAG=${WATCH:-}
 SRC="$1"
-shift || true
-if [ "$#" -gt 0 ]; then
-    cargo run -- operator --src "$SRC" --engine "$E_FLAG" --watch-sources "$@"
+if [ -n "$W_FLAG" ]; then
+    cargo run -- operator --src "$SRC" --engine "$E_FLAG" --watch-sources "$W_FLAG"
 else
     cargo run -- operator --src "$SRC" --engine "$E_FLAG"
 fi
@@ -115,3 +132,46 @@ run = "cargo clippy --all-targets --all-features -- -D warnings"
 [tasks.lint]
 description = "Run all Rust linters"
 depends = ["fmt", "clippy"]
+
+[tasks.stream-solana]
+depends = ["ensure-redis"]
+description = "Usage: [WATCH=hedera,eth] mise run stream-solana (Runs ONLY the Streamer engine)"
+run = '''
+bash -c '
+W_FLAG=${WATCH:-hedera,eth}
+if [ -n "$W_FLAG" ]; then
+    cargo run -- operator --src solana --engine streamer --watch-sources "$W_FLAG"
+else
+    cargo run -- operator --src solana --engine streamer
+fi
+'
+'''
+
+[tasks.convert-solana]
+depends = ["ensure-redis"]
+description = "Usage: [WATCH=hedera,eth] mise run convert-solana (Runs ONLY the Converter engine)"
+run = '''
+bash -c '
+W_FLAG=${WATCH:-hedera,eth}
+if [ -n "$W_FLAG" ]; then
+    cargo run -- operator --src solana --engine converter --watch-sources "$W_FLAG"
+else
+    cargo run -- operator --src solana --engine converter
+fi
+'
+'''
+
+[tasks.rebalance-hedera]
+depends = ["ensure-redis"]
+description = "Run rebalance engine for Hedera"
+run = "cargo run -- operator --src hedera --engine rebalance"
+
+[tasks.rebalance-ethereum]
+depends = ["ensure-redis"]
+description = "Run rebalance engine for Ethereum"
+run = "cargo run -- operator --src eth --engine rebalance"
+
+[tasks.rebalance-solana]
+depends = ["ensure-redis"]
+description = "Run rebalance engine for Solana"
+run = "cargo run -- operator --src solana --engine rebalance"

@@ -1,6 +1,8 @@
 use once_cell::sync::Lazy;
 use paradapp_chain_evm::evm_stack::EvmStack;
 use paradapp_chain_evm::network::EvmNetwork;
+use paradapp_chain_solana::network::SolanaNetwork;
+use paradapp_chain_solana::svm_stack::SvmStack;
 use paradapp_core::dependencies::context::CoreContext;
 use paradapp_core::traits::chain_stack::ChainStack;
 use std::collections::HashMap;
@@ -42,6 +44,9 @@ impl Registry {
             "eth" | "ethereum" => Arc::new(
                 EvmStack::init(EvmNetwork::EthereumSepolia, core_ctx).await?,
             ),
+            "solana" | "sol" => {
+                Arc::new(SvmStack::init(SolanaNetwork::Devnet, core_ctx).await?)
+            },
             _ => anyhow::bail!("Unsupported network: {}", name),
         };
 

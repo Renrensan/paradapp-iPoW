@@ -8,9 +8,11 @@ use ethers::{
 use paradapp_core::{
     btc::btc_service::derive_p2wpkh_address,
     consts::{
+        supported_network_enum::SupportedNetwork,
         transaction_phase::TransactionPhase, transaction_type::TransactionType,
     },
     dependencies::context::CoreContext,
+    supra::supra_service::{self, SupraNetwork},
     traits::{
         approving_adapter::ApprovingAdapter,
         chain_provider_adapter::{ChainProviderAdapter, TxIdFilter},
@@ -32,7 +34,7 @@ pub struct EvmApprovingAdapter {
 #[async_trait]
 impl ApprovingAdapter for EvmApprovingAdapter {
     async fn get_or_create_index_for_tx(&self, tx_id: U256) -> Result<u32> {
-        let network = self.ctx.cfg.network.string_identifier();
+        let network: &str = self.ctx.cfg.network.string_identifier();
         let tx_id_str = tx_id.to_string();
 
         self.core_ctx
@@ -438,83 +440,131 @@ impl ApprovingAdapter for EvmApprovingAdapter {
         let contract = &self.ctx.contract.clone();
         let c_op = &self.ctx.c_op.clone();
 
-        // 1. Load the conversion data
         let conv = contract.conversions(tx_id).call().await?;
         let (
             _user,
             is_native_to_bitcoin,
-            _slippage,
             _user_program,
             _paradapp_receive_program,
             _network_address,
             network_id,
-            _native_amount,
-            _bitcoin_amount,
+            native_amount,
+            bitcoin_amount,
+            _commit_fee,
+            _reserved_native,
             _created_at,
             _approved_at,
             _deposited_at,
-            _commit_fee,
+            _operator_duty_expires_at,
             _approved,
             _deposited,
             _completed,
             _refunded,
-            _reserved_native,
-            _operator_duty_expires_at,
         ) = conv;
 
-        // 2. Decide scriptArg
-        let xpub_str: &str = &self.ctx.cfg.btc_root_xpub;
+        let tolerance_multiplier = 0.005;
+
+        // Determine Source Network from Config
+        let source_network_name = self.ctx.cfg.network.string_identifier();
+        let source_network = SupportedNetwork::from_str(source_network_name)
+            .ok_or_else(|| {
+                anyhow!(
+                    "Unsupported operator source network: {}",
+                    source_network_name
+                )
+            })?;
+
+        let source_decimals = source_network.decimals();
+
+        // Use source_network for price fetching to ensure we price what was deposited
+        let market_ratio = match supra_service::get_token_price_vs_btc(
+            &self.core_ctx,
+            source_network,
+            Some(SupraNetwork::Testnet),
+        )
+        .await
+        {
+            Ok(ratio) => ratio,
+            Err(e) => {
+                tracing::warn!(tx_id = %tx_id, error = %e, "Failed to fetch market ratio from Supra");
+                return Ok(());
+            },
+        };
+
+        let native_float =
+            native_amount.to_string().parse::<f64>().unwrap_or(0.0)
+                / 10f64.powi(source_decimals as i32);
+        let btc_float = bitcoin_amount.as_u64() as f64 / 100_000_000.0;
+
+        if is_native_to_bitcoin {
+            let tx_ratio =
+                if native_float > 0.0 { btc_float / native_float } else { 0.0 };
+            let max_allowed_ratio = market_ratio * (1.0 + tolerance_multiplier);
+
+            info!(
+                tx_id = %tx_id,
+                tx_ratio = tx_ratio,
+                market_ratio = market_ratio,
+                max_allowed_ratio = max_allowed_ratio,
+                asset = %source_network,
+                "Checking price for Native->BTC approval"
+            );
+
+            if tx_ratio > max_allowed_ratio {
+                warn!(tx_id = %tx_id, tx_ratio = tx_ratio, "Price check failed: N2B ratio exceeds max payout");
+                return Ok(());
+            }
+        } else {
+            let tx_ratio =
+                if btc_float > 0.0 { native_float / btc_float } else { 0.0 };
+            let market_native_per_btc =
+                if market_ratio > 0.0 { 1.0 / market_ratio } else { 0.0 };
+            let max_allowed_ratio =
+                market_native_per_btc * (1.0 + tolerance_multiplier);
+
+            info!(
+                tx_id = %tx_id,
+                tx_ratio = tx_ratio,
+                market_ratio = market_native_per_btc,
+                max_allowed_ratio = max_allowed_ratio,
+                asset = %source_network,
+                "Checking price for BTC->Native approval"
+            );
+
+            if tx_ratio > max_allowed_ratio {
+                warn!(tx_id = %tx_id, tx_ratio = tx_ratio, "Price check failed: B2N ratio exceeds max payout");
+                return Ok(());
+            }
+        }
+
+        let xpub_str: &str = self.ctx.cfg.btc_root_xpub.as_ref();
 
         let script_arg: Vec<u8> = match (
             is_native_to_bitcoin,
             network_id.is_zero(),
         ) {
-            // Path A: Not Native-to-Bitcoin (B2N) OR it is N2N (Cross-network)
             (false, _) | (true, false) => {
                 match self
                     .get_or_create_receive_program_for_tx(tx_id, xpub_str)
                     .await
                 {
                     Ok((index, address, script_buf)) => {
-                        info!(
-                            tx_id = %tx_id,
-                            address = %address,
-                            index = index,
-                            is_n2n = (network_id != U256::zero()),
-                            "Assigned BTC addr via XPUB for conversion"
-                        );
+                        info!(tx_id = %tx_id, address = %address, index = index, "Assigned BTC addr");
                         script_buf
                     },
                     Err(err) => {
-                        warn!(
-                            tx_id = %tx_id,
-                            error = %err,
-                            "Failed deriving address from XPUB"
-                        );
+                        warn!(tx_id = %tx_id, error = %err, "Failed deriving BTC address");
                         return Ok(());
                     },
                 }
             },
-
-            // Path B: Pure Native-to-Bitcoin (Network ID 0)
             (true, true) => {
                 if let Some(static_program) =
                     &self.core_ctx.cfg.paradapp_receive_program
                 {
-                    let decoded =
-                        hex::decode(static_program.trim_start_matches("0x"))
-                            .unwrap_or_default();
-
-                    info!(
-                        tx_id = %tx_id,
-                        "Native→BTC tx using static receive program from PARADAPP_RECEIVE_PROGRAM"
-                    );
-                    decoded
+                    hex::decode(static_program.trim_start_matches("0x"))
+                        .unwrap_or_default()
                 } else {
-                    info!(
-                        tx_id = %tx_id,
-                        "Cannot approve Native→BTC tx – missing PARADAPP_RECEIVE_PROGRAM"
-                    );
                     return Err(anyhow!(
                         "missing receive program for Native→BTC"
                     ));
@@ -522,49 +572,23 @@ impl ApprovingAdapter for EvmApprovingAdapter {
             },
         };
 
-        info!(
-            tx_id = %tx_id,
-            is_native_to_bitcoin = %is_native_to_bitcoin,
-            "Trying to approve transaction"
-        );
-
-        // Convert hex strings (anchor80 / first80) to Bytes
-        let script_arg_bytes = Bytes::from(script_arg);
-
-        // Build the call ONCE
-        let duty_seconds_bn = U256::from(duty_seconds);
         let call = c_op.approve_and_start_with_anchor_and_first(
             tx_id,
-            duty_seconds_bn,
-            script_arg_bytes.clone(),
-            1000,
+            U256::from(duty_seconds),
+            Bytes::from(script_arg),
         );
 
-        // 3. callStatic once
         if let Err(err) = call.clone().call().await {
-            error!(
-                tx_id = %tx_id,
-                err = %err,
-                "callStatic approve failed"
-            );
+            error!(tx_id = %tx_id, err = %err, "callStatic approve failed");
             return Ok(());
         }
 
-        // 4. Send real tx — fire-and-forget
         match call.send().await {
             Ok(pending) => {
-                info!(
-                    tx_hash = ?pending.tx_hash(),
-                    tx_id = %tx_id,
-                    "Sent approve tx"
-                );
+                info!(tx_hash = ?pending.tx_hash(), tx_id = %tx_id, "Sent approve tx")
             },
             Err(e) => {
-                warn!(
-                    tx_id = %tx_id,
-                    error = %e,
-                    "Failed to send approve tx — retrying next cycle"
-                );
+                warn!(tx_id = %tx_id, error = %e, "Failed to send approve tx")
             },
         }
 

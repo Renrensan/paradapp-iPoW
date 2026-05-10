@@ -1,20 +1,16 @@
 use crate::Engine;
-use chrono::Utc;
 use ethers_core::types::U256;
 use futures::future::join_all;
 use paradapp_core::{
-    btc::btc_service::{btc_tip_height, rbf_send_to_user_program},
-    consts::{
+    btc::btc_service::{btc_tip_height}, consts::{
         supported_network_enum::SupportedNetwork,
         transaction_phase::TransactionPhase, transaction_type::TransactionType,
-    },
-    dependencies::context::CoreContext,
-    traits::{
+    }, dependencies::context::CoreContext, supra::supra_service, traits::{
         chain_provider_adapter::{
             BitcoinProgramType, GlobalChainState, TxIdFilter,
         },
         chain_stack::ChainStack,
-    },
+    }
 };
 use std::sync::Arc;
 use tokio::try_join;
@@ -33,24 +29,32 @@ impl ChainOperator {
         watch_sources: Vec<String>,
         engine: Engine,
     ) -> anyhow::Result<()> {
+        let parsed_watch_sources: Vec<String> = watch_sources
+            .into_iter()
+            .flat_map(|s| {
+                s.split(',')
+                    .map(|part| part.trim().to_lowercase())
+                    .filter(|part| !part.is_empty())
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
         let network_id = stack.network_id().to_string();
         info!(
             network = %network_id,
-            watching = ?watch_sources,
+            watching = ?parsed_watch_sources,
             engine = ?engine,
             "Launching Operator Task(s)"
         );
 
-        let has_watch_targets = !watch_sources.is_empty();
-        let watch_sources = Arc::new(watch_sources);
+        let has_watch_targets = !parsed_watch_sources.is_empty();
+        let watch_sources_arc = Arc::new(parsed_watch_sources);
 
-        // We use a Vec to track handles so we can monitor whichever ones we actually start
         let mut handles = Vec::new();
 
-        // 1. Approving Loop
         if engine == Engine::Approver || engine == Engine::All {
             let s = stack.clone();
-            let ws = watch_sources.clone();
+            let ws = watch_sources_arc.clone();
             handles.push(tokio::spawn(async move {
                 let mut interval = tokio::time::interval(std::time::Duration::from_secs(13));
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
@@ -63,7 +67,6 @@ impl ChainOperator {
             }));
         }
 
-        // 2. Converting Loop
         if engine == Engine::Converter || engine == Engine::All {
             let s = stack.clone();
             handles.push(tokio::spawn(async move {
@@ -78,7 +81,6 @@ impl ChainOperator {
             }));
         }
 
-        // 3. Tunneling Loop (only runs if one or more watch target is specified)
         if (engine == Engine::Approver || engine == Engine::All)
             && has_watch_targets
         {
@@ -95,7 +97,6 @@ impl ChainOperator {
             }));
         }
 
-        // 4. Streaming Loop
         if engine == Engine::Streamer || engine == Engine::All {
             let s = stack.clone();
             handles.push(tokio::spawn(async move {
@@ -110,18 +111,14 @@ impl ChainOperator {
             }));
         }
 
-        // 5. Scheduled BTC Sweeping Loop
         if engine == Engine::Rebalance || engine == Engine::All {
             let s = stack.clone();
             handles.push(tokio::spawn(async move {
-                // 1. Initial Delay (Safety buffer)
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
-                // 2. Run immediately on startup
                 info!("Running initial startup BTC sweep check");
                 let _ = Self::tick_sweeping(s.clone()).await;
 
-                // 3. Setup interval for subsequent runs
                 let one_day = std::time::Duration::from_secs(24 * 60 * 60);
 
                 let mut interval = tokio::time::interval_at(
@@ -137,12 +134,10 @@ impl ChainOperator {
             }));
         }
 
-        // Monitor whichever handles were created
         if handles.is_empty() {
             return Err(anyhow::anyhow!("No engines selected to run"));
         }
 
-        // Wait for a crash or a shutdown
         tokio::select! {
             res = futures::future::select_all(handles) => {
                 error!(result = ?res.0, "One of the operator tasks exited unexpectedly");
@@ -154,7 +149,6 @@ impl ChainOperator {
 
         Ok(())
     }
-
     #[tracing::instrument(
         name = "operator_approving",
         skip(stack),
@@ -172,8 +166,6 @@ impl ChainOperator {
         let next_tx_id = provider.next_tx_id().await?;
         let to_tx_id = next_tx_id.saturating_sub(U256::one());
 
-        // Fetch pending tx ids in parallel
-        // 1. Fetch raw IDs from the contract filters
         let (n2b_raw, b2n_raw, n2n_out_raw) = try_join!(
             provider.get_tx_ids_by_filter(TxIdFilter {
                 type_filter: TransactionType::NATIVE_TO_BITCOIN,
@@ -195,37 +187,15 @@ impl ChainOperator {
             })
         )?;
 
-        // 2. Access the limits you just implemented in the Provider
         let min_limit = U256::from(provider.min_transaction_limit());
         let max_limit = U256::from(provider.max_transaction_limit());
 
-        // 3. Define the async filter helper
         let filter_by_limits = |ids: Vec<U256>| async {
             let mut filtered = Vec::new();
             for id in ids {
                 if let Ok(conv) = provider.get_conversion_info(id).await {
-                    let amount_to_check = if conv.is_native_to_bitcoin {
-                        // N2B: Native amount is already known/set in the struct
-                        conv.native_amount
-                    } else {
-                        // B2N: Native amount is pending; estimate it from the BTC amount
-                        match provider
-                            .estimate_native_from_bitcoin(conv.bitcoin_amount)
-                            .await
-                        {
-                            Ok(estimated) => estimated,
-                            Err(e) => {
-                                warn!(
-                                    tx_id = %id,
-                                    error = %e,
-                                    "Skipping B2N: estimation of native amount failed"
-                                );
-                                continue;
-                            },
-                        }
-                    };
+                    let amount_to_check = conv.native_amount;
 
-                    // Validate the determined amount against native limits
                     if amount_to_check >= min_limit
                         && amount_to_check <= max_limit
                     {
@@ -243,17 +213,14 @@ impl ChainOperator {
             filtered
         };
 
-        // 4. Run the filters for all three categories
         let (n2b, b2n, n2n_out) = tokio::join!(
             filter_by_limits(n2b_raw),
             filter_by_limits(b2n_raw),
             filter_by_limits(n2n_out_raw)
         );
 
-        // Log pending tx counts
         let pending_count = n2b.len() + b2n.len() + n2n_out.len();
         if pending_count > 0 {
-            // Check RPC health, skip tick if unhealthy
             if (provider.check_rpc_health().await).is_err() {
                 warn!("RPC unhealthy, skipping approval tick");
                 return Ok(());
@@ -266,14 +233,10 @@ impl ChainOperator {
             );
         }
 
-        // Get this network's global chain state
         let state = provider.get_global_chain_state().await?;
 
-        // Handle operator timeouts for this network tx's
         Self::handle_operator_timeouts(&stack, &state).await;
 
-        // Determine if any bridge intents defined by watch_sources from other networks to this network are active
-        // 1. Get the list of active intents
         let active_intents = Self::check_bridge_intent(
             core_ctx.clone(),
             watch_sources,
@@ -282,9 +245,7 @@ impl ChainOperator {
         .await;
         let bridge_intent_active = !active_intents.is_empty();
 
-        // 2. Handle sync/jump logic
         if bridge_intent_active || pending_count > 0 {
-            // Collect network names for better logging
             let source_names: Vec<String> = active_intents
                 .iter()
                 .map(|i| i.stack.network_id().to_string())
@@ -302,67 +263,72 @@ impl ChainOperator {
             info!("No active intents or pending txs; skipping sync logic");
         }
 
-        // Approve local N2B and B2N txs
-        for tx_id in n2b.into_iter().chain(b2n) {
-            let _ = stack.approving().approve_one_tx(tx_id, duty_seconds).await;
-        }
+        // Attempt approve local tx
+        let current_tip_height = paradapp_core::btc::btc_service::btc_tip_height(&stack.core_context()).await? as u64;
+        let global_tip_height = provider.global_tip_height().await?;
 
-        // Approve N2N_OUT txs if destination anchor height sufficient
-        for tx_id in n2n_out {
-            // Get conversion info to determine destination network
-            let info = provider.get_conversion_info(tx_id).await?;
-            let net_val = info.network_id.as_u32() as u8;
+        info!(
+            current_tip_height = %current_tip_height,
+            global_tip_height = %global_tip_height,
+            "Current Bitcoin tip height and global tip height fetched for approval checks"
+        );
 
-            // Map net_val to SupportedNetwork
-            let dest_network = match SupportedNetwork::from_u8(net_val) {
-                Some(net) => net,
-                None => {
-                    warn!(
-                        val = net_val,
-                        %tx_id,
-                        "Received unknown network ID from conversion info"
-                    );
-                    continue;
-                },
-            };
+        if current_tip_height == global_tip_height.as_u64() {
+            for tx_id in n2b.into_iter().chain(b2n) {
+                let _ = stack.approving().approve_one_tx(tx_id, duty_seconds).await;
+            }
 
-            // If destination is in registry, attempt approval logic
-            if let Ok(dest_stack) = crate::registry::Registry::get_stack(
-                dest_network.as_str(),
-                core_ctx.clone(),
-            )
-            .await
-            {
-                // Get min anchor height on destination
-                let min_anchor_dest =
-                    dest_stack.chain_provider().min_anchor_height().await?;
-                // Get current global tip on this network
-                let current_global_tip = provider.global_tip_height().await?;
+            // Attempt approve cross chain tx
+            for tx_id in n2n_out {
+                let info = provider.get_conversion_info(tx_id).await?;
+                let net_val = info.network_id.as_u32() as u8;
 
-                // Only approve if min anchor on dest <= current global tip, else skip
-                if min_anchor_dest <= current_global_tip {
-                    info!(
-                        %tx_id,
-                        %dest_network,
-                        %min_anchor_dest,
-                        %current_global_tip,
-                        "Anchor height sufficient, approving cross-chain tx"
-                    );
-                    let _ = stack
-                        .approving()
-                        .approve_one_tx(tx_id, duty_seconds)
-                        .await;
+                let dest_network = match SupportedNetwork::from_u8(net_val) {
+                    Some(net) => net,
+                    None => {
+                        warn!(
+                            val = net_val,
+                            %tx_id,
+                            "Received unknown network ID from conversion info"
+                        );
+                        continue;
+                    },
+                };
+
+                if let Ok(dest_stack) = crate::registry::Registry::get_stack(
+                    dest_network.as_str(),
+                    core_ctx.clone(),
+                )
+                .await
+                {
+                    let min_anchor_dest =
+                        dest_stack.chain_provider().min_anchor_height().await?;
+                    let current_global_tip = provider.global_tip_height().await?;
+
+                    if min_anchor_dest <= current_global_tip {
+                        info!(
+                            %tx_id,
+                            %dest_network,
+                            %min_anchor_dest,
+                            %current_global_tip,
+                            "Anchor height sufficient, approving cross-chain tx"
+                        );
+                        let _ = stack
+                            .approving()
+                            .approve_one_tx(tx_id, duty_seconds)
+                            .await;
+                    } else {
+                        warn!(
+                            %tx_id,
+                            %dest_network,
+                            anchor = %min_anchor_dest,
+                            global_tip = %current_global_tip,
+                            "Anchor height not yet sufficient for cross-chain approval"
+                        );
+                    }
                 } else {
-                    warn!(
-                        %tx_id,
-                        %dest_network,
-                        anchor = %min_anchor_dest,
-                        global_tip = %current_global_tip,
-                        "Anchor height not yet sufficient for cross-chain approval"
-                    );
+                    warn!(%tx_id, %dest_network, "Could not find stack in registry for destination network");
                 }
-            } else {
-                warn!(%tx_id, %dest_network, "Could not find stack in registry for destination network");
             }
         }
         Ok(())
@@ -520,11 +486,24 @@ impl ChainOperator {
                 // --- CACHE CHECK START ---
                 // Fetch submitted proof info from contract
                 let info = stack.chain_provider().proof_info(tx_id).await?;
+                info!(
+                    %tx_id,
+                    proof_h = %info.block_height,
+                    attempts = %info.attempts,
+                    "Fetched existing proof info for transaction"
+                );
 
                 // Check if cached: attempts > 0 and current_tip < proof_block_height
                 if info.attempts > 0 {
                     let chain_height =
                         stack.chain_provider().global_tip_height().await?;
+                        info!(
+                            %tx_id,
+                            proof_h = %info.block_height,
+                            tip_h = %chain_height,
+                            attempts = %info.attempts,
+                            "Transaction has existing proof attempts. Checking if chain height is below proof block height."
+                        );
 
                     if chain_height < info.block_height {
                         info!(
@@ -537,6 +516,7 @@ impl ChainOperator {
                         continue;
                     }
                 }
+                
                 // --- CACHE CHECK END ---
 
                 match stack
@@ -624,52 +604,52 @@ impl ChainOperator {
                                     "RBF criteria met. Proceeding with fee bump."
                                 );
 
-                                let amount_sats = conv.bitcoin_amount.as_u64();
-                                let user_program = conv.user_program.0.to_vec();
+                                // let amount_sats = conv.bitcoin_amount.as_u64();
+                                // let user_program = conv.user_program.0.to_vec();
 
-                                match rbf_send_to_user_program(
-                                    &stack.core_context(),
-                                    btc_txid,
-                                    &user_program,
-                                    amount_sats,
-                                )
-                                .await
-                                {
-                                    Ok(new_btc_txid) => {
-                                        info!(
-                                            %tx_id,
-                                            old_btc_txid = %btc_txid,
-                                            new_btc_txid = %new_btc_txid,
-                                            "RBF successful"
-                                        );
+                                // match rbf_send_to_user_program(
+                                //     &stack.core_context(),
+                                //     btc_txid,
+                                //     &user_program,
+                                //     amount_sats,
+                                // )
+                                // .await
+                                // {
+                                //     Ok(new_btc_txid) => {
+                                //         info!(
+                                //             %tx_id,
+                                //             old_btc_txid = %btc_txid,
+                                //             new_btc_txid = %new_btc_txid,
+                                //             "RBF successful"
+                                //         );
 
-                                        // Update storage
-                                        if let Err(e) = stack
-                                            .converting()
-                                            .mark_processed(
-                                                tx_id,
-                                                Some(new_btc_txid),
-                                            )
-                                            .await
-                                        {
-                                            error!(
-                                                %tx_id,
-                                                "Failed to update RBF txid in storage: {:?}",
-                                                e
-                                            );
-                                        }
-                                    },
-                                    Err(e) => {
-                                        warn!(
-                                            %tx_id,
-                                            current_tip_height = %current_tip_height,
-                                            estimated_confirmation_height = %estimated_confirmation_height,
-                                            estimated_blocks_until_confirmation = %estimated_blocks_until_confirmation,
-                                            "RBF attempt failed or skipped by node: {:?}",
-                                            e
-                                        );
-                                    },
-                                }
+                                //         // Update storage
+                                //         if let Err(e) = stack
+                                //             .converting()
+                                //             .mark_processed(
+                                //                 tx_id,
+                                //                 Some(new_btc_txid),
+                                //             )
+                                //             .await
+                                //         {
+                                //             error!(
+                                //                 %tx_id,
+                                //                 "Failed to update RBF txid in storage: {:?}",
+                                //                 e
+                                //             );
+                                //         }
+                                //     },
+                                //     Err(e) => {
+                                //         warn!(
+                                //             %tx_id,
+                                //             current_tip_height = %current_tip_height,
+                                //             estimated_confirmation_height = %estimated_confirmation_height,
+                                //             estimated_blocks_until_confirmation = %estimated_blocks_until_confirmation,
+                                //             "RBF attempt failed or skipped by node: {:?}",
+                                //             e
+                                //         );
+                                //     },
+                                // }
                             } else {
                                 debug!(
                                     %tx_id,
@@ -733,8 +713,6 @@ impl ChainOperator {
         let next_tx_id = provider.next_tx_id().await?;
         let to_tx_id = next_tx_id.saturating_sub(U256::one());
 
-        // Find outgoing bridge intents waiting for the "IN" side to be opened on the other chain
-        // 1. Prepare the filters
         let user_action_filter = TxIdFilter {
             type_filter: TransactionType::NATIVE_TO_NATIVE_OUT,
             phase_filter: TransactionPhase::WAITING_USER_ACTION,
@@ -743,24 +721,24 @@ impl ChainOperator {
         };
 
         let mut waiting_proof_filter = user_action_filter.clone();
-        waiting_proof_filter.phase_filter =
-            TransactionPhase::ACTIVE_WAITING_PROOF;
+        waiting_proof_filter.phase_filter = TransactionPhase::ACTIVE_WAITING_PROOF;
 
-        // 2. Parallel Execution
         let (user_action_res, proof_res) = tokio::try_join!(
             provider.get_tx_ids_by_filter(user_action_filter),
             provider.get_tx_ids_by_filter(waiting_proof_filter)
         )?;
 
-        // 3. Combine results
         let mut intents = user_action_res;
         intents.extend(proof_res);
 
         for tx_id in intents {
-            // Allows the loop to continue if one intent fails
             if let Err(e) = async {
                 let info = provider.get_conversion_info(tx_id).await?;
                 let net_val = info.network_id.as_u32() as u8;
+
+                if net_val == 0 {
+                    return Ok::<(), anyhow::Error>(());
+                }
 
                 let dest_network = SupportedNetwork::from_u8(net_val)
                     .ok_or_else(|| anyhow::anyhow!("Unknown network ID: {}", net_val))?;
@@ -774,7 +752,6 @@ impl ChainOperator {
 
                 let dest_provider = dest_stack.chain_provider();
 
-                // Check if already opened
                 let dest_next_id = dest_provider.next_tx_id().await?;
                 let filter = TxIdFilter {
                     type_filter: TransactionType::NATIVE_TO_NATIVE_IN,
@@ -785,72 +762,153 @@ impl ChainOperator {
                     ..Default::default()
                 };
 
-                // Waiting user action filter
                 let mut ua_filter = filter.clone();
                 ua_filter.phase_filter = TransactionPhase::WAITING_USER_ACTION;
 
-                // Active waiting proof filter
                 let mut wp_filter = filter;
                 wp_filter.phase_filter = TransactionPhase::ACTIVE_WAITING_PROOF;
 
-                // Run in parallel
                 let (user_list, proof_list) = tokio::try_join!(
                     dest_provider.get_tx_ids_by_filter(ua_filter),
                     dest_provider.get_tx_ids_by_filter(wp_filter)
                 )?;
 
                 if !user_list.is_empty() || !proof_list.is_empty() {
-                    return Ok(()); // Tunnel already opened, skip
+                    return Ok(()); 
                 }
 
-                // Start opening tunnel
-                info!(%tx_id, dest = %dest_network, "Opening bridge tunnel");
+                let market_ratio = supra_service::get_token_price_vs_btc(
+                    &core_ctx,
+                    dest_network,
+                    Some(supra_service::SupraNetwork::Testnet),
+                )
+                .await?;
 
-                // Store tx index in storage
-                // dest_stack.approving().get_or_create_index_for_tx(dest_next_id).await.map_err(
-                //     |e| anyhow::anyhow!("Indexing failed for tx {}: {}", dest_next_id, e),
-                // )?;
+                let native_decimals = match dest_network {
+                    SupportedNetwork::HEDERA => 8,
+                    SupportedNetwork::SOLANA => 9,
+                    _ => 18, 
+                };
+                let btc_float = info.bitcoin_amount.as_u64() as f64 / 100_000_000.0;
+                let market_native_float = btc_float / market_ratio;
+                let safe_native_float = market_native_float * 0.995;
+                let safe_native_amount = U256::from((safe_native_float * 10f64.powi(native_decimals)) as u128);
 
-                // Open tunnel by creating the native to native IN tx
+                let mut raw_user_address_32 = vec![0u8; 32];
+                raw_user_address_32[..20].copy_from_slice(info.user.as_bytes());
+
+                let mut dest_addr_bytes = info.network_address.to_vec();
+                if dest_addr_bytes.starts_with(b"0x") || dest_addr_bytes.starts_with(b"0X") {
+                    let hex_str = String::from_utf8_lossy(&dest_addr_bytes);
+                    let clean_hex = hex_str.trim_start_matches("0x").trim_start_matches("0X");
+                    
+                    if let Ok(decoded) = (0..clean_hex.len())
+                        .step_by(2)
+                        .map(|i| u8::from_str_radix(&clean_hex[i..std::cmp::min(i + 2, clean_hex.len())], 16))
+                        .collect::<Result<Vec<u8>, _>>()
+                    {
+                        dest_addr_bytes = decoded;
+                    }
+                }
+
+                let network_id_u8 = provider.network() as u8;
                 let source_anchor = provider.anchor_info(tx_id).await?;
-                let btc_amount = provider.estimate_bitcoin_from_native(info.native_amount).await?;
-
-                let now = Utc::now().timestamp();
+                let now = chrono::Utc::now().timestamp();
                 let now_u256 = U256::from(now as u64);
                 let duty_window = info.operator_duty_expires_at.saturating_sub(now_u256);
 
-                dest_provider
-                    .commit_bitcoin_to_native(
-                        paradapp_core::traits::chain_provider_adapter::BitcoinToNativeCommitArgs {
-                            bitcoin_amount: btc_amount,
-                            network_id: U256::from(provider.network() as u8),
-                            user_program: ethers::types::Bytes::new(),
-                            dest_address: ethers::types::Address::from_slice(
-                                &info.network_address.as_ref()[..20],
-                            ),
-                            network_address: ethers::types::Bytes::from(
-                                info.user.as_bytes().to_vec(),
-                            ),
-                            duty_window_seconds: duty_window,
-                            paradapp_receive_program: info.user_program, // Use source receive program
-                            locked_anchor_height: source_anchor.anchor_height,
-                            slippage: info.slippage,
-                        },
-                    )
-                    .await
-                    .map_err(|e| anyhow::anyhow!("Commit failed: {}", e))?;
+                if dest_network == SupportedNetwork::SOLANA {
+                    let network_address_bytes = ethers::types::Bytes::from(info.user.as_bytes().to_vec());
+                    
+                    info!(
+                        %tx_id, 
+                        dest = %dest_network, 
+                        requested = %info.native_amount, 
+                        calculated_payout = %safe_native_amount, 
+                        dest_address = ?dest_addr_bytes,
+                        network_address = %network_address_bytes,
+                        "Opening bridge tunnel with market-adjusted native amount (Solana Dest)"
+                    );
+
+                    dest_provider
+                        .commit_bitcoin_to_native(
+                            paradapp_core::traits::chain_provider_adapter::BitcoinToNativeCommitArgs {
+                                bitcoin_amount: info.bitcoin_amount,
+                                native_amount: safe_native_amount,
+                                network_id: U256::from(network_id_u8),
+                                user_program: ethers::types::Bytes::new(), 
+                                dest_address: ethers::types::Bytes::from(dest_addr_bytes.clone()),
+                                network_address: network_address_bytes, 
+                                duty_window_seconds: duty_window,
+                                paradapp_receive_program: info.user_program.clone(),
+                                locked_anchor_height: source_anchor.anchor_height,
+                            },
+                        )
+                        .await
+                        .map_err(|e| anyhow::anyhow!("Commit failed: {}", e))?;
+                } else {
+                    let mut final_dest_address = [0u8; 20];
+                    let copy_len = std::cmp::min(dest_addr_bytes.len(), 20);
+                    final_dest_address[..copy_len].copy_from_slice(&dest_addr_bytes[..copy_len]);
+
+                    // We keep this purely for clean logging
+                    let dest_address_evm = ethers::types::Address::from(final_dest_address);
+                    
+                    let dest_address_bytes_param = ethers::types::Bytes::from(final_dest_address.to_vec());
+                    
+                    let network_address_bytes = ethers::types::Bytes::from(raw_user_address_32); 
+
+                    info!(
+                        %tx_id, 
+                        dest = %dest_network, 
+                        requested = %info.native_amount, 
+                        calculated_payout = %safe_native_amount, 
+                        dest_address = %dest_address_evm,
+                        network_address = %network_address_bytes,
+                        "Opening bridge tunnel with market-adjusted native amount (EVM Dest)"
+                    );
+
+                    info!(
+                        tx_id = %tx_id,
+                        dest_network_id = %network_id_u8,
+                        bitcoin_amount = %info.bitcoin_amount,
+                        native_amount = %safe_native_amount,
+                        dest_address = %dest_address_evm,
+                        network_address = %network_address_bytes,
+                        duty_window_seconds = %duty_window,
+                        receive_program_len = %info.user_program.len(),
+                        locked_anchor = %source_anchor.anchor_height,
+                        "[TUNNEL] Sending commit_bitcoin_to_native to destination provider"
+                    );
+
+                    dest_provider
+                        .commit_bitcoin_to_native(
+                            paradapp_core::traits::chain_provider_adapter::BitcoinToNativeCommitArgs {
+                                bitcoin_amount: info.bitcoin_amount,
+                                native_amount: safe_native_amount,
+                                network_id: U256::from(network_id_u8),
+                                user_program: ethers::types::Bytes::new(),
+                                dest_address: dest_address_bytes_param,
+                                network_address: network_address_bytes,
+                                duty_window_seconds: duty_window,
+                                paradapp_receive_program: info.user_program.clone(),
+                                locked_anchor_height: source_anchor.anchor_height,
+                            },
+                        )
+                        .await
+                        .map_err(|e| anyhow::anyhow!("Commit failed: {}", e))?;
+                }
 
                 Ok::<(), anyhow::Error>(())
             }
             .await
             {
-                error!(%tx_id, error = %e, "Failed to process tunneling intent");
-                continue; // Move to the next tx_id instead of crashing the whole tick
+                tracing::error!(%tx_id, error = %e, "Failed to process tunneling intent");
+                continue; 
             }
         }
         Ok(())
     }
-
     #[tracing::instrument(
     name = "scheduled_btc_sweep",
     skip(stack),
@@ -921,6 +979,7 @@ impl ChainOperator {
 
         // 1. Determine the target height
         let mut target_height = state.safe_anchor;
+        info!(%network, target_height = %target_height, "Initial sync target height determined");
         let mut target_reason = "local safe anchor";
 
         // Collect all anchor_info futures from all intents and all tx_ids
@@ -937,10 +996,6 @@ impl ChainOperator {
                         .map_err(|e| (tx_id, remote_name, e))
                 });
             }
-        }
-
-        if !anchor_futures.is_empty() {
-            debug!(%network, count = anchor_futures.len(), "Fetching remote anchor heights in parallel");
         }
 
         // Execute all requests in parallel
@@ -961,13 +1016,14 @@ impl ChainOperator {
             // We only update if the remote requirement is actually different/relevant
             if remote_target != state.safe_anchor {
                 target_height = remote_target;
+                info!(%network, target_height = %target_height, "Updated sync target height based on remote anchor requirements");
                 target_reason = "lowest remote bridge intent anchor";
             }
         }
 
         let gap = target_height.saturating_sub(state.global_tip);
         if gap == 0 {
-            debug!(%network, current = state.global_tip, target = target_height, "No sync gap found; chain is up to date");
+            warn!(%network, current = state.global_tip, target = target_height, "No sync gap found; chain is up to date");
             return Ok(());
         }
 
@@ -992,6 +1048,7 @@ impl ChainOperator {
                     target_height,
                 )
                 .await?;
+            info!(%network, "Jump execution completed");
         } else {
             let user_close_candidates = stack
                 .approving()
@@ -1035,6 +1092,7 @@ impl ChainOperator {
                         .collect();
 
                 stack.approving().execute_user_closes(candidates).await?;
+                info!(%network, "User closes executed");
 
                 // REFRESH STATE: Check if we can jump now
                 let refreshed = provider.get_global_chain_state().await?;
@@ -1046,6 +1104,7 @@ impl ChainOperator {
                             target_height,
                         )
                         .await?;
+                    info!(%network, "Post-close jump execution completed");
                 } else {
                     info!(
                         %network,
@@ -1064,12 +1123,13 @@ impl ChainOperator {
                         200,
                     )
                     .await?;
+                info!(%network, "Header streaming sequence completed");
             }
         }
 
         Ok(())
     }
-
+    
     async fn check_bridge_intent(
         ctx: Arc<CoreContext>,
         sources: &[String],

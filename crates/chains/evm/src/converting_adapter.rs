@@ -34,23 +34,22 @@ impl EvmConvertingAdapter {
         Conversion {
             user: evm.user,
             is_native_to_bitcoin: evm.is_native_to_bitcoin,
-            slippage: evm.slippage,
             user_program: evm.user_program,
             paradapp_receive_program: evm.paradapp_receive_program,
             network_address: evm.network_address,
             network_id: evm.network_id,
             native_amount: evm.native_amount,
             bitcoin_amount: evm.bitcoin_amount,
+            commit_fee: evm.commit_fee,
+            reserved_native: evm.reserved_native,
             created_at: evm.created_at,
             approved_at: evm.approved_at,
             deposited_at: evm.deposited_at,
-            commit_fee: evm.commit_fee,
+            operator_duty_expires_at: evm.operator_duty_expires_at,
             approved: evm.approved,
             deposited: evm.deposited,
             completed: evm.completed,
             refunded: evm.refunded,
-            reserved_native: evm.reserved_native,
-            operator_duty_expires_at: evm.operator_duty_expires_at,
         }
     }
 }
@@ -354,7 +353,11 @@ impl ConvertingAdapter for EvmConvertingAdapter {
             proof.branch,
             proof.index,
         );
-
+        info!(
+            tx_id = %tx_id,
+            block_height = proof.block_height.as_u64(),
+             "Submitting merkle proof cache to EVM program"
+        );
         let pending = call.send().await?;
         let tx_hash = pending.tx_hash();
 

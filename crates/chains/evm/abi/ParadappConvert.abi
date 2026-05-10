@@ -17,29 +17,9 @@
 				"type": "address"
 			},
 			{
-				"internalType": "address",
-				"name": "_oracle",
-				"type": "address"
-			},
-			{
 				"internalType": "uint256",
-				"name": "_bitcoinUsdPriceId",
+				"name": "_commitFeeBps",
 				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_nativeUsdPriceId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_commitFeeNative",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint16",
-				"name": "_serviceFeeBps",
-				"type": "uint16"
 			}
 		],
 		"stateMutability": "nonpayable",
@@ -267,16 +247,6 @@
 	},
 	{
 		"inputs": [],
-		"name": "OracleDecimalsIncorrect",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "OracleZeroPrice",
-		"type": "error"
-	},
-	{
-		"inputs": [],
 		"name": "PrevAndTipUnmatch",
 		"type": "error"
 	},
@@ -288,6 +258,11 @@
 	{
 		"inputs": [],
 		"name": "ProgramOutOfBounds",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ReentrancyGuardReentrantCall",
 		"type": "error"
 	},
 	{
@@ -484,14 +459,8 @@
 			{
 				"indexed": false,
 				"internalType": "uint256",
-				"name": "newCommitFee",
+				"name": "newCommitFeeBps",
 				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint16",
-				"name": "newServiceFeeBps",
-				"type": "uint16"
 			}
 		],
 		"name": "FeesUpdated",
@@ -818,29 +787,11 @@
 				"internalType": "bytes",
 				"name": "paradappReceiveProgram",
 				"type": "bytes"
-			},
-			{
-				"internalType": "uint16",
-				"name": "slippage",
-				"type": "uint16"
 			}
 		],
 		"name": "approveAndStartWithAnchorAndFirst",
 		"outputs": [],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "bitcoinUsdPriceId",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -878,6 +829,11 @@
 			},
 			{
 				"internalType": "uint256",
+				"name": "nativeAmount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
 				"name": "networkId",
 				"type": "uint256"
 			},
@@ -910,11 +866,6 @@
 				"internalType": "uint256",
 				"name": "lockedAnchorHeight",
 				"type": "uint256"
-			},
-			{
-				"internalType": "uint16",
-				"name": "slippage",
-				"type": "uint16"
 			}
 		],
 		"name": "commitBitcoinToNative",
@@ -924,7 +875,7 @@
 	},
 	{
 		"inputs": [],
-		"name": "commitFeeNative",
+		"name": "commitFeeBps",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -958,6 +909,11 @@
 			{
 				"internalType": "uint256",
 				"name": "nativeAmount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "bitcoinAmount",
 				"type": "uint256"
 			},
 			{
@@ -1002,11 +958,6 @@
 				"type": "bool"
 			},
 			{
-				"internalType": "uint16",
-				"name": "slippage",
-				"type": "uint16"
-			},
-			{
 				"internalType": "bytes",
 				"name": "userProgram",
 				"type": "bytes"
@@ -1038,6 +989,16 @@
 			},
 			{
 				"internalType": "uint256",
+				"name": "commitFee",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "reservedNative",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
 				"name": "createdAt",
 				"type": "uint256"
 			},
@@ -1053,7 +1014,7 @@
 			},
 			{
 				"internalType": "uint256",
-				"name": "commitFee",
+				"name": "operatorDutyExpiresAt",
 				"type": "uint256"
 			},
 			{
@@ -1075,16 +1036,6 @@
 				"internalType": "bool",
 				"name": "refunded",
 				"type": "bool"
-			},
-			{
-				"internalType": "uint256",
-				"name": "reservedNative",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "operatorDutyExpiresAt",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -1146,44 +1097,6 @@
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "nativeAmount",
-				"type": "uint256"
-			}
-		],
-		"name": "estimateBitcoinFromNative",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "bitcoinAmount",
-				"type": "uint256"
-			}
-		],
-		"name": "estimateNativeFromBitcoin",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
 				"name": "txId",
 				"type": "uint256"
 			}
@@ -1232,11 +1145,6 @@
 						"type": "bool"
 					},
 					{
-						"internalType": "uint16",
-						"name": "slippage",
-						"type": "uint16"
-					},
-					{
 						"internalType": "bytes",
 						"name": "userProgram",
 						"type": "bytes"
@@ -1268,6 +1176,16 @@
 					},
 					{
 						"internalType": "uint256",
+						"name": "commitFee",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "reservedNative",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
 						"name": "createdAt",
 						"type": "uint256"
 					},
@@ -1283,7 +1201,7 @@
 					},
 					{
 						"internalType": "uint256",
-						"name": "commitFee",
+						"name": "operatorDutyExpiresAt",
 						"type": "uint256"
 					},
 					{
@@ -1305,24 +1223,14 @@
 						"internalType": "bool",
 						"name": "refunded",
 						"type": "bool"
-					},
-					{
-						"internalType": "uint256",
-						"name": "reservedNative",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "operatorDutyExpiresAt",
-						"type": "uint256"
 					}
 				],
-				"internalType": "struct ParadappConvert.Conversion",
+				"internalType": "struct iPoWParadappV1.Conversion",
 				"name": "c",
 				"type": "tuple"
 			},
 			{
-				"internalType": "enum ParadappConvert.Phase",
+				"internalType": "enum iPoWParadappV1.Phase",
 				"name": "phase",
 				"type": "uint8"
 			}
@@ -1333,12 +1241,12 @@
 	{
 		"inputs": [
 			{
-				"internalType": "enum ParadappConvert.TypeFilter",
+				"internalType": "enum iPoWParadappV1.TypeFilter",
 				"name": "typeFilter",
 				"type": "uint8"
 			},
 			{
-				"internalType": "enum ParadappConvert.Phase",
+				"internalType": "enum iPoWParadappV1.Phase",
 				"name": "phaseFilter",
 				"type": "uint8"
 			},
@@ -1486,19 +1394,6 @@
 	{
 		"inputs": [],
 		"name": "nativeLiquidity",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "nativeUsdPriceId",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -1689,29 +1584,11 @@
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "serviceFeeBps",
-		"outputs": [
-			{
-				"internalType": "uint16",
-				"name": "",
-				"type": "uint16"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "newCommitFee",
+				"name": "newCommitFeeBps",
 				"type": "uint256"
-			},
-			{
-				"internalType": "uint16",
-				"name": "newServiceFeeBps",
-				"type": "uint16"
 			}
 		],
 		"name": "setFees",

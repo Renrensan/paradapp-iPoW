@@ -6,6 +6,7 @@ pub enum SupportedNetwork {
     BTC = 0,
     HEDERA = 1,
     ETH = 2,
+    SOLANA = 3,
 }
 
 impl SupportedNetwork {
@@ -14,7 +15,27 @@ impl SupportedNetwork {
             0 => Some(Self::BTC),
             1 => Some(Self::HEDERA),
             2 => Some(Self::ETH),
+            3 => Some(Self::SOLANA),
             _ => None,
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "btc" | "bitcoin" => Some(Self::BTC),
+            "hedera" => Some(Self::HEDERA),
+            "ethereum" | "eth" => Some(Self::ETH),
+            "solana" | "sol" => Some(Self::SOLANA),
+            _ => None,
+        }
+    }
+
+    pub fn decimals(&self) -> u32 {
+        match self {
+            Self::BTC => 8,
+            Self::HEDERA => 8,
+            Self::ETH => 18,
+            Self::SOLANA => 9,
         }
     }
 
@@ -23,6 +44,7 @@ impl SupportedNetwork {
             Self::BTC => "btc",
             Self::HEDERA => "hedera",
             Self::ETH => "ethereum",
+            Self::SOLANA => "solana",
         }
     }
 }

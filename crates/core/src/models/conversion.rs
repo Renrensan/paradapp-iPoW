@@ -1,7 +1,6 @@
 pub struct Conversion {
     pub user: ::ethers::core::types::Address,
     pub is_native_to_bitcoin: bool,
-    pub slippage: u16,
     pub user_program: ::ethers::core::types::Bytes,
     pub paradapp_receive_program: ::ethers::core::types::Bytes,
     pub network_address: ::ethers::core::types::Bytes,

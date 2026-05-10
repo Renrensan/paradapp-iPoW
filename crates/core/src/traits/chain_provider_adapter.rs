@@ -1,6 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use ethers::types::{Address, Bytes, H160, U256};
+use ethers::types::{Bytes, H160, U256};
 
 use crate::{
     consts::supported_network_enum::SupportedNetwork,
@@ -45,14 +45,14 @@ impl Default for TxIdFilter {
 /// Parameters for committing a Bitcoin -> Native conversion.
 pub struct BitcoinToNativeCommitArgs {
     pub bitcoin_amount: U256,
+    pub native_amount: U256,
     pub network_id: U256,
     pub user_program: Bytes,
-    pub dest_address: Address,
+    pub dest_address: Bytes,
     pub network_address: Bytes,
     pub duty_window_seconds: U256,
     pub paradapp_receive_program: Bytes,
     pub locked_anchor_height: U256,
-    pub slippage: u16,
 }
 
 #[derive(Debug, Clone)]
@@ -129,14 +129,4 @@ pub trait ChainProviderAdapter: Send + Sync {
     async fn get_conversion_info(&self, tx_id: U256) -> Result<Conversion>;
 
     async fn get_global_chain_state(&self) -> Result<GlobalChainState>;
-
-    async fn estimate_bitcoin_from_native(
-        &self,
-        native_amount: U256,
-    ) -> Result<U256>;
-
-    async fn estimate_native_from_bitcoin(
-        &self,
-        bitcoin_amount: U256,
-    ) -> anyhow::Result<U256>;
 }

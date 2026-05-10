@@ -2,6 +2,14 @@ use config::{Config, Environment, File};
 use std::env;
 
 #[derive(Clone)]
+pub struct SupraConfig {
+    pub api_url_mainnet: String,
+    pub api_url_testnet: String,
+    pub api_key_mainnet: String,
+    pub api_key_testnet: String,
+}
+
+#[derive(Clone)]
 pub struct CoreConfig {
     pub esplora_base: String,
     pub mempool_api: String,
@@ -17,6 +25,7 @@ pub struct CoreConfig {
     pub high_finality_confirmed_block: u32,
     pub rbf_blocks_since_anchor: u64,
     pub rbf_blocks_from_tip_to_unconfirmed: u64,
+    pub supra: SupraConfig,
 }
 
 impl CoreConfig {
@@ -101,6 +110,23 @@ impl CoreConfig {
         let redis_url = env::var("REDIS_URL")
             .expect("REDIS_URL must be set in .env or environment");
 
+        // Supra Configurations
+        let supra_api_url_mainnet = env::var("SUPRA_API_URL_MAINNET")
+            .or_else(|_| settings.get_string("supra.api_url_mainnet"))
+            .unwrap_or_else(|_| "https://api.supraoracles.com/v1".to_string());
+
+        let supra_api_url_testnet = env::var("SUPRA_API_URL_TESTNET")
+            .or_else(|_| settings.get_string("supra.api_url_testnet"))
+            .unwrap_or_else(|_| {
+                "https://api-testnet.supraoracles.com/v1".to_string()
+            });
+
+        let supra_api_key_mainnet = env::var("SUPRA_API_KEY_MAINNET")
+            .expect("SUPRA_API_KEY_MAINNET must be set in .env");
+
+        let supra_api_key_testnet = env::var("SUPRA_API_KEY_TESTNET")
+            .expect("SUPRA_API_KEY_TESTNET must be set in .env");
+
         Self {
             esplora_base,
             mempool_api,
@@ -124,6 +150,12 @@ impl CoreConfig {
             rbf_blocks_since_anchor,
             rbf_blocks_from_tip_to_unconfirmed,
             high_finality_confirmed_block,
+            supra: SupraConfig {
+                api_url_mainnet: supra_api_url_mainnet,
+                api_url_testnet: supra_api_url_testnet,
+                api_key_mainnet: supra_api_key_mainnet,
+                api_key_testnet: supra_api_key_testnet,
+            },
         }
     }
 }

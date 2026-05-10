@@ -157,23 +157,22 @@ impl StreamingAdapter for EvmStreamingAdapter {
         let (
             _user,
             is_native_to_bitcoin,
-            _slippage,
             _user_program,
             _paradapp_receive_program,
             _network_address,
             _network_id,
             _native_amount,
             _bitcoin_amount,
+            _commit_fee,
+            _reserved_native,
             _created_at,
             _approved_at,
             _deposited_at,
-            _commit_fee,
+            _operator_duty_expires_at,
             _approved,
             deposited,
             completed,
             refunded,
-            _reserved_native,
-            _operator_duty_expires_at,
         ) = conv;
 
         // 2. windowsFor(txId)

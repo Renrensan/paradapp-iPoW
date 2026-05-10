@@ -1,0 +1,1450 @@
+{
+  "address": "CEUmCuQza1pQpuS7CxSUwv1nmRmdvAkCUKbQXQYq3VRF",
+  "metadata": {
+    "name": "ipow",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "add_network",
+      "discriminator": [88, 116, 116, 189, 41, 140, 135, 172],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103, 108, 111, 98, 97, 108, 95, 115, 116, 97, 116, 101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "network_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [110, 101, 116, 119, 111, 114, 107]
+              },
+              {
+                "kind": "arg",
+                "path": "network_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "network_id",
+          "type": "u64"
+        },
+        {
+          "name": "min_addr_len",
+          "type": "u16"
+        },
+        {
+          "name": "max_addr_len",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "approve_and_start_with_anchor",
+      "discriminator": [113, 51, 151, 249, 125, 46, 26, 126],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103, 108, 111, 98, 97, 108, 95, 115, 116, 97, 116, 101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "conversion",
+          "writable": true
+        },
+        {
+          "name": "operator",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "duty_window_seconds",
+          "type": "i64"
+        },
+        {
+          "name": "paradapp_receive_program",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "claim_native_after_operator_expired",
+      "discriminator": [106, 12, 54, 71, 107, 202, 247, 110],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [101, 115, 99, 114, 111, 119]
+              }
+            ]
+          }
+        },
+        {
+          "name": "conversion",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "relations": ["conversion"]
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_no_bitcoin_bitcoin_to_native",
+      "discriminator": [233, 114, 238, 244, 227, 48, 58, 239],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true
+        },
+        {
+          "name": "conversion",
+          "writable": true
+        },
+        {
+          "name": "operator",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "commit_bitcoin_to_native",
+      "discriminator": [66, 107, 203, 28, 177, 227, 56, 47],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103, 108, 111, 98, 97, 108, 95, 115, 116, 97, 116, 101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [101, 115, 99, 114, 111, 119]
+              }
+            ]
+          }
+        },
+        {
+          "name": "conversion",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 118, 101, 114, 115, 105, 111, 110]
+              },
+              {
+                "kind": "account",
+                "path": "global_state.next_tx_id",
+                "account": "GlobalState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "bitcoin_amount",
+          "type": "u64"
+        },
+        {
+          "name": "native_amount",
+          "type": "u64"
+        },
+        {
+          "name": "network_id",
+          "type": "u64"
+        },
+        {
+          "name": "network_address",
+          "type": "bytes"
+        },
+        {
+          "name": "user_program",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "commit_global_header",
+      "discriminator": [7, 35, 38, 214, 91, 62, 171, 36],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103, 108, 111, 98, 97, 108, 95, 115, 116, 97, 116, 101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "header",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [104, 101, 97, 100, 101, 114]
+              },
+              {
+                "kind": "arg",
+                "path": "height"
+              }
+            ]
+          }
+        },
+        {
+          "name": "prev_height_tracker"
+        },
+        {
+          "name": "prev_epoch_start_header",
+          "optional": true
+        },
+        {
+          "name": "prev_epoch_end_header",
+          "optional": true
+        },
+        {
+          "name": "operator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "header_80",
+          "type": {
+            "array": ["u8", 80]
+          }
+        },
+        {
+          "name": "height",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "commit_native_to_bitcoin",
+      "discriminator": [167, 194, 177, 146, 5, 156, 155, 116],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103, 108, 111, 98, 97, 108, 95, 115, 116, 97, 116, 101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [101, 115, 99, 114, 111, 119]
+              }
+            ]
+          }
+        },
+        {
+          "name": "conversion",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 118, 101, 114, 115, 105, 111, 110]
+              },
+              {
+                "kind": "account",
+                "path": "global_state.next_tx_id",
+                "account": "GlobalState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "network_config",
+          "optional": true
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "native_amount",
+          "type": "u64"
+        },
+        {
+          "name": "bitcoin_amount",
+          "type": "u64"
+        },
+        {
+          "name": "network_id",
+          "type": "u64"
+        },
+        {
+          "name": "network_address",
+          "type": "bytes"
+        },
+        {
+          "name": "user_program",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "deposit_approved_conversion",
+      "discriminator": [143, 114, 73, 65, 85, 55, 224, 10],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [101, 115, 99, 114, 111, 119]
+              }
+            ]
+          }
+        },
+        {
+          "name": "conversion",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true,
+          "relations": ["conversion"]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize",
+      "discriminator": [175, 175, 109, 31, 13, 152, 155, 237],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103, 108, 111, 98, 97, 108, 95, 115, 116, 97, 116, 101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [101, 115, 99, 114, 111, 119]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "operator",
+          "type": "pubkey"
+        },
+        {
+          "name": "commit_fee_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "operator_open_tunnel",
+      "discriminator": [110, 231, 98, 218, 15, 220, 230, 152],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103, 108, 111, 98, 97, 108, 95, 115, 116, 97, 116, 101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "conversion",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 118, 101, 114, 115, 105, 111, 110]
+              },
+              {
+                "kind": "account",
+                "path": "global_state.next_tx_id",
+                "account": "GlobalState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "network_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [110, 101, 116, 119, 111, 114, 107]
+              },
+              {
+                "kind": "arg",
+                "path": "network_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "operator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "bitcoin_amount",
+          "type": "u64"
+        },
+        {
+          "name": "native_amount",
+          "type": "u64"
+        },
+        {
+          "name": "network_id",
+          "type": "u64"
+        },
+        {
+          "name": "dest_address",
+          "type": "pubkey"
+        },
+        {
+          "name": "network_address",
+          "type": "bytes"
+        },
+        {
+          "name": "duty_window_seconds",
+          "type": "i64"
+        },
+        {
+          "name": "paradapp_receive_program",
+          "type": "bytes"
+        },
+        {
+          "name": "locked_anchor_height",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "refund_after_no_proof_native_to_bitcoin",
+      "discriminator": [173, 100, 64, 152, 199, 76, 238, 122],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [101, 115, 99, 114, 111, 119]
+              }
+            ]
+          }
+        },
+        {
+          "name": "conversion",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "relations": ["conversion"]
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "refund_if_not_approved",
+      "discriminator": [153, 235, 150, 110, 132, 19, 29, 255],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [101, 115, 99, 114, 111, 119]
+              }
+            ]
+          }
+        },
+        {
+          "name": "conversion",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true,
+          "relations": ["conversion"]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "submit_bitcoin_proof_cache",
+      "discriminator": [75, 60, 230, 110, 50, 133, 73, 38],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103, 108, 111, 98, 97, 108, 95, 115, 116, 97, 116, 101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [101, 115, 99, 114, 111, 119]
+              }
+            ]
+          }
+        },
+        {
+          "name": "conversion",
+          "writable": true
+        },
+        {
+          "name": "proof_cache",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [112, 114, 111, 111, 102]
+              },
+              {
+                "kind": "account",
+                "path": "conversion.tx_id",
+                "account": "Conversion"
+              }
+            ]
+          }
+        },
+        {
+          "name": "height_tracker",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [116, 114, 97, 99, 107, 101, 114]
+              },
+              {
+                "kind": "arg",
+                "path": "proof_block_height"
+              }
+            ]
+          }
+        },
+        {
+          "name": "header",
+          "optional": true
+        },
+        {
+          "name": "operator",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "writable": true
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "tx_raw",
+          "type": "bytes"
+        },
+        {
+          "name": "vout_index",
+          "type": "u64"
+        },
+        {
+          "name": "proof_block_height",
+          "type": "u64"
+        },
+        {
+          "name": "branch_le",
+          "type": {
+            "vec": {
+              "array": ["u8", 32]
+            }
+          }
+        },
+        {
+          "name": "index",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "try_finalize_cached_proof",
+      "discriminator": [117, 255, 183, 94, 33, 43, 54, 163],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103, 108, 111, 98, 97, 108, 95, 115, 116, 97, 116, 101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [101, 115, 99, 114, 111, 119]
+              }
+            ]
+          }
+        },
+        {
+          "name": "conversion",
+          "writable": true
+        },
+        {
+          "name": "proof_cache",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [112, 114, 111, 111, 102]
+              },
+              {
+                "kind": "account",
+                "path": "conversion.tx_id",
+                "account": "Conversion"
+              }
+            ]
+          }
+        },
+        {
+          "name": "height_tracker",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [116, 114, 97, 99, 107, 101, 114]
+              },
+              {
+                "kind": "account",
+                "path": "proof_cache.proof_block_height",
+                "account": "ProofCache"
+              }
+            ]
+          }
+        },
+        {
+          "name": "header",
+          "optional": true
+        },
+        {
+          "name": "operator",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_network",
+      "discriminator": [39, 115, 188, 77, 162, 232, 216, 161],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103, 108, 111, 98, 97, 108, 95, 115, 116, 97, 116, 101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "network_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [110, 101, 116, 119, 111, 114, 107]
+              },
+              {
+                "kind": "arg",
+                "path": "network_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "_network_id",
+          "type": "u64"
+        },
+        {
+          "name": "min_addr_len",
+          "type": "u16"
+        },
+        {
+          "name": "max_addr_len",
+          "type": "u16"
+        },
+        {
+          "name": "is_active",
+          "type": "bool"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Conversion",
+      "discriminator": [166, 162, 161, 65, 158, 55, 109, 27]
+    },
+    {
+      "name": "GlobalHeader",
+      "discriminator": [254, 42, 78, 220, 103, 159, 102, 120]
+    },
+    {
+      "name": "GlobalState",
+      "discriminator": [163, 46, 74, 168, 216, 123, 133, 98]
+    },
+    {
+      "name": "HeightTracker",
+      "discriminator": [171, 131, 119, 208, 250, 114, 237, 46]
+    },
+    {
+      "name": "ProofCache",
+      "discriminator": [214, 67, 52, 16, 45, 191, 77, 250]
+    },
+    {
+      "name": "SupportedNetwork",
+      "discriminator": [24, 190, 84, 238, 161, 129, 71, 191]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "Action performed by unauthorized party"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidFeeConfig",
+      "msg": "Invalid fee configuration"
+    },
+    {
+      "code": 6002,
+      "name": "ZeroValue",
+      "msg": "Required input value is zero"
+    },
+    {
+      "code": 6003,
+      "name": "BadState",
+      "msg": "Contract is in an invalid state for this action"
+    },
+    {
+      "code": 6004,
+      "name": "ApproveWindowOver",
+      "msg": "Approve window has expired"
+    },
+    {
+      "code": 6005,
+      "name": "IncorrectWindow",
+      "msg": "Action falls outside the allowed block window"
+    },
+    {
+      "code": 6006,
+      "name": "NoHeadersYet",
+      "msg": "No headers available yet"
+    },
+    {
+      "code": 6007,
+      "name": "IncorrectValue",
+      "msg": "Incorrect value provided"
+    },
+    {
+      "code": 6008,
+      "name": "BadBitcoinProgram",
+      "msg": "Bitcoin program is malformed"
+    },
+    {
+      "code": 6009,
+      "name": "WrongConversionType",
+      "msg": "Wrong conversion type for this action"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidHeader",
+      "msg": "Invalid Bitcoin Header or Merkle Proof"
+    },
+    {
+      "code": 6011,
+      "name": "AlreadyVerified",
+      "msg": "Proof has already been verified"
+    },
+    {
+      "code": 6012,
+      "name": "NeedDutyWindow",
+      "msg": "Need Duty Window"
+    },
+    {
+      "code": 6013,
+      "name": "LowWork",
+      "msg": "Low Proof of Work"
+    },
+    {
+      "code": 6014,
+      "name": "InvalidRetarget",
+      "msg": "Invalid Difficulty Retarget"
+    },
+    {
+      "code": 6015,
+      "name": "TransactionTooShort",
+      "msg": "Transaction too short"
+    },
+    {
+      "code": 6016,
+      "name": "TransactionOverflow",
+      "msg": "Transaction overflow"
+    },
+    {
+      "code": 6017,
+      "name": "VoutOutOfBounds",
+      "msg": "Vout out of bounds"
+    },
+    {
+      "code": 6018,
+      "name": "ValueOutOfBounds",
+      "msg": "Value out of bounds"
+    },
+    {
+      "code": 6019,
+      "name": "ProgramOutOfBounds",
+      "msg": "Program out of bounds"
+    },
+    {
+      "code": 6020,
+      "name": "VarIntOutOfBounds",
+      "msg": "VarInt out of bounds"
+    },
+    {
+      "code": 6021,
+      "name": "Var16OutOfBounds",
+      "msg": "Var16 out of bounds"
+    },
+    {
+      "code": 6022,
+      "name": "Var32OutOfBounds",
+      "msg": "Var32 out of bounds"
+    },
+    {
+      "code": 6023,
+      "name": "Var64OutOfBounds",
+      "msg": "Var64 out of bounds"
+    },
+    {
+      "code": 6024,
+      "name": "DutyNotExpired",
+      "msg": "Duty Not Expired"
+    },
+    {
+      "code": 6025,
+      "name": "InvalidAddressLength",
+      "msg": "Invalid Network Address Length"
+    },
+    {
+      "code": 6026,
+      "name": "MustBeContiguous",
+      "msg": "Blocks must be submitted contiguously while conversions are active"
+    },
+    {
+      "code": 6027,
+      "name": "InvalidJump",
+      "msg": "Jump height must be strictly greater than current tip"
+    },
+    {
+      "code": 6028,
+      "name": "NetworkNotAllowed",
+      "msg": "Network ID not allowed for this action"
+    },
+    {
+      "code": 6029,
+      "name": "NetworkAddressNotAllowed",
+      "msg": "Network Address must be empty for Network ID 0"
+    },
+    {
+      "code": 6030,
+      "name": "UserBitcoinProgramNotAllowed",
+      "msg": "User Bitcoin Program is not allowed when routing to an external network"
+    },
+    {
+      "code": 6031,
+      "name": "IncorrectNetwork",
+      "msg": "Incorrect Network Configuration"
+    },
+    {
+      "code": 6032,
+      "name": "InvalidTrackerAccount",
+      "msg": "Invalid Tracker Account Provided"
+    },
+    {
+      "code": 6033,
+      "name": "PendingProofsExist",
+      "msg": "Pending proofs exist for the previous block"
+    },
+    {
+      "code": 6034,
+      "name": "InvalidAnchorHeight",
+      "msg": "Invalid Anchor Height provided"
+    }
+  ],
+  "types": [
+    {
+      "name": "Conversion",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tx_id",
+            "type": "u64"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "is_native_to_bitcoin",
+            "type": "bool"
+          },
+          {
+            "name": "user_program",
+            "type": "bytes"
+          },
+          {
+            "name": "paradapp_receive_program",
+            "type": "bytes"
+          },
+          {
+            "name": "network_address",
+            "type": "bytes"
+          },
+          {
+            "name": "network_id",
+            "type": "u64"
+          },
+          {
+            "name": "native_amount",
+            "type": "u64"
+          },
+          {
+            "name": "bitcoin_amount",
+            "type": "u64"
+          },
+          {
+            "name": "commit_fee",
+            "type": "u64"
+          },
+          {
+            "name": "reserved_native",
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "approved_at",
+            "type": "i64"
+          },
+          {
+            "name": "deposited_at",
+            "type": "i64"
+          },
+          {
+            "name": "operator_duty_expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "ConversionStatus"
+              }
+            }
+          },
+          {
+            "name": "window_started",
+            "type": "bool"
+          },
+          {
+            "name": "window_start_height",
+            "type": "u64"
+          },
+          {
+            "name": "epoch_start_height",
+            "type": "u64"
+          },
+          {
+            "name": "proof_verified",
+            "type": "bool"
+          },
+          {
+            "name": "proof_txid_le",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "proof_block_height",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConversionStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "None"
+          },
+          {
+            "name": "Committed"
+          },
+          {
+            "name": "Approved"
+          },
+          {
+            "name": "Deposited"
+          },
+          {
+            "name": "Completed"
+          },
+          {
+            "name": "Refunded"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GlobalHeader",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "height",
+            "type": "u64"
+          },
+          {
+            "name": "hash_le",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "prev_hash_le",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "merkle_root_le",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "n_bits",
+            "type": "u32"
+          },
+          {
+            "name": "timestamp",
+            "type": "u32"
+          },
+          {
+            "name": "arrival_time",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GlobalState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "operator",
+            "type": "pubkey"
+          },
+          {
+            "name": "commit_fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "next_tx_id",
+            "type": "u64"
+          },
+          {
+            "name": "global_tip_height",
+            "type": "u64"
+          },
+          {
+            "name": "min_anchor_height",
+            "type": "u64"
+          },
+          {
+            "name": "active_open_conversions",
+            "type": "u64"
+          },
+          {
+            "name": "total_held_commit_fees",
+            "type": "u64"
+          },
+          {
+            "name": "total_locked_deposits",
+            "type": "u64"
+          },
+          {
+            "name": "total_reserved_native",
+            "type": "u64"
+          },
+          {
+            "name": "escrow_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "HeightTracker",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "count",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProofCache",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tx_id",
+            "type": "u64"
+          },
+          {
+            "name": "is_set",
+            "type": "bool"
+          },
+          {
+            "name": "is_verified",
+            "type": "bool"
+          },
+          {
+            "name": "is_invalid",
+            "type": "bool"
+          },
+          {
+            "name": "attempts",
+            "type": "u8"
+          },
+          {
+            "name": "txid_le",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "proof_block_height",
+            "type": "u64"
+          },
+          {
+            "name": "branch_le",
+            "type": {
+              "vec": {
+                "array": ["u8", 32]
+              }
+            }
+          },
+          {
+            "name": "merkle_index",
+            "type": "u64"
+          },
+          {
+            "name": "out_value_sats",
+            "type": "u64"
+          },
+          {
+            "name": "out_program",
+            "type": "bytes"
+          },
+          {
+            "name": "out_set",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SupportedNetwork",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "network_id",
+            "type": "u64"
+          },
+          {
+            "name": "min_addr_len",
+            "type": "u16"
+          },
+          {
+            "name": "max_addr_len",
+            "type": "u16"
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          }
+        ]
+      }
+    }
+  ]
+}

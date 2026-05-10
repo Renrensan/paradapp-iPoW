@@ -1,6 +1,7 @@
 use crate::btc::btc_service::parse_btc_network;
 use crate::dependencies::config::CoreConfig;
 use crate::dependencies::db::redis::RedisStorage;
+use crate::supra::supra_service::SupraNetwork;
 use bitcoin::Network;
 use reqwest::Client;
 use std::sync::Arc;
@@ -21,10 +22,8 @@ impl CoreContext {
 
         let redis_storage = Arc::new(RedisStorage::init(&cfg).await?);
 
-        // Parse Bitcoin network
         let btc_network = parse_btc_network(&cfg.btc_network)?;
 
-        // HTTP client
         let http = Arc::new(
             Client::builder()
                 .timeout(std::time::Duration::from_secs(25))
@@ -39,5 +38,23 @@ impl CoreContext {
             rpc_limiter: Arc::new(Semaphore::new(1)),
             redis_storage,
         })
+    }
+
+    pub fn get_supra_creds(
+        &self,
+        network: SupraNetwork,
+    ) -> anyhow::Result<(String, String)> {
+        match network {
+            SupraNetwork::Mainnet => {
+                let url = self.cfg.supra.api_url_mainnet.clone();
+                let key = self.cfg.supra.api_key_mainnet.clone();
+                Ok((url, key))
+            },
+            SupraNetwork::Testnet => {
+                let url = self.cfg.supra.api_url_testnet.clone();
+                let key = self.cfg.supra.api_key_testnet.clone();
+                Ok((url, key))
+            },
+        }
     }
 }

@@ -23,8 +23,8 @@ use paradapp_core::{
     dependencies::context::CoreContext,
     models::conversion::Conversion,
     traits::chain_provider_adapter::{
-        AnchorInfo, BitcoinProgramType, BitcoinToNativeCommitArgs,
-        ChainProviderAdapter, GlobalChainState, SubmittedProofInfo, TxIdFilter,
+        AnchorInfo, BitcoinProgramType, ChainProviderAdapter, GlobalChainState,
+        SubmittedProofInfo, TxIdFilter,
     },
 };
 use tracing::{error, info, warn};
@@ -524,39 +524,47 @@ impl ChainProviderAdapter for EvmChainProvider {
 
     async fn commit_bitcoin_to_native(
         &self,
-        args: BitcoinToNativeCommitArgs,
+        args: paradapp_core::traits::chain_provider_adapter::BitcoinToNativeCommitArgs,
     ) -> Result<()> {
         let c_op = self.ctx.c_op.clone();
+
+        // Safely extract up to 20 bytes from the dynamic Bytes field to create an EVM H160
+        let mut evm_address = [0u8; 20];
+        let copy_len = std::cmp::min(args.dest_address.len(), 20);
+        if copy_len > 0 {
+            evm_address[..copy_len]
+                .copy_from_slice(&args.dest_address[..copy_len]);
+        }
+        let dest_address_h160 = ethers::types::Address::from(evm_address);
 
         match c_op
             .commit_bitcoin_to_native(
                 args.bitcoin_amount,
+                args.native_amount,
                 args.network_id,
                 args.user_program,
-                args.dest_address,
+                dest_address_h160, // <--- Converted back to H160 here
                 args.network_address,
                 args.duty_window_seconds,
                 args.paradapp_receive_program,
                 args.locked_anchor_height,
-                args.slippage,
             )
             .send()
             .await
         {
             Ok(pending_tx) => {
-                info!(
+                tracing::info!(
                     tx_hash = ?pending_tx.tx_hash(),
                     "Sent CommitBitcoinToNative transaction"
                 );
                 Ok(())
             },
             Err(e) => {
-                error!(error = %e, "Failed to send CommitBitcoinToNative transaction");
+                tracing::error!(error = %e, "Failed to send CommitBitcoinToNative transaction");
                 Err(anyhow::anyhow!(e))
             },
         }
     }
-
     async fn anchor_info(&self, tx_id: U256) -> Result<AnchorInfo> {
         let c_op = self.ctx.c_op.clone();
 
@@ -583,45 +591,43 @@ impl ChainProviderAdapter for EvmChainProvider {
         let (
             user,
             is_native_to_bitcoin,
-            slippage,
             user_program,
             paradapp_receive_program,
             network_address,
             network_id,
             native_amount,
             bitcoin_amount,
+            commit_fee,
+            reserved_native,
             created_at,
             approved_at,
             deposited_at,
-            commit_fee,
+            operator_duty_expires_at,
             approved,
             deposited,
             completed,
             refunded,
-            reserved_native,
-            operator_duty_expires_at,
         ) = conv;
 
         Ok(Conversion {
             user,
             is_native_to_bitcoin,
-            slippage,
             user_program,
             paradapp_receive_program,
             network_address,
             network_id,
             native_amount,
             bitcoin_amount,
+            commit_fee,
+            reserved_native,
             created_at,
             approved_at,
             deposited_at,
-            commit_fee,
+            operator_duty_expires_at,
             approved,
             deposited,
             completed,
             refunded,
-            reserved_native,
-            operator_duty_expires_at,
         })
     }
 
@@ -688,50 +694,6 @@ impl ChainProviderAdapter for EvmChainProvider {
             },
             Err(e) => {
                 error!(error = %e, "Failed to fetch tx_ids by filter");
-                Err(anyhow::anyhow!(e))
-            },
-        }
-    }
-
-    async fn estimate_bitcoin_from_native(
-        &self,
-        native_amount: U256,
-    ) -> Result<U256> {
-        let c_op = self.ctx.c_op.clone();
-
-        match c_op.estimate_bitcoin_from_native(native_amount).call().await {
-            Ok(estimated_btc) => {
-                info!(
-                    native_amount = %native_amount,
-                    estimated_btc = %estimated_btc,
-                    "Estimated Bitcoin from native"
-                );
-                Ok(estimated_btc)
-            },
-            Err(e) => {
-                error!(
-                    error = %e,
-                    native_amount = %native_amount,
-                    "Failed to estimate Bitcoin from native"
-                );
-                Err(anyhow::anyhow!(e))
-            },
-        }
-    }
-
-    async fn estimate_native_from_bitcoin(
-        &self,
-        bitcoin_amount: U256,
-    ) -> anyhow::Result<U256> {
-        let c_op = self.ctx.c_op.clone();
-
-        match c_op.estimate_native_from_bitcoin(bitcoin_amount).call().await {
-            Ok(native_amount) => {
-                info!(%bitcoin_amount, %native_amount, "Estimated native from Bitcoin");
-                Ok(native_amount)
-            },
-            Err(e) => {
-                error!(error = %e, %bitcoin_amount, "Failed to estimate native from Bitcoin");
                 Err(anyhow::anyhow!(e))
             },
         }

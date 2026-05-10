@@ -32,7 +32,6 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Run as a specific network operator (No API)
     Operator {
         #[arg(long, value_enum, default_value = "all")]
         engine: Engine,
@@ -44,17 +43,14 @@ enum Commands {
         watch_sources: Vec<String>,
     },
 
-    /// Run only the API service
     Api {
         #[arg(long, default_value = "8888")]
         port: u16,
 
-        /// Which network config to load for the API
         #[arg(long, default_value = "hedera")]
         network: String,
     },
 
-    /// Run everything: All networks AND API service
     Monolith {
         #[arg(long, value_enum, default_value = "all")]
         engine: Engine,
@@ -82,24 +78,17 @@ async fn main() -> anyhow::Result<()> {
         Commands::Api { port, .. } => {
             info!("Launching API Service on port {}", port);
 
-            // 1. Create a map to hold all your network configurations
             let mut all_configs = std::collections::HashMap::new();
-
-            // 2. Define the networks you want the API to track
-            let networks =
+            let evm_networks =
                 vec![EvmNetwork::Hedera, EvmNetwork::EthereumSepolia];
 
-            // 3. Load each one into the map
-            for net in networks {
+            for net in evm_networks {
                 let identifier = net.string_identifier().to_string();
                 let config = EvmConfig::load(net);
                 all_configs.insert(identifier, config);
             }
 
-            // 4. Wrap the whole map in the Arc/RwLock
             let shared_state = Arc::new(RwLock::new(all_configs));
-
-            // 5. Start the API with the multi-network state
             start_api(shared_state, port).await;
         },
 
@@ -109,14 +98,11 @@ async fn main() -> anyhow::Result<()> {
                 port
             );
 
-            // 1. Setup API Shared State with multiple networks
             let mut all_configs = std::collections::HashMap::new();
-
-            // List all networks the API should display
-            let networks =
+            let evm_networks =
                 vec![EvmNetwork::Hedera, EvmNetwork::EthereumSepolia];
 
-            for net in networks {
+            for net in evm_networks {
                 let identifier = net.string_identifier().to_string();
                 let config = EvmConfig::load(net);
                 all_configs.insert(identifier, config);
@@ -124,26 +110,29 @@ async fn main() -> anyhow::Result<()> {
 
             let api_config = Arc::new(RwLock::new(all_configs));
 
-            // 2. Setup Stacks for the Operators
             let hedera_key = SupportedNetwork::HEDERA.as_str();
             let eth_key = SupportedNetwork::ETH.as_str();
+            let sol_key = SupportedNetwork::SOLANA.as_str();
 
             let hedera_stack =
                 Registry::get_stack(hedera_key, core_ctx.clone()).await?;
             let eth_stack =
                 Registry::get_stack(eth_key, core_ctx.clone()).await?;
+            let sol_stack =
+                Registry::get_stack(sol_key, core_ctx.clone()).await?;
 
-            // 3. Run all tasks concurrently
-            // tokio::select! ensures if any critical service (API or Bot) fails, we know immediately.
             tokio::select! {
                 _ = start_api(api_config, port) => {
                     error!("API Server task exited unexpectedly");
                 },
-                res = ChainOperator::run(hedera_stack, vec![eth_key.to_string()], engine) => {
+                res = ChainOperator::run(hedera_stack, vec![eth_key.to_string(), sol_key.to_string()], engine) => {
                     error!(result = ?res, "Hedera operator task exited");
                 },
-                res = ChainOperator::run(eth_stack, vec![hedera_key.to_string()], engine) => {
+                res = ChainOperator::run(eth_stack, vec![hedera_key.to_string(), sol_key.to_string()], engine) => {
                     error!(result = ?res, "Ethereum operator task exited");
+                },
+                res = ChainOperator::run(sol_stack, vec![hedera_key.to_string(), eth_key.to_string()], engine) => {
+                    error!(result = ?res, "Solana operator task exited");
                 },
                 _ = tokio::signal::ctrl_c() => {
                     info!("Monolith shutdown signal received (Ctrl+C)");
